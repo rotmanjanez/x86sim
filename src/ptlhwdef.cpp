@@ -5,6 +5,7 @@
 // Copyright 1999-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
+#include <format>
 #include "ptlsim.h"
 #include "dcache.h"
 
@@ -457,119 +458,6 @@ const W16 setflags_to_x86_flags[1 << 3] = {
     FLAG_OF | FLAG_CF | FLAG_ZAPS, // 111 = ZCO
 };
 
-stringbuf& operator<<(stringbuf& sb, const TransOpBase& op) {
-  static const char* size_names[4] = {"b", "w", "d", ""};
-  // e.g. addfp, addfv, addfd, xxx
-  static const char* fptype_names[4] = {".s", ".vs", ".d", ".d"};
-
-  bool ld = isload(op.opcode);
-  bool st = isstore(op.opcode);
-  bool fp = (isclass(op.opcode, OPCLASS_FP_ALU));
-  bool br = isbranch(op.opcode);
-
-  stringbuf sbname;
-
-  sbname << nameof(op.opcode);
-  if (!(opinfo[op.opcode].flagops & opNOSIZE))
-    sbname << (fp ? fptype_names[op.size] : size_names[op.size]);
-
-  if (isclass(op.opcode, OPCLASS_USECOND))
-    sbname << ".", cond_code_names[op.cond];
-
-  if (ld | st) {
-    if (op.opcode == OP_mf) {
-      static const char* mf_names[4] = {"none", "st", "ld", "all"};
-      sbname << '.', mf_names[op.extshift];
-    }
-    sbname << ((op.cond == LDST_ALIGN_LO) ? ".lo" : (op.cond == LDST_ALIGN_HI) ? ".hi" : "");
-  } else if ((op.opcode == OP_mask) || (op.opcode == OP_maskb)) {
-    sbname << ((op.cond == 0) ? "" : (op.cond == 1) ? ".z" : (op.cond == 2) ? ".x" : ".???");
-  }
-
-  if ((ld | st) && (op.cachelevel > 0))
-    sbname << ".L", (char)('1' + op.cachelevel);
-  if ((ld | st) && (op.locked))
-    sbname << ((ld) ? ".acq" : ".rel");
-  if (op.internal)
-    sbname << ".p";
-  if (op.eom)
-    sbname << ".", (op.any_flags_in_insn ? "+" : "-");
-
-  sb << padstring((char*)sbname, -12), " ", arch_reg_names[op.rd];
-  if ((op.rd < ARCHREG_COUNT) & (!op.final_arch_in_insn))
-    sb << ".t";
-
-  sb << " = ";
-  if (ld | st)
-    sb << "[";
-  sb << arch_reg_names[op.ra];
-  if (op.rb == REG_imm) {
-    if (abs(op.rbimm) <= 32768)
-      sb << ",", op.rbimm;
-    else
-      sb << ",", (void*)op.rbimm;
-  } else {
-    sb << ",", arch_reg_names[op.rb];
-  }
-  if (ld | st)
-    sb << "]";
-  if ((op.opcode == OP_mask) | (op.opcode == OP_maskb)) {
-    MaskControlInfo mci(op.rcimm);
-    int sh = (op.opcode == OP_maskb) ? 3 : 0;
-    sb << ",[ms=", (mci.info.ms >> sh), " mc=", (mci.info.mc >> sh), " ds=", (mci.info.ds >> sh), "]";
-  } else {
-    if (op.rc != REG_zero) {
-      if (op.rc == REG_imm)
-        sb << ",", op.rcimm;
-      else
-        sb << ",", arch_reg_names[op.rc];
-    }
-  }
-  if ((op.opcode == OP_adda || op.opcode == OP_suba) && (op.extshift != 0))
-    sb << "*", (1 << op.extshift);
-
-  if (op.setflags) {
-    sb << " ";
-    if (op.nouserflags)
-      sb << "int:";
-    sb << "[";
-    for (int i = 0; i < SETFLAG_COUNT; i++) {
-      if (bit(op.setflags, i))
-        sb << setflag_names[i];
-    }
-    sb << "]";
-    if (!op.final_flags_in_insn)
-      sb << "/temp";
-  }
-
-  if (isbranch(op.opcode))
-    sb << " [taken ", (void*)(Waddr)op.riptaken, ", seq ", (void*)(Waddr)op.ripseq, "]";
-
-  if (op.som) {
-    sb << " [som]";
-  }
-  if (op.eom) {
-    sb << " [eom]";
-  }
-  if (op.som | op.eom) {
-    sb << " [", op.bytes, " bytes]";
-  }
-
-  return sb;
-}
-
-ostream& operator<<(ostream& os, const TransOpBase& op) {
-  stringbuf sb;
-  sb << op;
-  os << sb;
-  return os;
-}
-
-ostream& RIPVirtPhysBase::print(ostream& os) const {
-  os << (void*)(Waddr)rip;
-  return os;
-}
-
 void BasicBlock::reset() {
   setzero(*((BasicBlockBase*)this));
   hashlink.reset();
@@ -616,50 +504,17 @@ BasicBlock* BasicBlock::clone() {
   return bb;
 }
 
-ostream& operator<<(ostream& os, const BasicBlock& bb) {
-  os << "BasicBlock ", (void*)(Waddr)bb.rip, " of type ", branch_type_names[bb.brtype], ": ", bb.bytes, " bytes, ",
-      bb.count, " transops (", bb.tagcount, "t ", bb.memcount, "m ", bb.storecount, "s";
-  if (bb.repblock)
-    os << " rep";
-  os << ", uses ", bitstring(bb.usedregs, 64, true), "), ";
-  os << bb.refcount, " refs, ", (void*)(Waddr)bb.rip_taken, " taken, ", (void*)(Waddr)bb.rip_not_taken,
-      " not taken:", endl;
-  Waddr rip = bb.rip;
-  int bytes_in_insn;
-
-  foreach (i, bb.count) {
-    const TransOp& transop = bb.transops[i];
-    os << "  ", (void*)rip, ": ", transop;
-
-    // if (transop.som) os << " [som bytes ", transop.bytes, "]";
-    // if (transop.eom) os << " [eom]";
-    os << endl;
-
-    if (transop.som)
-      bytes_in_insn = transop.bytes;
-    if (transop.eom)
-      rip += bytes_in_insn;
-
-    //if (transop.eom) os << "  ;;", endl;
-  }
-  os << "Basic block terminates with taken rip ", (void*)(Waddr)bb.rip_taken, ", not taken rip ",
-      (void*)(Waddr)bb.rip_not_taken, endl;
-  return os;
-}
-
 const char* bb_type_names[BB_TYPE_COUNT] = {"br", "bru", "jmp", "brp"};
 
 char* regname(int r) {
-  static stringbuf temp;
+  static char temp[16];
   assert(r >= 0);
   assert(r < 256);
-  temp.reset();
-
-  temp << 'r', r;
-  return (char*)temp;
+  std::snprintf(temp, sizeof(temp), "r%d", r);
+  return temp;
 }
 
-stringbuf& nameof(stringbuf& sbname, const TransOpBase& uop) {
+std::string nameof(const TransOpBase& uop) {
   static const char* size_names[4] = {"b", "w", "d", ""};
   static const char* fptype_names[4] = {"ss", "ps", "sd", "pd"};
   static const char* mask_exttype[4] = {"", "zxt", "sxt", "???"};
@@ -670,147 +525,60 @@ stringbuf& nameof(stringbuf& sbname, const TransOpBase& uop) {
   bool st = isstore(op);
   bool fp = (isclass(op, OPCLASS_FP_ALU));
 
-  sbname << nameof(op);
+  std::string result = nameof(op);
 
   if ((op != OP_maskb) & (op != OP_mask))
-    sbname << (fp ? fptype_names[uop.size] : size_names[uop.size]);
+    result += (fp ? fptype_names[uop.size] : size_names[uop.size]);
   else
-    sbname << ".", mask_exttype[uop.cond];
+    result += std::format(".{}", mask_exttype[uop.cond]);
 
   if (isclass(op, OPCLASS_USECOND))
-    sbname << ".", cond_code_names[uop.cond];
+    result += std::format(".{}", cond_code_names[uop.cond]);
 
   if (ld | st) {
-    sbname << ((uop.cond == LDST_ALIGN_LO) ? ".low" : (uop.cond == LDST_ALIGN_HI) ? ".high" : "");
+    result += ((uop.cond == LDST_ALIGN_LO) ? ".low" : (uop.cond == LDST_ALIGN_HI) ? ".high" : "");
     if (uop.cachelevel > 0)
-      sbname << ".L", (char)('1' + uop.cachelevel);
+      result += std::format(".L{}", (char)('1' + uop.cachelevel));
   }
 
   if (uop.internal)
-    sbname << ".p";
+    result += ".p";
 
-  return sbname;
+  return result;
 }
 
-ostream& operator<<(ostream& os, const UserContext& arf) {
+auto std::formatter<UserContext>::format(const UserContext& arf, std::format_context& ctx) const {
   static const int width = 4;
+  auto out = ctx.out();
   foreach (i, ARCHREG_COUNT) {
-    os << "  ", padstring(arch_reg_names[i], -6), " 0x", hexstring(arf[i], 64), "  ";
+    out = std::format_to(out, "  {:<6} 0x{:016x}  ", arch_reg_names[i], arf[i]);
     if ((i % width) == (width - 1))
-      os << endl;
+      out = std::format_to(out, "\n");
   }
-  return os;
+  return out;
 }
 
-ostream& operator<<(ostream& os, const IssueState& state) {
-  os << "  rd 0x", hexstring(state.reg.rddata, 64), " (", flagstring(state.reg.rdflags), "), sfrd ", state.st,
-      " (exception ", exception_name(state.reg.rddata), ")", endl;
-  return os;
-}
-
-stringbuf& operator<<(stringbuf& os, const SFR& sfr) {
-  if (sfr.invalid) {
-    os << "< Invalid: fault 0x", hexstring(sfr.data, 8), " > ";
-  } else {
-    os << bytemaskstring((const byte*)&sfr.data, sfr.bytemask, 8), " ";
-  }
-
-  os << "@ 0x", hexstring(sfr.physaddr << 3, 64), " for memid tag ", intstring(sfr.tag, 3);
-  return os;
-}
-
-stringbuf& print_value_and_flags(stringbuf& sb, W64 value, W16 flags) {
-  stringbuf flagsb;
+std::string format_value_and_flags(W64 value, W16 flags) {
+  std::string flagstr;
   if (flags & FLAG_ZF)
-    flagsb << 'z';
+    flagstr += 'z';
   if (flags & FLAG_PF)
-    flagsb << 'p';
+    flagstr += 'p';
   if (flags & FLAG_SF)
-    flagsb << 's';
+    flagstr += 's';
   if (flags & FLAG_CF)
-    flagsb << 'c';
+    flagstr += 'c';
   if (flags & FLAG_OF)
-    flagsb << 'o';
+    flagstr += 'o';
 
-  if (flags & FLAG_INV)
-    sb << " < ", padstring(exception_name(LO32(value)), -14), " >";
-  else
-    sb << " 0x", hexstring(value, 64);
-  sb << "|", padstring(flagsb, -5);
-  return sb;
-}
-
-ostream& operator<<(ostream& os, const PageFaultErrorCode& pfec) {
-  os << "[";
-  os << (pfec.p ? " present" : " not-present");
-  os << (pfec.rw ? " write" : " read");
-  os << (pfec.us ? " user" : " kernel");
-  os << (pfec.rsv ? " reserved-bits-set" : "");
-  os << (pfec.nx ? " execute" : "");
-  os << " ]";
-
-  return os;
-}
-
-ostream& operator<<(ostream& os, const SegmentDescriptor& seg) {
-  os << "base ", hexstring(seg.getbase(), 32), ", limit ", hexstring(seg.getlimit(), 32), ", ring ", seg.dpl;
-  os << ((seg.s) ? " sys" : " usr");
-  os << ((seg.l) ? " 64bit" : "      ");
-  os << ((seg.d) ? " 32bit" : " 16bit");
-  os << ((seg.g) ? " g=4KB" : "      ");
-
-  if (!seg.p)
-    os << "not present";
-
-  return os;
-}
-
-stringbuf& operator<<(stringbuf& os, const SegmentDescriptorCache& seg) {
-  os << "0x", hexstring(seg.selector, 16), ": ";
-
-  os << "base ", hexstring(seg.base, 64), ", limit ", hexstring(seg.limit, 64), ", ring ", seg.dpl, ":";
-  os << ((seg.supervisor) ? " sys" : " usr");
-  os << ((seg.use64) ? " 64bit" : "      ");
-  os << ((seg.use32) ? " 32bit" : "      ");
-
-  if (!seg.present)
-    os << " (not present)";
-
-  return os;
-}
-
-stringbuf& operator<<(stringbuf& os, const Context& ctx) {
-  static const int arfwidth = 4;
-
-  os << "VCPU State:", endl;
-  os << "  Architectural Registers:", endl;
-  foreach (i, ARCHREG_COUNT) {
-    os << "  ", padstring(arch_reg_names[i], -6), " 0x", hexstring(ctx.commitarf[i], 64);
-    if ((i % arfwidth) == (arfwidth - 1))
-      os << endl;
+  std::string result;
+  if (flags & FLAG_INV) {
+    W32 exc_idx = LO32(value);
+    const char* exc_name = (exc_idx < 256) ? x86_exception_names[exc_idx] : "unknown";
+    result = std::format(" < {:<14} >", exc_name);
+  } else {
+    result = std::format(" 0x{:016x}", value);
   }
-
-  os << "  Segment Registers:", endl;
-  os << "    cs ", ctx.seg[SEGID_CS], endl;
-  os << "    ss ", ctx.seg[SEGID_SS], endl;
-  os << "    ds ", ctx.seg[SEGID_DS], endl;
-  os << "    es ", ctx.seg[SEGID_ES], endl;
-  os << "    fs ", ctx.seg[SEGID_FS], endl;
-  os << "    gs ", ctx.seg[SEGID_GS], endl;
-
-  os << "  FPU:", endl;
-  os << "    FP Control Word: 0x", hexstring(ctx.fpcw, 32), endl;
-  os << "    MXCSR:           0x", hexstring(ctx.mxcsr, 32), endl;
-
-  for (int i = 7; i >= 0; i--) {
-    int stackid = (i - (ctx.commitarf[REG_fptos] >> 3)) & 0x7;
-    os << "    fp", i, "  st(", stackid, ")  ", (bit(ctx.commitarf[REG_fptags], i * 8) ? "Valid" : "Empty"), "  0x",
-        hexstring(ctx.fpstack[i], 64), " => ", *((double*)&ctx.fpstack[i]), endl;
-  }
-
-  os << "  Internal State:", endl;
-  os << "    Last internal exception: ", "0x", hexstring(ctx.exception, 64), " (", exception_name(ctx.exception), ")",
-      endl;
-
-  return os;
+  result += std::format("|{:<5}", flagstr);
+  return result;
 }

@@ -23,27 +23,6 @@ enum class Prot {
   RWX = PROT_READ | PROT_WRITE | PROT_EXEC
 };
 
-std::ostream& operator<<(std::ostream& os, Prot p) {
-  switch (p) {
-  case Prot::READ:
-    return os << "READ";
-  case Prot::WRITE:
-    return os << "WRITE";
-  case Prot::EXEC:
-    return os << "EXEC";
-  case Prot::NONE:
-    return os << "NONE";
-  case Prot::RW:
-    return os << "RW";
-  case Prot::RX:
-    return os << "RX";
-  case Prot::RWX:
-    return os << "RWX";
-  }
-
-  return os;
-}
-
 bool hasProt(Prot p, Prot q) {
   return (static_cast<int>(p) & static_cast<int>(q)) == static_cast<int>(q);
 }

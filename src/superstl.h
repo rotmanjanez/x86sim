@@ -17,6 +17,10 @@
 #include <algorithm>
 #include <bitset>
 #include <bit>
+#include <format>
+#include <print>
+#include <string>
+#include <string_view>
 #include <vector>
 
 //
@@ -39,288 +43,6 @@ int current_vcpuid();
 extern bool force_synchronous_streams;
 
 namespace superstl {
-//
-// String buffer
-//
-
-#define stringbuf_smallbufsize 256
-class stringbuf;
-
-stringbuf& operator<<(stringbuf& os, const char* v);
-stringbuf& operator<<(stringbuf& os, const char v);
-
-class stringbuf {
-public:
-  stringbuf() {
-    buf = null;
-    reset();
-  }
-  stringbuf(int length) {
-    buf = null;
-    reset(length);
-  }
-
-  void reset(int length = stringbuf_smallbufsize);
-
-  ~stringbuf();
-
-  int remaining() const { return (buf + length) - p; }
-
-  operator char*() const { return buf; }
-
-  void resize(int newlength);
-
-  void expand() { resize(length * 2); }
-
-  void reserve(int extra);
-
-  int size() const { return p - buf; }
-  bool empty() const { return (size() == 0); }
-  bool set() const { return !empty(); }
-
-  stringbuf& operator=(const char* str) {
-    if unlikely (!str) {
-      reset();
-      return *this;
-    }
-    reset(strlen(str) + 1);
-    *this << str;
-    return *this;
-  }
-
-  stringbuf& operator=(const stringbuf& str) {
-    const char* s = (const char*)str;
-    if unlikely (!s) {
-      reset();
-      return *this;
-    }
-    reset(strlen(s) + 1);
-    *this << s;
-    return *this;
-  }
-
-  bool operator==(const stringbuf& s) { return strequal((char*)(*this), (char*)s); }
-
-  bool operator!=(const stringbuf& s) { return !strequal((char*)(*this), (char*)s); }
-
-public:
-  char smallbuf[stringbuf_smallbufsize];
-  char* buf;
-  char* p;
-  int length;
-};
-
-//
-// Inserters
-//
-
-#define DefineIntegerInserter(T, signedtype)                                                                           \
-  static inline stringbuf& operator<<(stringbuf& os, const T v) {                                                      \
-    char buf[128];                                                                                                     \
-    format_integer(buf, sizeof(buf), ((signedtype) ? (W64s)v : (W64)v));                                               \
-    return os << buf;                                                                                                  \
-  }
-
-DefineIntegerInserter(signed short, 1);
-DefineIntegerInserter(signed int, 0);
-DefineIntegerInserter(signed long, 0);
-DefineIntegerInserter(signed long long, 0);
-DefineIntegerInserter(unsigned short, 0);
-DefineIntegerInserter(unsigned int, 0);
-DefineIntegerInserter(unsigned long, 0);
-DefineIntegerInserter(unsigned long long, 0);
-
-#define DefineFloatInserter(T, digits)                                                                                 \
-  static inline stringbuf& operator<<(stringbuf& os, const T v) {                                                      \
-    char buf[128];                                                                                                     \
-    format_float(buf, sizeof(buf), v, digits);                                                                         \
-    return os << buf;                                                                                                  \
-  }
-
-DefineFloatInserter(float, 6);
-DefineFloatInserter(double, 16);
-
-static inline stringbuf& operator<<(stringbuf& os, const bool v) {
-  return os << (int)v;
-}
-
-#undef DefineInserter
-
-#define PrintOperator(T)                                                                                               \
-  static inline ostream& operator<<(ostream& os, const T& obj) {                                                       \
-    return obj.print(os);                                                                                              \
-  }
-
-static inline stringbuf& operator<<(stringbuf& os, const stringbuf& sb) {
-  os << ((char*)sb);
-  return os;
-}
-
-template<class T>
-static inline stringbuf& operator<<(stringbuf& os, const T* v) {
-  char buf[128];
-  format_integer(buf, sizeof(buf), (W64)(Waddr)v, 0, FMT_SPECIAL, 16);
-  return os << buf;
-}
-
-//
-// A much more intuitive syntax than STL provides:
-//
-template<class T>
-static inline stringbuf& operator,(stringbuf& os, const T& v) {
-  return os << v;
-}
-
-//
-// ostream class
-//
-static const char endl[] = "\n";
-static class iosflush {
-} flush;
-
-#define OSTREAM_BUF_SIZE 256
-
-class odstream {
-protected:
-  int fd;
-  byte* buf;
-  int bufsize;
-  int tail;
-  odstream* chain;
-  W64 offset;
-  bool ringbuf_mode;
-  byte* ringbuf;
-  int ringbuf_tail;
-
-public:
-  bool close_on_destroy;
-
-  odstream();
-
-  bool open(const char* filename, bool append = false, int bufsize = 65536);
-
-  bool open(int fd, int bufsize = 65536);
-
-  void close();
-
-  int setbuf(int bufsize);
-
-  void setchain(odstream* chain);
-
-  void set_ringbuf_mode(bool new_ringbuf_mode);
-
-  ~odstream();
-
-  odstream(int fd) {
-    this->fd = -1;
-    open(fd);
-  }
-
-  odstream(const char* filename, bool append = false, int bufsize = 65536) {
-    this->fd = -1;
-    open(filename, append, bufsize);
-  }
-
-  int write(const void* buf, int count);
-
-  operator bool() const { return ok(); }
-
-  bool ok() const { return (fd >= 0); }
-
-  int filehandle() const { return fd; }
-
-  W64 seek(W64 pos, int whence = SEEK_SET);
-
-  W64 where() const;
-
-  void flush();
-};
-
-//
-// Manipulators
-//
-static inline odstream& operator<<(odstream& os, const iosflush& v) {
-  os.flush();
-  return os;
-}
-
-template<typename T>
-static inline odstream& operator<<(odstream& os, const T& v) {
-  os.write(&v, sizeof(T));
-  return os;
-}
-
-template<typename T>
-static inline odstream& operator,(odstream& os, const T& v) {
-  return os << v;
-}
-
-class ostream : public odstream {
-public:
-  ostream() : odstream() {}
-
-  ostream(int fd) : odstream(fd) {}
-
-  ostream(const char* filename, bool append = false) : odstream(filename, append) {}
-};
-
-//
-// Inserters
-//
-
-template<typename T>
-static inline ostream& operator<<(ostream& os, const T& v) {
-  stringbuf sb;
-  sb << v;
-  os.write((char*)sb, sb.size());
-  return os;
-}
-
-inline ostream& operator<<(ostream& os, const std::string_view v) {
-  os.write(v.data(), v.size());
-  return os;
-}
-
-template<>
-inline ostream& operator<<(ostream& os, const iosflush& v) {
-  os.flush();
-  return os;
-}
-
-template<>
-inline ostream& operator<<(ostream& os, const char& v) {
-  os.write(&v, sizeof(char));
-  return os;
-}
-
-static inline ostream& operator<<(ostream& os, const char* v) {
-  if unlikely (!v)
-    v = "<null>";
-  os.write(v, strlen(v));
-  return os;
-}
-
-template<>
-inline ostream& operator<<(ostream& os, const stringbuf& v) {
-  stringbuf sb;
-  sb << (char*)v;
-  os.write((char*)sb, sb.size());
-  return os;
-}
-
-template<class T>
-static inline ostream& operator,(ostream& os, const T& v) {
-  return os << v;
-}
-
-#define DeclareStringBufToStream(T)                                                                                    \
-  inline ostream& operator<<(ostream& os, const T& arg) {                                                              \
-    stringbuf sb;                                                                                                      \
-    sb << arg;                                                                                                         \
-    os << sb;                                                                                                          \
-    return os;                                                                                                         \
-  }
-
 // Print bits as a string:
 struct bitstring {
   W64 bits;
@@ -337,31 +59,6 @@ struct bitstring {
   }
 };
 
-stringbuf& operator<<(stringbuf& os, const bitstring& bs);
-
-DeclareStringBufToStream(bitstring);
-
-struct bitmaskstring {
-  W64 bits;
-  W64 mask;
-  int n;
-  bool reverse;
-
-  bitmaskstring() {}
-
-  bitmaskstring(const W64 bits, W64 mask, const int n, bool reverse = false) {
-    assert(n <= 64);
-    this->bits = bits;
-    this->mask = mask;
-    this->n = n;
-    this->reverse = reverse;
-  }
-};
-
-stringbuf& operator<<(stringbuf& os, const bitmaskstring& bs);
-
-DeclareStringBufToStream(bitmaskstring);
-
 struct hexstring {
   W64 value;
   int n;
@@ -373,10 +70,6 @@ struct hexstring {
     this->n = n;
   }
 };
-
-stringbuf& operator<<(stringbuf& os, const hexstring& hs);
-
-DeclareStringBufToStream(hexstring);
 
 struct bytemaskstring {
   const byte* bytes;
@@ -395,9 +88,6 @@ struct bytemaskstring {
   }
 };
 
-stringbuf& operator<<(stringbuf& os, const bytemaskstring& bs);
-
-DeclareStringBufToStream(bytemaskstring);
 
 struct intstring {
   W64s value;
@@ -410,10 +100,6 @@ struct intstring {
     this->width = width;
   }
 };
-
-stringbuf& operator<<(stringbuf& os, const intstring& is);
-
-DeclareStringBufToStream(intstring);
 
 struct floatstring {
   double value;
@@ -429,10 +115,6 @@ struct floatstring {
   }
 };
 
-stringbuf& operator<<(stringbuf& os, const floatstring& fs);
-
-DeclareStringBufToStream(floatstring);
-
 struct padstring {
   const char* value;
   int width;
@@ -447,10 +129,6 @@ struct padstring {
   }
 };
 
-stringbuf& operator<<(stringbuf& os, const padstring& s);
-
-DeclareStringBufToStream(padstring);
-
 struct percentstring {
   double fraction;
   int width;
@@ -462,23 +140,6 @@ struct percentstring {
     this->width = width;
   }
 };
-
-static inline stringbuf& operator<<(stringbuf& os, const percentstring& ps) {
-  double f = ps.fraction * 100.;
-  W64s intpart = W64s(f);
-  W64s fracpart = std::clamp(W64s(((f - double(intpart)) * 100) + 0.5), W64s(0), W64s(99));
-
-  stringbuf sbfrac;
-  sbfrac << fracpart;
-
-  stringbuf sb;
-  sb << intpart, '.', padstring(sbfrac, 2, '0'), '%';
-
-  os << padstring(sb, ps.width);
-  return os;
-}
-
-DeclareStringBufToStream(percentstring);
 
 struct substring {
   const char* str;
@@ -492,145 +153,6 @@ struct substring {
     this->str = str + std::min(start, r);
   }
 };
-
-stringbuf& operator<<(stringbuf& os, const substring& s);
-
-DeclareStringBufToStream(substring);
-
-//
-// String tools
-//
-int stringsubst(stringbuf& sb, const char* pattern, const char* find, const char* replace);
-int stringsubst(stringbuf& sb, const char* pattern, const char* find[], const char* replace[], int substcount);
-
-class readline;
-
-//
-// istream class
-//
-class idstream {
-protected:
-  int fd;
-  int error;
-  int eos;
-  int head;
-  int tail;
-  int bufsize;
-  int bufused;
-  W32 bufmask;
-  W64 offset;
-  byte* buf;
-
-  int fillbuf();
-  int readbuf(byte* dest, int bytes);
-  int unread(int bytes);
-
-  inline int addmod(int a, int b) { return ((a + b) & bufmask); }
-
-  inline void reset() {
-    fd = -1;
-    error = 0;
-    eos = 0;
-    head = 0;
-    tail = 0;
-    buf = null;
-    bufused = 0;
-    bufsize = 0;
-    bufmask = 0;
-    offset = 0;
-    close_on_destroy = 1;
-  }
-
-public:
-  bool close_on_destroy;
-
-  idstream() { reset(); }
-
-  bool open(const char* filename, int bufsize = 65536);
-
-  bool open(int fd, int bufsize = 65536);
-
-  int setbuf(int bufsize);
-
-  idstream(const char* filename) {
-    reset();
-    open(filename);
-  }
-
-  idstream(int fd) {
-    reset();
-    open(fd);
-  }
-
-  void close();
-
-  ~idstream() {
-    if likely (close_on_destroy)
-      close();
-  }
-
-  bool ok() const { return (!error); }
-  operator bool() { return ok(); }
-
-  int read(void* data, int count);
-
-  int filehandle() const { return fd; }
-
-  int readline(char* v, int len);
-  int readline(stringbuf& sb);
-
-  bool getc(char& c);
-
-  W64 seek(W64 pos, int whence = SEEK_SET);
-  W64 where() const;
-  W64 size() const;
-
-  void* mmap(long long size);
-};
-
-template<typename T>
-inline idstream& operator>>(idstream& is, T& v) {
-  is.read(&v, sizeof(T));
-  return is;
-}
-
-template<typename T>
-inline idstream& operator,(idstream& is, T& v) {
-  return is >> v;
-}
-
-class istream : public idstream {
-public:
-  istream() : idstream() {}
-  istream(const char* filename) : idstream(filename) {}
-  istream(int fd) : idstream(fd) {}
-};
-
-class readline {
-public:
-  readline(char* p, size_t l) : buf(p), len(l) {}
-  char* buf;
-  size_t len;
-};
-
-//inline istream& operator ,(istream& is, const readline& v) { return is >> v; }
-
-static inline istream& operator>>(istream& is, const readline& v) {
-  is.readline(v.buf, v.len);
-  return is;
-}
-
-static inline istream& operator>>(istream& is, stringbuf& sb) {
-  is.readline(sb);
-  return is;
-}
-
-//
-// Global streams:
-//
-extern istream cin;
-extern ostream cout;
-extern ostream cerr;
 
 /*
    * CRC32
@@ -723,10 +245,6 @@ public:
 
   bool unlinked() const { return !linked(); }
 };
-
-static inline ostream& operator<<(ostream& os, const selflistlink& link) {
-  return os << "[prev ", link.prev, ", next ", link.next, "]";
-}
 
 class selfqueuelink {
 public:
@@ -940,7 +458,7 @@ public:
 
   T* head() const { return (unlikely(empty())) ? null : next; }
 
-  T* tail() const { return (unlikely(empty())) ? null : tail; }
+  T* tail() const { return (unlikely(empty())) ? null : prev; }
 
   bool empty() const { return (next == this); }
 
@@ -1001,23 +519,11 @@ struct shortptr {
   }
 };
 
-template<typename T, typename P, Waddr base, int granularity>
-static inline stringbuf& operator<<(stringbuf& os, const shortptr<T, P, base, granularity>& sp) {
-  return os << (T*)sp;
-}
 
 template<std::size_t N>
 inline int lsb(const std::bitset<N>& bits) {
   return std::countl_zero(bits.to_ullong());
 }
-
-template<std::size_t N>
-static inline stringbuf& operator<<(stringbuf& sb, const std::bitset<N>& bs) {
-  auto str = bs.to_string();
-  sb << str.c_str();
-  return sb;
-}
-
 
 //
 // Convenient list iterator
@@ -1210,31 +716,8 @@ public:
   }
 
   T& remove(T& obj) { return *remove(&obj); }
-
-  ostream& print(ostream& os) const {
-    os << "Hashtable of ", setcount, " sets containing ", count, " entries:", endl;
-    foreach (i, setcount) {
-      selflistlink* tlink = sets[i];
-      if (!tlink)
-        continue;
-      os << "  Set ", i, ":", endl;
-      int n = 0;
-      while
-        likely(tlink) {
-          T* obj = LM::objof(tlink);
-          os << "    ", LM::keyof(obj), " -> ", *obj, endl;
-          tlink = tlink->next;
-          n++;
-        }
-    }
-    return os;
-  }
 };
 
-template<typename K, typename T, typename LM, int setcount, typename KM>
-static inline ostream& operator<<(ostream& os, const SelfHashtable<K, T, setcount, LM, KM>& ht) {
-  return ht.print(os);
-}
 
 template<typename K, typename T, typename KM>
 struct ObjectHashtableEntry : public KeyValuePair<K, T> {
@@ -1320,7 +803,7 @@ struct ChunkList {
 
       T* next() {
         for (;;) {
-          if unlikely (i >= lengthof(chunk.data))
+          if unlikely (i >= lengthof(chunk->data))
             return null;
           if unlikely (chunk->freemap[i]) {
             i++;
@@ -1599,5 +1082,81 @@ template<typename T>
 bool div_rem_s(T& quotient, T& remainder, T dividend_hi, T dividend_lo, T divisor);
 
 } // namespace superstl
+
+//
+// std::formatter specializations
+//
+namespace std {
+
+template<typename K, typename T, typename LM, int setcount, typename KM>
+struct formatter<superstl::SelfHashtable<K, T, setcount, LM, KM>> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const superstl::SelfHashtable<K, T, setcount, LM, KM>& ht, format_context& ctx) const {
+    auto out = ctx.out();
+    out = format_to(out, "Hashtable of {} sets containing {} entries:\n", setcount, ht.count);
+    for (int i = 0; i < setcount; i++) {
+      superstl::selflistlink* tlink = ht.sets[i];
+      if (!tlink)
+        continue;
+      out = format_to(out, "  Set {}:\n", i);
+      while (tlink) {
+        T* obj = LM::objof(tlink);
+        out = format_to(out, "    {} -> {}\n", LM::keyof(obj), *obj);
+        tlink = tlink->next;
+      }
+    }
+    return out;
+  }
+};
+
+template<>
+struct formatter<superstl::bitstring> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const superstl::bitstring& bs, format_context& ctx) const {
+    auto out = ctx.out();
+    if (bs.reverse) {
+      for (int i = 0; i < bs.n; i++)
+        out = format_to(out, "{}", (char)(((bs.bits >> i) & 1) + '0'));
+    } else {
+      for (int i = bs.n - 1; i >= 0; i--)
+        out = format_to(out, "{}", (char)(((bs.bits >> i) & 1) + '0'));
+    }
+    return out;
+  }
+};
+
+template<>
+struct formatter<superstl::hexstring> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const superstl::hexstring& hs, format_context& ctx) const {
+    int n = (hs.n + 3) / 4;
+    return format_to(ctx.out(), "{:0{}x}", hs.value & ((1ULL << hs.n) - 1), n);
+  }
+};
+
+template<>
+struct formatter<superstl::bytemaskstring> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const superstl::bytemaskstring& bs, format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < bs.n; i++) {
+      if ((bs.mask >> i) & 1)
+        out = format_to(out, "{:02x}", bs.bytes[i]);
+      else
+        out = format_to(out, "xx");
+      if (((i % bs.splitat) == (bs.splitat - 1)) && (i != bs.n - 1))
+        out = format_to(out, "\n");
+      else if (i != bs.n - 1)
+        out = format_to(out, " ");
+    }
+    return out;
+  }
+};
+
+} // namespace std
 
 #endif // _SUPERSTL_H_

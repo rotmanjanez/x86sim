@@ -52,15 +52,19 @@ struct CommitRecord : public Context {
     pte_update_count = 0;
     exit_reason = SEQEXEC_OK;
   }
-
-  ostream& print(ostream& os) const;
 };
-
-PrintOperator(CommitRecord);
 
 int execute_sequential(Context& ctx, CommitRecord* cmtrec = null, W64 bbcount = 1,
                        W64 insncount = std::numeric_limits<W64>::max());
 
 extern W64 suppress_total_user_insn_count_updates_in_seqcore;
+
+//
+// std::formatter specialization
+template<>
+struct std::formatter<CommitRecord> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const CommitRecord& cr, std::format_context& ctx) const;
+};
 
 #endif // _SEQCORE_H_

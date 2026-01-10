@@ -65,8 +65,8 @@ struct ConfigurationParserBase {
   }
 
   int parse(void* baseptr, int argc, char* argv[]);
-  ostream& printusage(const void* baseptr, ostream& os) const;
-  ostream& print(const void* baseptr, ostream& os) const;
+  std::string format_to_string_usage(const void* baseptr) const;
+  std::string format_to_string_config(const void* baseptr) const;
 };
 
 template<typename T>
@@ -87,19 +87,13 @@ struct ConfigurationParser : public T {
     options.addentry(this, &field, OPTION_TYPE_BOOL, name, description);
   }
 
-  void add(stringbuf& field, const char* name, const char* description) {
-    options.addentry(this, field, OPTION_TYPE_STRING, name, description);
+  void add(std::string& field, const char* name, const char* description) {
+    options.addentry(this, &field, OPTION_TYPE_STRING, name, description);
   }
 
   void section(const char* name) { options.addentry(this, null, OPTION_TYPE_SECTION, name, name); }
 
   int parse(T& config, int argc, char* argv[]) { return options.parse(&config, argc, argv); }
-
-  int parse(T& config, char* argstr) { return options.parse(&config, argstr); }
-
-  ostream& print(ostream& os, const T& config) { return options.print(&config, os); }
-
-  ostream& printusage(ostream& os, const T& config) { return options.printusage(&config, os); }
 
   // Provided by user:
   void setup();

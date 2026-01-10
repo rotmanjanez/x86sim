@@ -8,13 +8,12 @@
 //
 
 #include "globals.h"
-#include <elf.h>
+#include "logging.h"
 #include "ptlsim.h"
 #include "branchpred.h"
 #include "logic.h"
 #include "dcache.h"
 
-#define INSIDE_OOOCORE
 #include "ooocore.h"
 #include "stats.h"
 
@@ -24,8 +23,6 @@
 #endif
 
 #ifndef ENABLE_LOGGING
-#undef logable
-#define logable(level) (0)
 #endif
 
 using namespace OutOfOrderModel;
@@ -35,8 +32,8 @@ void OutOfOrderCoreCacheCallbacks::icache_wakeup(LoadStoreInfo lsi, W64 physaddr
     ThreadContext* thread = core.threads[i];
     if unlikely (thread && thread->waiting_for_icache_fill &&
                  (floor(thread->waiting_for_icache_fill_physaddr, CacheSubsystem::L1_LINE_SIZE) == physaddr)) {
-      if (logable(6))
-        logfile << "[vcpu ", thread->ctx.vcpuid, "] i-cache wakeup of physaddr ", (void*)(Waddr)physaddr, endl;
+      logging::println(logging::TRACE, "[vcpu {}] i-cache wakeup of physaddr {}", thread->ctx.vcpuid,
+                       (void*)(Waddr)physaddr);
       thread->waiting_for_icache_fill = 0;
       thread->waiting_for_icache_fill_physaddr = 0;
     }
@@ -107,16 +104,13 @@ void ThreadContext::flush_pipeline() {
   // through a partially committed x86 instruction. This is dangerous,
   // especially if the instruction has already partially updated
   // architectural state.
-  if unlikely (logable(1) && rob_ready_to_commit_queue.count && !ROB.peekhead()->uop.som) {
+  if unlikely (rob_ready_to_commit_queue.count && !ROB.peekhead()->uop.som) {
 
-    logfile << "[vcpu ", ctx.vcpuid, "] thread ", threadid,
-        ": Flushing through a "
-        "partially committed x86 instruction, this is likely BAD:",
-        endl;
-
+    logging::println("[vcpu {}] thread {}: Flushing through a partially committed x86 instruction, this is likely BAD:",
+                     ctx.vcpuid, threadid);
     foreach_forward(ROB, i) {
       ReorderBufferEntry& rob = ROB[i];
-      logfile << "  ", rob, endl;
+      logging::println(logging::INFO, "  rob {} uuid {}", rob.index(), rob.uop.uuid);
       if (rob.uop.eom)
         break;
     }
@@ -211,8 +205,7 @@ void ThreadContext::reset_fetch_unit(W64 realrip) {
 //
 void ThreadContext::invalidate_smc() {
   if unlikely (smc_invalidate_pending) {
-    if (logable(5))
-      logfile << "SMC invalidate pending on ", smc_invalidate_rvp, endl;
+    logging::println(logging::DEBUG, "SMC invalidate pending on {}", smc_invalidate_rvp);
     bbcache.invalidate_page(smc_invalidate_rvp.mfnlo, INVALIDATE_REASON_SMC);
     if unlikely (smc_invalidate_rvp.mfnlo != smc_invalidate_rvp.mfnhi)
       bbcache.invalidate_page(smc_invalidate_rvp.mfnhi, INVALIDATE_REASON_SMC);
@@ -298,8 +291,8 @@ void ThreadContext::external_to_core_state() {
 // a result or are otherwise stalled.
 //
 void ThreadContext::redispatch_deadlock_recovery() {
-  if (logable(6))
-    core.dump_smt_state(logfile);
+  if (logging::logable_at(logging::TRACE))
+    core.dump_smt_state();
 
   per_context_ooocore_stats_update(threadid, dispatch.redispatch.deadlock_flushes++);
   // don't want to reset the counter for no commit in this case
@@ -307,40 +300,9 @@ void ThreadContext::redispatch_deadlock_recovery() {
   flush_pipeline();
   last_commit_at_cycle =
       previous_last_commit_at_cycle; /// so we can exit after no commit after deadlock recovery a few times in a roll
-  logfile << "[vcpu ", ctx.vcpuid, "] thread ", threadid,
-      ": reset thread.last_commit_at_cycle to be before redispatch_deadlock_recovery() ", previous_last_commit_at_cycle,
-      endl;
-  /*
-  //
-  // This is a more selective scheme than the full pipeline flush.
-  // Presently it does not work correctly with some combinations
-  // of user-modifiable parameters, so it's disabled to ensure
-  // deadlock-free operation in every configuration.
-  //
-
-  ReorderBufferEntry* prevrob = null;
-  std::bitset<MAX_OPERANDS> noops = 0;
-
-  foreach_forward(ROB, robidx) {
-  ReorderBufferEntry& rob = ROB[robidx];
-
-  //
-  // Only re-dispatch those uops that have not yet generated a value
-  // or are guaranteed to produce a value soon without tying up resources.
-  // This must occur in program order to avoid deadlock!
-  //
-  // bool recovery_required = (rob.current_state_list->flags & ROB_STATE_IN_ISSUE_QUEUE) || (rob.current_state_list == &rob_ready_to_dispatch_list);
-  bool recovery_required = 1; // for now, just to be safe
-
-  if (recovery_required) {
-  rob.redispatch(noops, prevrob);
-  prevrob = &rob;
-  per_context_ooocore_stats_update(threadid, dispatch.redispatch.deadlock_uops_flushed++);
-  }
-  }
-
-  if (logable(6)) dump_smt_state();
-  */
+  logging::println(
+      "[vcpu {}] thread {}: reset thread.last_commit_at_cycle to be before redispatch_deadlock_recovery() {}",
+      ctx.vcpuid, threadid, previous_last_commit_at_cycle);
 }
 
 
@@ -362,12 +324,12 @@ void ThreadContext::redispatch_deadlock_recovery() {
 static RIPVirtPhys fetch_bb_address_ringbuf[256];
 static W64 fetch_bb_address_ringbuf_head = 0;
 
-static void print_fetch_bb_address_ringbuf(ostream& os) {
-  os << "Head: ", fetch_bb_address_ringbuf_head, endl;
+static void print_fetch_bb_address_ringbuf() {
+  logging::println("Head: {}", fetch_bb_address_ringbuf_head);
   foreach (i, lengthof(fetch_bb_address_ringbuf)) {
     int j = (fetch_bb_address_ringbuf_head + i) % lengthof(fetch_bb_address_ringbuf);
     const RIPVirtPhys& addr = fetch_bb_address_ringbuf[j];
-    os << "  ", intstring(i, 16), ": ", addr, endl;
+    logging::println("  {:>16}: {}", i, addr);
   }
 }
 
@@ -1508,14 +1470,14 @@ void ThreadContext::flush_mem_lock_release_list(int start) {
     MemoryInterlockEntry* lock = interlocks.probe(lockaddr);
 
     if (!lock) {
-      logfile << "ERROR: thread ", ctx.vcpuid, ": attempted to release queued lock #", i, " for physaddr ",
-          (void*)lockaddr, ": lock was ", lock, endl;
+      logging::println("ERROR: thread {}: attempted to release queued lock #{} for physaddr {}: lock was {}",
+                       ctx.vcpuid, i, (void*)lockaddr, (void*)lock);
       assert(false);
     }
 
     if (lock->vcpuid != ctx.vcpuid) {
-      logfile << "ERROR: thread ", ctx.vcpuid, ": attempted to release queued lock #", i, " for physaddr ",
-          (void*)lockaddr, ": lock vcpuid was ", lock->vcpuid, endl;
+      logging::println("ERROR: thread {}: attempted to release queued lock #{} for physaddr {}: lock vcpuid was {}",
+                       ctx.vcpuid, i, (void*)lockaddr, lock->vcpuid);
       assert(false);
     }
 
@@ -1669,7 +1631,7 @@ int ReorderBufferEntry::commit() {
     /* If we're at the start of a macroop and the macroop has already been invalidated
      * aport execution immediately, to make effects visible
      */
-    printf("TEST: Speculative execution shoot down due to SOM invalidated before execution!\n");
+    logging::println(logging::WARNING, "TEST: Speculative execution shoot down due to SOM invalidated before execution!");
     if unlikely (config.event_log_enabled) {
       core.eventlog.add_commit(EVENT_COMMIT_SMC_DETECTED, this);
     }
@@ -1800,10 +1762,11 @@ int ReorderBufferEntry::commit() {
 
   if unlikely (config.event_log_enabled) {
     if unlikely ((uop.rip.rip == config.log_backwards_from_trigger_rip) && (uop.som)) {
-      logfile << "Hit trigger rip ", (void*)(Waddr)config.log_backwards_from_trigger_rip,
-          "; printing event ring buffer:", endl, flush;
-      core.eventlog.print(logfile);
-      logfile << "End of triggered event dump", endl, flush;
+      logging::println("Hit trigger rip {}; printing event ring buffer:", config.log_backwards_from_trigger_rip);
+      logging::flush();
+      core.eventlog.print();
+      logging::println("End of triggered event dump");
+      logging::flush();
     }
   }
 
@@ -1979,8 +1942,8 @@ int ReorderBufferEntry::commit() {
   }
 
   if unlikely (uop_is_eom & thread.stop_at_next_eom) {
-    logfile << "[vcpu ", thread.ctx.vcpuid, "] Stopping at cycle ", sim_cycle, " (", total_user_insns_committed,
-        " commits)", endl;
+    logging::println("[vcpu {}] Stopping at cycle {} ({} commits)", thread.ctx.vcpuid, sim_cycle,
+                     total_user_insns_committed);
     return COMMIT_RESULT_STOP;
   }
 

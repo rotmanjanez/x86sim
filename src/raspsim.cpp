@@ -9,13 +9,14 @@
 #include <ranges>
 #include <string_view>
 #include <span>
-#include <print>
+
+#include <fstream>
 
 #include "globals.h"
 #include "superstl.h"
 #include "mm.h"
+#include "logging.h"
 
-#include <elf.h>
 
 #include "ptlsim.h"
 #include "ptlsim-api.h"
@@ -24,15 +25,15 @@
 #include "stats.h"
 #include "raspsim-hwsetup.h"
 
-static void print_hex_bytes(FILE* fp, std::span<const byte> bytes, size_t splitat = 16) {
+static void print_hex_bytes(std::span<const byte> bytes, size_t splitat = 16) {
   for (size_t i = 0; i < bytes.size(); i++) {
-    std::print(fp, "{:02x}", static_cast<unsigned>(bytes[i]));
+    logging::eprint("{:02x}", static_cast<unsigned>(bytes[i]));
     if (((i % splitat) == (splitat - 1)) && (i != bytes.size() - 1))
-      std::print(fp, "\n");
+      logging::eprint("\n");
     else if (i != bytes.size() - 1)
-      std::print(fp, " ");
+      logging::eprint(" ");
   }
-  std::println(fp, "");
+  logging::eprintln("");
 }
 
 struct PTLsimConfig;
@@ -42,19 +43,13 @@ extern ConfigurationParser<PTLsimConfig> configparser;
 
 
 extern "C" void assert_fail(const char* __assertion, const char* __file, unsigned int __line, const char* __function) {
-  stringbuf sb;
-  sb << "Assert ", __assertion, " failed in ", __file, ":", __line, " (", __function, ") at ", sim_cycle, " cycles, ",
-      iterations, " iterations, ", total_user_insns_committed, " user commits", endl;
+  logging::println(logging::ERROR, "Assert {} failed in {}:{} ({}) at {} cycles, {} iterations, {} user commits\n",
+                   __assertion, __file, __line, __function, sim_cycle, iterations, total_user_insns_committed);
 
-  cerr << sb, flush;
-
-  if (logfile) {
-    logfile << sb, flush;
-    PTLsimMachine* machine = PTLsimMachine::getcurrent();
-    if (machine)
-      machine->dump_state(logfile);
-    logfile.close();
+  if (auto* machine = PTLsimMachine::getcurrent(); machine) {
+    logging::println(logging::ERROR, "{}", *machine);
   }
+  logging::flush();
 
   sys_exit(1); // Well, we don't want core dumps.
 
@@ -76,12 +71,13 @@ void Raspsim::propagate_x86_exception(byte exception, W32 errorcode, Waddr virta
   Context& ctx{Raspsim::getContext()};
 
   const char* msg = Raspsim::formatException(exception, errorcode, virtaddr);
-  logfile << msg, endl, flush;
-  cerr << msg, endl, flush;
+  logging::println("{}", msg);
+  logging::flush();
+  logging::eprintln("{}", msg);
   free((void*)msg);
 
-  cerr << "End state:", endl;
-  cerr << ctx, endl;
+  logging::eprintln("End state:");
+  logging::eprintln("{}", ctx);
   sys_exit(1);
 }
 
@@ -105,18 +101,18 @@ void Raspsim::handle_syscall_64bit() {
   W64 arg5 = ctx.commitarf[REG_r8];
   W64 arg6 = ctx.commitarf[REG_r9];
 
-  if (DEBUG)
-    logfile << "handle_syscall -> (#", syscallid, " ",
-        ((syscallid < lengthofSyscallNames()) ? syscall_names_64bit[syscallid] : "???"), ") from ",
-        (void*)ctx.commitarf[REG_rcx], " args ", " (", (void*)arg1, ", ", (void*)arg2, ", ", (void*)arg3, ", ",
-        (void*)arg4, ", ", (void*)arg5, ", ", (void*)arg6, ") at iteration ", iterations, endl, flush;
+
+  logging::println(logging::DEBUG, "handle_syscall -> (#{} {}) from {} args  ({}, {}, {}, {}, {}, {}) at iteration {}",
+                   syscallid, ((syscallid < lengthofSyscallNames()) ? syscall_names_64bit[syscallid] : "???"),
+                   (void*)ctx.commitarf[REG_rcx], (void*)arg1, (void*)arg2, (void*)arg3, (void*)arg4, (void*)arg5,
+                   (void*)arg6, iterations);
 
   ctx.commitarf[REG_rax] = -ENOSYS;
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_rcx];
 
-  if (DEBUG)
-    logfile << "handle_syscall: result ", ctx.commitarf[REG_rax], " (", (void*)ctx.commitarf[REG_rax],
-        "); returning to ", (void*)ctx.commitarf[REG_rip], endl, flush;
+  logging::println(logging::DEBUG, "handle_syscall: result {} ({}); returning to {}", ctx.commitarf[REG_rax],
+                   (void*)ctx.commitarf[REG_rax], (void*)ctx.commitarf[REG_rip]);
+  logging::flush();
 }
 
 #endif // PTLSIM_AMD64
@@ -172,12 +168,12 @@ bool handle_config_arg(Raspsim& sim, const std::string_view line, std::vector<Wa
 
   if (toks[0][0] == 'M') { // allocate page M<addr> <prot>
     if (toks.size() != 2) {
-      cerr << "Error: option ", line, " has wrong number of arguments", endl;
+      logging::eprintln("Error: option {} has wrong number of arguments", line);
       return true;
     }
     auto addrOpt = parse_hex(toks[0].substr(1));
     if (!addrOpt || lowbits(*addrOpt, 12)) {
-      cerr << "Error: invalid value ", toks[0], endl;
+      logging::eprintln("Error: invalid value {}", toks[0]);
       return true;
     }
     int prot = 0;
@@ -190,29 +186,29 @@ bool handle_config_arg(Raspsim& sim, const std::string_view line, std::vector<Wa
     else if (toks[1] == "rwx")
       prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     else {
-      cerr << "Error: invalid mem prot ", toks[1], endl;
+      logging::eprintln("Error: invalid mem prot {}", toks[1]);
       return true;
     }
     sim.map(*addrOpt, Raspsim::getPageSize(), prot);
   } else if (toks[0][0] == 'W') { // write to mem W<addr> <hexbytes>, may not cross page boundaries
     if (toks.size() != 2) {
-      cerr << "Error: option ", line, " has wrong number of arguments", endl;
+      logging::eprintln("Error: option {} has wrong number of arguments", line);
       return true;
     }
     auto addrOpt = parse_hex(toks[0].substr(1));
     if (!addrOpt) {
-      cerr << "Error: invalid value ", toks[0], endl;
+      logging::eprintln("Error: invalid value {}", toks[0]);
       return true;
     }
     byte* mapped = sim.getMappedPage(*addrOpt);
     if (!mapped) {
-      cerr << "Error: page not mapped ", (void*)*addrOpt, endl;
+      logging::eprintln("Error: page not mapped {}", (void*)*addrOpt);
       return true;
     }
     Waddr addr = *addrOpt;
     Waddr arglen = toks[1].length();
     if ((arglen & 1) || arglen / 2 > 4096 - lowbits(addr, 12)) {
-      cerr << "Error: arg has odd size or crosses page boundary", (void*)addr, endl;
+      logging::eprintln("Error: arg has odd size or crosses page boundary {}", (void*)addr);
       return true;
     }
     unsigned n = std::min((Waddr)(4096 - lowbits(addr, 12)), arglen / 2);
@@ -222,12 +218,12 @@ bool handle_config_arg(Raspsim& sim, const std::string_view line, std::vector<Wa
     }
   } else if (toks[0][0] == 'D') { // dump page D<page>
     if (toks.size() != 1) {
-      cerr << "Error: option ", line, " has wrong number of arguments", endl;
+      logging::eprintln("Error: option {} has wrong number of arguments", line);
       return true;
     }
     auto addrOpt = parse_hex(toks[0].substr(1));
     if (!addrOpt) {
-      cerr << "Error: invalid value ", toks[0], endl;
+      logging::eprintln("Error: invalid value {}", toks[0]);
       return true;
     }
     dump_pages.push_back(floor(*addrOpt, PAGE_SIZE));
@@ -241,18 +237,18 @@ bool handle_config_arg(Raspsim& sim, const std::string_view line, std::vector<Wa
     sim.enableStaticBranchPrediction();
   } else {
     if (toks.size() != 2) {
-      cerr << "Error: option ", line, " has wrong number of arguments", endl;
+      logging::eprintln("Error: option {} has wrong number of arguments", line);
       return true;
     }
     std::string reg_str(toks[0]);
     int reg = sim.getRegisterIndex(reg_str.c_str());
     if (reg < 0) {
-      cerr << "Error: invalid register ", toks[0], endl;
+      logging::eprintln("Error: invalid register {}", toks[0]);
       return true;
     }
     auto valOpt = parse_hex(toks[1]);
     if (!valOpt) {
-      cerr << "Error: invalid value ", toks[1], endl;
+      logging::eprintln("Error: invalid value {}", toks[1]);
       return true;
     }
     sim.setRegisterValue(reg, *valOpt);
@@ -279,61 +275,59 @@ int main(int argc, char** argv) {
   bool parse_err = false;
   for (unsigned i = ptlsim_arg_count; i < argc; i++) {
     if (argv[i][0] == '@') {
-      stringbuf line;
-      istream is(argv[i] + 1);
+      std::ifstream is(argv[i] + 1);
       if (!is) {
-        cerr << "Warning: cannot open command list file '", argv[i], "'", endl;
+        logging::eprintln("Warning: cannot open command list file '{}'", argv[i]);
         continue;
       }
+      std::string line;
       for (;;) {
-        line.reset();
-        if (!is)
+        if (!std::getline(is, line))
           break;
-        is >> line;
-        char* p = strchr(line, '#');
-        if (p)
-          *p = 0;
-        parse_err |= handle_config_arg(sim, (char*)line, dump_pages);
+        // Remove comments
+        size_t comment_pos = line.find('#');
+        if (comment_pos != std::string::npos)
+          line.erase(comment_pos);
+        parse_err |= handle_config_arg(sim, line, dump_pages);
       }
     } else {
       parse_err |= handle_config_arg(sim, argv[i], dump_pages);
     }
   }
   if (parse_err) {
-    cerr << "Error: could not parse all arguments", endl, flush;
+    logging::eprintln("Error: could not parse all arguments");
     sys_exit(1);
   }
 
-  logfile << endl, "=== Switching to simulation mode at rip ", (void*)(Waddr)sim.getRegisterValue(REG_rip),
-      " ===", endl, endl, flush;
-  logfile << "Baseline state:", endl;
-  logfile << sim.getContext();
+  logging::println("\n=== Switching to simulation mode at rip {} ===\n", (void*)(Waddr)sim.getRegisterValue(REG_rip));
+  logging::flush();
+  logging::println("Baseline state:");
+  logging::println("{}", sim.getContext());
 
   sim.run();
 
-  cerr << "End state:", endl;
-  cerr << sim.getContext(), endl;
+  logging::eprintln("End state:");
+  logging::eprintln("{}", sim.getContext());
 
   for (Waddr addr : dump_pages) {
     byte* mapped = sim.getMappedPage(addr);
     if (!mapped) {
-      cerr << "Error dumping memory: page not mapped ", (void*)addr, endl;
+      logging::eprintln("Error dumping memory: page not mapped {}", (void*)addr);
     } else {
-      cerr << "Dump of memory at ", (void*)addr, ": ", endl;
-      print_hex_bytes(stderr, std::span<const byte>(mapped, PAGE_SIZE));
+      logging::eprintln("Dump of memory at {}:", (void*)addr);
+      print_hex_bytes(std::span<const byte>(mapped, PAGE_SIZE));
     }
   }
 
-  cerr << "Decoder stats:";
+  logging::eprint("Decoder stats:");
   foreach (i, DECODE_TYPE_COUNT) {
-    cerr << " ", decode_type_names[i], "=", stats.decoder.x86_decode_type[i];
+    logging::eprint(" {}={}", decode_type_names[i], stats.decoder.x86_decode_type[i]);
   }
-  cerr << endl;
-  cerr << flush;
+  logging::eprintln("");
 
-  cerr << endl, "=== Exiting after full simulation on tid ", sys_gettid(), " at rip ",
-      (void*)(Waddr)sim.getRegisterValue(REG_rip), " (", sim_cycle, " cycles, ", total_user_insns_committed,
-      " user commits, ", iterations, " iterations) ===", endl, endl;
+  logging::eprintln(
+      "\n=== Exiting after full simulation on tid {} at rip {} ({} cycles, {} user commits, {} iterations) ===\n",
+      sys_gettid(), (void*)(Waddr)sim.getRegisterValue(REG_rip), sim_cycle, total_user_insns_committed, iterations);
 
   Raspsim::stutdown();
 

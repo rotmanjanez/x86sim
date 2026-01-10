@@ -21,6 +21,7 @@ extern "C" {
 
 #ifdef __cplusplus
 
+#include <format>
 #include <math.h>
 #include <float.h>
 
@@ -200,6 +201,37 @@ typedef W32 v4si __attribute__((vector_size(16)));
 typedef v4si vec4i;
 typedef float v2df __attribute__((vector_size(16)));
 typedef v2df vec2d;
+
+// std::formatter specializations for vector types - must be declared early before any use
+template<>
+struct std::formatter<v16qi> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const v16qi& v, std::format_context& ctx) const {
+    auto out = ctx.out();
+    const unsigned char* b = (const unsigned char*)&v;
+    for (int i = 15; i >= 0; i--) {
+      if (i < 15)
+        out = std::format_to(out, "{}", (i == 7) ? '.' : ' ');
+      out = std::format_to(out, "{:02x}", static_cast<unsigned int>(b[i]));
+    }
+    return out;
+  }
+};
+
+template<>
+struct std::formatter<v8hi> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const v8hi& v, std::format_context& ctx) const {
+    auto out = ctx.out();
+    const W16* b = (const W16*)&v;
+    for (int i = 0; i < 8; i++) {
+      if (i)
+        out = std::format_to(out, " ");
+      out = std::format_to(out, "{:>5}", b[i]);
+    }
+    return out;
+  }
+};
 
 inline vec16b x86_sse_pcmpeqb(vec16b a, vec16b b) {
   asm("pcmpeqb %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
@@ -841,12 +873,14 @@ inline int add_index_modulo(int index, int increment, int bufsize) {
 
 #include "superstl.h"
 
-using namespace superstl;
+template<>
+struct std::formatter<MXCSR> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-ostream& operator<<(ostream& os, const vec16b& v);
-ostream& operator,(ostream& os, const vec16b& v);
-ostream& operator<<(ostream& os, const vec8w& v);
-ostream& operator,(ostream& os, const vec8w& v);
+  auto format(const MXCSR& mxcsr, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "0x{:08x}", mxcsr.data);
+  }
+};
 
 #endif // __cplusplus
 

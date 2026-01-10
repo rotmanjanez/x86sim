@@ -8,13 +8,12 @@
 //
 
 #include "globals.h"
-#include <elf.h>
 #include "ptlsim.h"
 #include "branchpred.h"
+#include "logging.h"
 #include "logic.h"
 #include "dcache.h"
 
-#define INSIDE_OOOCORE
 #include "ooocore.h"
 #include "stats.h"
 
@@ -24,8 +23,6 @@
 #endif
 
 #ifndef ENABLE_LOGGING
-#undef logable
-#define logable(level) (0)
 #endif
 
 using namespace OutOfOrderModel;
@@ -245,23 +242,6 @@ bool IssueQueue<size, operandcount>::remove(int slot) {
   count--;
   assert(count >= 0);
   return true;
-}
-
-template<int size, int operandcount>
-ostream& IssueQueue<size, operandcount>::print(ostream& os) const {
-  os << "IssueQueue: count = ", count, ":", endl;
-  foreach (i, size) {
-    os << "  uop ";
-    uopids.printid(os, i);
-    os << ": ", ((valid[i]) ? 'V' : '-'), ' ', ((issued[i]) ? 'I' : '-'), ' ', ((allready[i]) ? 'R' : '-'), ' ';
-    foreach (j, operandcount) {
-      if (j)
-        os << ' ';
-      tags[j].printid(os, i);
-    }
-    os << endl;
-  }
-  return os;
 }
 
 // Instantiate all methods in the specific IssueQueue sizes we're using:
@@ -1338,8 +1318,9 @@ int ReorderBufferEntry::issueload(LoadStoreQueueEntry& state, Waddr& origaddr, W
 
     // Issuing more than one ld.acq on the same block is not allowed:
     if (lock) {
-      logfile << "ERROR: thread ", thread.ctx.vcpuid, " uuid ", uop.uuid, " over physaddr ", (void*)physaddr,
-          ": lock was already acquired by vcpuid ", lock->vcpuid, " uuid ", lock->uuid, " rob ", lock->rob, endl;
+      logging::println(
+          "ERROR: thread {} uuid {} over physaddr {}: lock was already acquired by vcpuid {} uuid {} rob {}",
+          thread.ctx.vcpuid, uop.uuid, (void*)physaddr, lock->vcpuid, lock->uuid, lock->rob);
       assert(false);
     }
 
@@ -1698,8 +1679,7 @@ void OutOfOrderCoreCacheCallbacks::dcache_wakeup(LoadStoreInfo lsi, W64 physaddr
   assert(inrange(idx, 0, ROB_SIZE - 1));
   ReorderBufferEntry& rob = thread->ROB[idx];
 
-  if (logable(100))
-    logfile << " dcache_wakeup ", rob, endl;
+  logging::println(logging::VERBOSE, " dcache_wakeup rob {} uuid {}", rob.index(), rob.uop.uuid);
   assert(rob.current_state_list == &thread->rob_cache_miss_list);
 
   rob.loadwakeup();
@@ -2098,14 +2078,14 @@ W64 ReorderBufferEntry::annul(bool keep_misspec_uop, bool return_first_annulled_
     specrrt[i]->addspecref(i, thread.threadid);
   }
 
-  // if (logable(6)) logfile << "Restored SpecRRT from CommitRRT; walking forward from:", endl, core.specrrt, endl;
+  logging::println(logging::INFO, "Restored SpecRRT from CommitRRT; walking forward from:\n{}", specrrt);
   idx = ROB.head;
   for (idx = ROB.head; idx != startidx; idx = add_index_modulo(idx, +1, ROB_SIZE)) {
     ReorderBufferEntry& rob = ROB[idx];
     rob.pseudocommit();
   }
 
-  // if (logable(6)) logfile << "Recovered SpecRRT:", endl, core.specrrt, endl;
+  logging::println(logging::INFO, "Recovered SpecRRT:\n{}", specrrt);
 
   //
   // Pass 3: For each speculative ROB, reinitialize and free speculative ROBs

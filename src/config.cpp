@@ -5,10 +5,12 @@
 // Copyright 2000-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
+#include <fstream>
 #include "config.h"
+#include "logging.h"
 
-ostream& ConfigurationParserBase::printusage(const void* baseptr, ostream& os) const {
-  os << "Options are:", endl;
+std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr) const {
+  std::string result = "Options are:\n";
   ConfigurationOption* option = options;
   int maxlength = 0;
   while (option) {
@@ -21,43 +23,42 @@ ostream& ConfigurationParserBase::printusage(const void* baseptr, ostream& os) c
   while (option) {
     void* variable = (baseptr) ? ((void*)((Waddr)baseptr + option->offset)) : null;
     if (option->type == OPTION_TYPE_SECTION) {
-      os << option->description, ":", endl;
+      result += std::format("{}:\n", option->description);
       option = option->next;
       continue;
     }
 
-    os << "  -", padstring(option->name, -maxlength), " ", option->description, " ";
+    result += std::format("  -{:<{}} {} [", option->name, maxlength, option->description);
 
-    os << "[";
     switch (option->type) {
     case OPTION_TYPE_NONE:
       break;
     case OPTION_TYPE_W64: {
       W64 v = *((W64*)(variable));
       if (v == infinity)
-        os << "inf";
+        result += "inf";
       else
-        os << v;
+        result += std::format("{}", v);
       break;
     }
     case OPTION_TYPE_FLOAT:
-      os << *((double*)(variable));
+      result += std::format("{}", *((double*)(variable)));
       break;
     case OPTION_TYPE_STRING:
-      os << *(stringbuf*)variable;
+      result += *(std::string*)variable;
       break;
     case OPTION_TYPE_BOOL:
-      os << ((*(bool*)variable) ? "enabled" : "disabled");
+      result += ((*(bool*)variable) ? "enabled" : "disabled");
       break;
     default:
       assert(false);
     }
-    os << "]", endl;
+    result += "]\n";
     option = option->next;
   }
-  os << endl;
+  result += "\n";
 
-  return os;
+  return result;
 }
 
 int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
@@ -82,7 +83,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
           found = true;
           void* variable = (void*)((Waddr)baseptr + option->offset);
           if ((option->type != OPTION_TYPE_NONE) && (option->type != OPTION_TYPE_BOOL) && (i == (argc + 1))) {
-            cerr << "Warning: missing value for option '", argv[i - 1], "'", endl;
+            logging::eprintln("Warning: missing value for option '{}'", argv[i - 1]);
             break;
           }
           switch (option->type) {
@@ -92,7 +93,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             char* p = (i < argc) ? argv[i] : null;
             int len = (p) ? strlen(p) : 0;
             if (!len) {
-              cerr << "Warning: option ", argv[i - 1], " had no argument; ignoring", endl;
+              logging::eprintln("Warning: option {} had no argument; ignoring", argv[i - 1]);
               break;
             }
 
@@ -130,7 +131,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             }
             W64 v = (isinf) ? infinity : strtoull(p, &endp, 0);
             if ((!isinf) && (endp[0] != 0)) {
-              cerr << "Warning: invalid value '", p, "' for option ", argv[i - 1], "; ignoring", endl;
+              logging::eprintln("Warning: invalid value '{}' for option {}; ignoring", p, argv[i - 1]);
             }
             v *= multiplier;
             *((W64*)variable) = v;
@@ -140,7 +141,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
           }
           case OPTION_TYPE_FLOAT:
             if (i >= argc) {
-              cerr << "Warning: option ", argv[i - 1], " had no argument; ignoring", endl;
+              logging::eprintln("Warning: option {} had no argument; ignoring", argv[i - 1]);
               break;
             }
             *((double*)variable) = atof(argv[i++]);
@@ -150,12 +151,11 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             break;
           case OPTION_TYPE_STRING: {
             if (i >= argc) {
-              cerr << "Warning: option ", argv[i - 1], " had no argument; ignoring", endl;
+              logging::eprintln("Warning: option {} had no argument; ignoring", argv[i - 1]);
               break;
             }
-            stringbuf& sb = *((stringbuf*)variable);
-            sb.reset();
-            sb << argv[i++];
+            std::string& s = *((std::string*)variable);
+            s = argv[i++];
             break;
           }
           default:
@@ -167,7 +167,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
         option = option->next;
       }
       if (!found) {
-        cerr << "Warning: invalid option '", (inrange(i - 1, 0, argc - 1) ? argv[i - 1] : "<missing>"), "'", endl;
+        logging::eprintln("Warning: invalid option '{}'", (inrange(i - 1, 0, argc - 1) ? argv[i - 1] : "<missing>"));
         i++;
       }
     } else {
@@ -175,14 +175,12 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
     }
   }
 
-  cerr << flush;
-
   // no trailing arguments
   return -1;
 }
 
-ostream& ConfigurationParserBase::print(const void* baseptr, ostream& os) const {
-  os << "Active parameters:", endl;
+std::string ConfigurationParserBase::format_to_string_config(const void* baseptr) const {
+  std::string result = "Active parameters:\n";
 
   ConfigurationOption* option = options;
   while (option) {
@@ -192,7 +190,7 @@ ostream& ConfigurationParserBase::print(const void* baseptr, ostream& os) const 
       option = option->next;
       continue;
     }
-    os << "  -", padstring(option->name, -12), " ";
+    result += std::format("  -{:<12} ", option->name);
     switch (option->type) {
     case OPTION_TYPE_NONE:
     case OPTION_TYPE_SECTION:
@@ -200,34 +198,34 @@ ostream& ConfigurationParserBase::print(const void* baseptr, ostream& os) const 
     case OPTION_TYPE_W64: {
       W64 v = *((W64*)(variable));
       if (v == 0) {
-        os << 0;
+        result += "0";
       } else if (v == infinity) {
-        os << "infinity";
+        result += "infinity";
       } else if ((v % 1000000000LL) == 0) {
-        os << (v / 1000000000LL), " G";
+        result += std::format("{} G", (v / 1000000000LL));
       } else if ((v % 1000000LL) == 0) {
-        os << (v / 1000000LL), " M";
+        result += std::format("{} M", (v / 1000000LL));
       } else {
-        os << v;
+        result += std::format("{}", v);
       }
       break;
     }
     case OPTION_TYPE_FLOAT:
-      os << *((double*)(variable));
+      result += std::format("{}", *((double*)(variable)));
       break;
     case OPTION_TYPE_BOOL:
-      os << (*((bool*)(variable)) ? "enabled" : "disabled");
+      result += (*((bool*)(variable)) ? "enabled" : "disabled");
       break;
     case OPTION_TYPE_STRING:
-      os << *((stringbuf*)(variable));
+      result += *((std::string*)(variable));
       break;
     default:
       break;
     }
-    os << endl;
+    result += "\n";
 
     option = option->next;
   }
 
-  return os;
+  return result;
 }

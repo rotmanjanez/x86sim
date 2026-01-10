@@ -38,7 +38,6 @@ struct ReturnAddressStackEntry {
   int index() const { return idx; }
 };
 
-ostream& operator<<(ostream& os, const ReturnAddressStackEntry& e);
 
 struct PredictorUpdate {
   W64 uuid;
@@ -73,10 +72,20 @@ struct BranchPredictorInterface {
   void flush();
 };
 
-ostream& operator<<(ostream& os, const BranchPredictorInterface& branchpred);
-
 extern BranchPredictorInterface branchpred;
 
 static const char* branchpred_outcome_names[2] = {"mispred", "correct"};
+
+//
+// std::formatter specialization for ReturnAddressStackEntry
+//
+template<>
+struct std::formatter<ReturnAddressStackEntry> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const ReturnAddressStackEntry& e, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "  {:>4}: uuid {:>16}, rip {}\n", e.idx, e.uuid, (void*)(Waddr)e.rip);
+  }
+};
 
 #endif // _BRANCHPRED_H_

@@ -7,6 +7,7 @@
 
 #include "globals.h"
 #include "ptlsim.h"
+#include "logging.h"
 
 
 // No operation
@@ -513,18 +514,15 @@ void exp_op_mask(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbf
   W64 M = x86_ror<T>(bitmask(mc), ms);
   W64 rd = (ra & ~M) | (x86_ror<T>(rb, ds) & M);
 
-#if 0
-  // For debugging purposes:
-  if unlikely (logable(5)) {
-    logfile << "mask [", sizeof(T), ", ", ZEROEXT, ", ", SIGNEXT, ", ss = ", sizeshift, ", mcms ", mcms, " [shmask ", bitstring(shmask, 18), " (ms=", ms, " mc=", mc, " ds=", ds, " (mcms ", mcms, "))]:", endl;
-    logfile << "  M      = ", bitstring(M, 64), " 0x", hexstring(M, 64), endl;
-    logfile << "  rot rb = ", bitstring(x86_ror<T>(rb, ds), 64), " 0x", hexstring(x86_ror<T>(rb, ds), 64), endl;
-    logfile << "  ra     = ", hexstring(ra, 64), endl;
-    logfile << "  rb     = ", hexstring(rb, 64), endl;
-    logfile << "  rc     = ", hexstring(rc, 64), endl;
-    logfile << "  initrd = ", hexstring(rd, 64), endl;
-  }
-#endif
+  logging::println(logging::TRACE,
+                   "mask [{}, {}, {}, ss = {}, mcms {} [shmask {} (ms={} mc={} ds={} (mcms {}))]]:", sizeof(T), ZEROEXT,
+                   SIGNEXT, sizeshift, mcms, bitstring(shmask, 18), ms, mc, ds, mcms);
+  logging::println(logging::TRACE, "  M      = {} 0x{:016x}", bitstring(M, 64), M);
+  logging::println(logging::TRACE, "  rot rb = {} 0x{:016x}", bitstring(x86_ror<T>(rb, ds), 64), x86_ror<T>(rb, ds));
+  logging::println(logging::TRACE, "  ra     = {:016x}", ra);
+  logging::println(logging::TRACE, "  rb     = {:016x}", rb);
+  logging::println(logging::TRACE, "  rc     = {:016x}", rc);
+  logging::println(logging::TRACE, "  initrd = {:016x}", rd);
 
   if (ZEROEXT) {
     // rd = rd & 1'[(ms+mc-1):0]
@@ -578,8 +576,6 @@ uopimpl_func_t implmap_maskb[4][3] = {
 // into permb in the pipeline, at the cost of additional muxing logic.
 //
 void uop_impl_permb(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags) {
-  static const bool DEBUG = 0;
-
   union vec128 {
     struct {
       W64 lo, hi;
@@ -604,13 +600,11 @@ void uop_impl_permb(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 
   ab.w64.lo = ra;
   ab.w64.hi = rb;
 
-  if unlikely (DEBUG)
-    logfile << "Permute: ", *(vec16b*)&ab, " by control 0x", hexstring(rc, 32), ":", endl;
+  logging::println(logging::TRACE, "Permute: by control 0x{:08x}:", rc);
   foreach (i, 8) {
     int which = bits(rc, i * 4, 4);
 
-    if unlikely (DEBUG)
-      logfile << "  z[", i, "] = ", "ab[", which, "] = 0x", hexstring(ab.bytes.b[which], 8), endl;
+    logging::println(logging::TRACE, "  z[{}] = ab[{}] = 0x{:02x}", i, which, ab.bytes.b[which]);
     d.bytes.b[i] = ab.bytes.b[which];
   }
 
@@ -1520,10 +1514,9 @@ static inline vec16b buildvec(W64 hi, W64 lo) {
     W64 rd;                                                                                                            \
     vec16b va = buildvec(rb, ra);                                                                                      \
     vec16b vb = buildvec(0, 0);                                                                                        \
-    logfile << "va = ", va, ", vb = ", vb, endl;                                                                       \
-    if ((size == 0) & bit(sizemask, 0))                                                                                \
-      asm(#opcode0 " " extra "%[vb],%[va]; movq %[va],%[rd];"                                                          \
-          : [rd] "=" W64_CONSTRAINT(rd), [va] "+x"(va), [vb] "+x"(vb));                                                \
+    logging::println(logging::INFO, "va = {}, vb = {}", va, vb);                                                       \
+    if ((size == 0) & bit(sizemask, 0)) asm(#opcode0 " " extra "%[vb],%[va]; movq %[va],%[rd];" :                   \
+                                               [rd] "=" W64_CONSTRAINT(rd), [va] "+x"(va), [vb] "+x"(vb));             \
     if ((size == 1) & bit(sizemask, 1))                                                                                \
       asm(#opcode1 " " extra "%[vb],%[va]; movq %[va],%[rd];"                                                          \
           : [rd] "=" W64_CONSTRAINT(rd), [va] "=x"(va), [vb] "=x"(vb));                                                \
@@ -2060,7 +2053,8 @@ uopimpl_func_t get_synthcode_for_uop(int op, int size, bool setflags, int cond, 
     func = implmap_vpack_ss[size];
     break;
   default:
-    logfile << "Unknown uop opcode ", op, flush, " (", nameof(op), ")", endl, flush;
+    logging::println("Unknown uop opcode {} ({})", op, nameof(op));
+    logging::flush();
     assert(false);
   }
   return func;

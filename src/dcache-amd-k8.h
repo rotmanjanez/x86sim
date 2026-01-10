@@ -137,14 +137,7 @@ struct CacheLine {
     hitcount = 0;
 #endif
   }
-
-  ostream& print(ostream& os, W64 tag) const;
 };
-
-template<int linesize>
-static inline ostream& operator<<(ostream& os, const CacheLine<linesize>& line) {
-  return line.print(os, 0);
-}
 
 template<int linesize>
 struct CacheLineWithValidMask {
@@ -169,13 +162,7 @@ struct CacheLineWithValidMask {
   }
   void invalidate() { reset(); }
   void fill(W64 tag, const std::bitset<linesize>& valid) { this->valid |= valid; }
-  ostream& print(ostream& os, W64 tag) const;
 };
-
-template<int linesize>
-static inline ostream& operator<<(ostream& os, const CacheLineWithValidMask<linesize>& line) {
-  return line.print(os, 0);
-}
 
 typedef CacheLineWithValidMask<L1_LINE_SIZE> L1CacheLine;
 typedef CacheLine<L1I_LINE_SIZE> L1ICacheLine;
@@ -196,8 +183,6 @@ struct HistogramAssociativeArrayStatisticsCollector {
   static W64 line_lifetime_histogram[LIFETIME_SLOTS];
   static W64 line_deadtime_histogram[DEADTIME_SLOTS];
   static W64 line_hitcount_histogram[HITCOUNT_SLOTS];
-
-  static const bool FORCE_DEBUG = 0;
 
   HistogramAssociativeArrayStatisticsCollector() { reset(); }
 
@@ -222,9 +207,8 @@ struct HistogramAssociativeArrayStatisticsCollector {
     int hitcountslot = std::clamp(hitcount / HITCOUNT_INTERVAL, 0, HITCOUNT_SLOTS - 1);
     line_hitcount_histogram[hitcountslot]++;
 
-    if (logable(6) | FORCE_DEBUG)
-      logfile << "[", cache_names[uniq], "] ", sim_cycle, ": evicted(", (void*)tag, "): lifetime ", lifetime,
-          ", deadtime ", deadtime, ", hitcount ", hitcount, " (line addr ", &line, ")", endl;
+    logging::println("[{}] {}: evicted({}): lifetime {}, deadtime {}, hitcount {} (line addr {})", cache_names[uniq],
+                     sim_cycle, (void*)tag, lifetime, deadtime, hitcount, (void*)&line);
   }
 
   static void filled(V& line, W64 tag) {
@@ -232,9 +216,7 @@ struct HistogramAssociativeArrayStatisticsCollector {
     line.lasttime = sim_cycle;
     line.hitcount = 1;
 
-    if (logable(6) | FORCE_DEBUG)
-      logfile << "[", cache_names[uniq], "] ", sim_cycle, ": filled(", (void*)tag, ")", " (line addr ", &line, ")",
-          endl;
+    logging::println("[{}] {}: filled({}) (line addr {})", cache_names[uniq], sim_cycle, (void*)tag, (void*)&line);
   }
 
   static void inserted(V& line, W64 newtag, int way) { filled(line, newtag); }
@@ -245,10 +227,9 @@ struct HistogramAssociativeArrayStatisticsCollector {
   }
 
   static void probed(V& line, W64 tag, int way, bool hit) {
-    if (logable(6) | FORCE_DEBUG)
-      logfile << "[", cache_names[uniq], "] ", sim_cycle, ": probe(", (void*)tag, "): ", (hit ? "HIT" : "miss"),
-          " way ", way, ": hitcount ", line.hitcount, ", filltime ", line.filltime, ", lasttime ", line.lasttime,
-          " (line addr ", &line, ")", endl;
+    logging::println("[{}] {}: probe({}): {} way {}: hitcount {}, filltime {}, lasttime {} (line addr {})",
+                     cache_names[uniq], sim_cycle, (void*)tag, (hit ? "HIT" : "miss"), way, line.hitcount,
+                     line.filltime, line.lasttime, (void*)&line);
     if (hit) {
       line.hitcount++;
       line.lasttime = sim_cycle;
@@ -326,10 +307,6 @@ struct L1Cache : public DataCache<L1CacheLine, L1_SET_COUNT, L1_WAY_COUNT, L1_LI
   }
 };
 
-static inline ostream& operator<<(ostream& os, const L1Cache& cache) {
-  return os;
-}
-
 //
 // L1 instruction cache
 //
@@ -343,9 +320,6 @@ struct L1ICache : public DataCache<L1ICacheLine, L1I_SET_COUNT, L1I_WAY_COUNT, L
   }
 };
 
-static inline ostream& operator<<(ostream& os, const L1ICache& cache) {
-  return os;
-}
 
 //
 // L2 cache
@@ -368,9 +342,18 @@ struct L2Cache : public L2CacheBase {
 // L3 cache
 //
 #ifdef ENABLE_L3_CACHE
-static inline ostream& operator<<(ostream& os, const L3CacheLine& line) {
-  return line.print(os, 0);
-}
+template<>
+struct std::formatter<L3CacheLine> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const L3CacheLine& line, std::format_context& ctx) const {
+#ifdef TRACK_LINE_USAGE
+    return std::format_to(ctx.out(), "L3CacheLine{{filltime={}, lasttime={}, hitcount={}}}", line.filltime,
+                          line.lasttime, line.hitcount);
+#else
+    return std::format_to(ctx.out(), "L3CacheLine{{}}");
+#endif
+  }
+};
 
 struct L3Cache : public DataCache<L3CacheLine, L3_SET_COUNT, L3_WAY_COUNT, L3_LINE_SIZE, L3StatsCollector> {
   L3CacheLine* validate(W64 addr) {
@@ -422,10 +405,9 @@ struct TranslationLookasideBuffer : public FullyAssociativeTagsNbitOneHot<size, 
     W64 oldtag;
     int way = base_t::select(tag, oldtag);
     W64 oldaddr = lowbits(oldtag, 36) << 12;
-    if (logable(6)) {
-      logfile << "TLB insertion of virt page ", (void*)(Waddr)addr, " (virt addr ", (void*)(Waddr)(addr), ") into way ",
-          way, ": ", ((oldtag != tag) ? "evicted old entry" : "already present"), endl;
-    }
+
+    logging::println("TLB insertion of virt page {} (virt addr {}) into way {}: {}", (void*)(Waddr)addr,
+                     (void*)(Waddr)(addr), way, ((oldtag != tag) ? "evicted old entry" : "already present"));
     return (oldtag != tag);
   }
 
@@ -445,11 +427,6 @@ struct TranslationLookasideBuffer : public FullyAssociativeTagsNbitOneHot<size, 
 
   int flush_virt(Waddr virtaddr, W64 threadid) { return invalidate(tagof(virtaddr, threadid)); }
 };
-
-template<int tlbid, int size>
-static inline ostream& operator<<(ostream& os, const TranslationLookasideBuffer<tlbid, size>& tlb) {
-  return tlb.print(os);
-}
 
 typedef TranslationLookasideBuffer<0, DTLB_SIZE> DTLB;
 typedef TranslationLookasideBuffer<1, ITLB_SIZE> ITLB;
@@ -472,12 +449,7 @@ struct LoadFillReq {
   inline LoadFillReq() {}
 
   LoadFillReq(W64 addr, W64 data, byte mask, LoadStoreInfo lsi);
-  ostream& print(ostream& os) const;
 };
-
-static inline ostream& operator<<(ostream& os, const LoadFillReq& req) {
-  return req.print(os);
-}
 
 template<int size>
 struct LoadFillReqQueue {
@@ -532,14 +504,7 @@ struct LoadFillReqQueue {
 
   LoadFillReq& operator[](int idx) { return reqs[idx]; }
   const LoadFillReq& operator[](int idx) const { return reqs[idx]; }
-
-  ostream& print(ostream& os) const;
 };
-
-template<int size>
-static inline ostream& operator<<(ostream& os, const LoadFillReqQueue<size>& lfrq) {
-  return lfrq.print(os);
-}
 
 enum { STATE_IDLE, STATE_DELIVER_TO_L3, STATE_DELIVER_TO_L2, STATE_DELIVER_TO_L1 };
 static const char* missbuf_state_names[] = {"idle", "mem->L3", "L3->L2", "L2->L1"};
@@ -586,14 +551,7 @@ struct MissBuffer {
   void annul_lfrq(int slot);
   void annul_lfrq(int slot, int threadid);
   void clock();
-
-  ostream& print(ostream& os) const;
 };
-
-template<int size>
-static inline ostream& operator<<(ostream& os, const MissBuffer<size>& missbuf) {
-  return missbuf.print(os);
-}
 
 struct PerCoreCacheCallbacks {
   virtual void dcache_wakeup(LoadStoreInfo lsi, W64 physaddr);
@@ -642,7 +600,6 @@ struct CacheHierarchy {
   void clock();
   void complete();
   void complete(int threadid);
-  ostream& print(ostream& os);
 };
 #endif // STATS_ONLY
 }; // namespace CacheSubsystem

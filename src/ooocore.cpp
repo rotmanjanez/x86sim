@@ -7,15 +7,16 @@
 // Copyright 2006-2008 Hui Zeng <hzeng@cs.binghamton.edu>
 //
 
+#include <format>
+#include <print>
+#include <cstdio>
 #include "globals.h"
-#include <elf.h>
 #include "ptlsim.h"
 #include "branchpred.h"
 #include "logic.h"
 #include "dcache.h"
+#include "logging.h"
 
-#define INSIDE_OOOCORE
-#define DECLARE_STRUCTURES
 #include "ooocore.h"
 #include "stats.h"
 
@@ -25,8 +26,6 @@
 #endif
 
 #ifndef ENABLE_LOGGING
-#undef logable
-#define logable(level) (0)
 #endif
 
 using namespace OutOfOrderModel;
@@ -171,23 +170,23 @@ void OutOfOrderCore::init_generic() {
 }
 
 template<typename T>
-static void OutOfOrderModel::print_list_of_state_lists(ostream& os, const ListOfStateLists& lol, const char* title) {
-  os << title, ":", endl;
+static void print_list_of_state_lists(const ListOfStateLists& lol, const char* title) {
+  logging::println("{}:", title);
   foreach (i, lol.count) {
     StateList& list = *lol[i];
-    os << list.name, " (", list.count, " entries):", endl;
+    logging::println("{} ({} entries):", list.name, list.count);
     int n = 0;
     T* obj;
     foreach_list_mutable(list, obj, entry, nextentry) {
       if ((n % 16) == 0)
-        os << " ";
-      os << " ", intstring(obj->index(), -3);
+        logging::print(" ");
+      logging::print(" {:<3}", obj->index());
       if (((n % 16) == 15) || (n == list.count - 1))
-        os << endl;
+        logging::println("");
       n++;
     }
     assert(n == list.count);
-    os << endl;
+    logging::println("");
     // list.validate();
   }
 }
@@ -214,9 +213,8 @@ void PhysicalRegisterFile::init(const char* name, int coreid, int rfid, int size
   this->frees = 0;
 
   foreach (i, MAX_PHYSREG_STATE) {
-    stringbuf sb;
-    sb << name, "-", physreg_state_names[i];
-    states[i].init(sb, getcore().physreg_states);
+    std::string name_str = std::format("{}-{}", name, physreg_state_names[i]);
+    states[i].init(name_str.c_str(), getcore().physreg_states);
   }
 
   foreach (i, size) {
@@ -235,14 +233,6 @@ PhysicalRegister* PhysicalRegisterFile::alloc(W8 threadid, int r) {
 
   assert(states[PHYSREG_FREE].count >= 0);
   return physreg;
-}
-
-ostream& PhysicalRegisterFile::print(ostream& os) const {
-  os << "PhysicalRegisterFile<", name, ", rfid ", rfid, ", size ", size, ">:", endl;
-  foreach (i, size) {
-    os << (*this)[i], endl;
-  }
-  return os;
 }
 
 void PhysicalRegisterFile::reset(W8 threadid) {
@@ -265,31 +255,6 @@ void PhysicalRegisterFile::reset() {
 
 StateList& PhysicalRegister::get_state_list(int s) const {
   return getcore().physregfiles[rfid].states[s];
-}
-
-namespace OutOfOrderModel {
-ostream& operator<<(ostream& os, const PhysicalRegister& physreg) {
-  stringbuf sb;
-  print_value_and_flags(sb, physreg.data, physreg.flags);
-  os << "TH ", physreg.threadid, " rfid ", physreg.rfid;
-  os << "  r", intstring(physreg.index(), -3), " state ", padstring(physreg.get_state_list().name, -12), " ", sb;
-  if (physreg.rob)
-    os << " rob ", physreg.rob->index(), " (uuid ", physreg.rob->uop.uuid, ")";
-  os << " refcount ", physreg.refcount;
-
-  return os;
-}
-}; // namespace OutOfOrderModel
-
-ostream& RegisterRenameTable::print(ostream& os) const {
-  foreach (i, TRANSREG_COUNT) {
-    if ((i % 8) == 0)
-      os << " ";
-    os << " ", padstring(arch_reg_names[i], -6), " r", intstring((*this)[i]->index(), -3), " | ";
-    if (((i % 8) == 7) || (i == TRANSREG_COUNT - 1))
-      os << endl;
-  }
-  return os;
 }
 
 //
@@ -459,8 +424,8 @@ bool OutOfOrderCore::runcycle() {
   // Flush event log ring buffer
   //
   if unlikely (config.event_log_enabled) {
-    // logfile << "[cycle ", sim_cycle, "] Miss buffer contents:", endl;
-    // logfile << caches.missbuf;
+    logging::println(logging::INFO, "[cycle {}] Miss buffer contents:", sim_cycle);
+    logging::println(logging::INFO, "{}", caches.missbuf);
     if unlikely (config.flush_event_log_every_cycle) {
       eventlog.flush(true);
     }
@@ -481,9 +446,10 @@ bool OutOfOrderCore::runcycle() {
 
     switch (rc) {
     case COMMIT_RESULT_SMC: {
-      if (logable(3))
-        logfile << "Potentially cross-modifying SMC detected: global flush required (cycle ", sim_cycle, ", ",
-            total_user_insns_committed, " commits)", endl, flush;
+      logging::println(logging::INFO,
+                       "Potentially cross-modifying SMC detected: global flush required (cycle {}, {} commits)",
+                       sim_cycle, total_user_insns_committed);
+      logging::flush();
       //
       // DO NOT GLOBALLY FLUSH! It will cut off the other thread(s) in the
       // middle of their currently committing x86 instruction, causing massive
@@ -505,13 +471,13 @@ bool OutOfOrderCore::runcycle() {
         ThreadContext* t = threads[i];
         if unlikely (!t)
           continue;
-        if (logable(3)) {
-          logfile << "  [vcpu ", i, "] current_basic_block = ", t->current_basic_block;
-          ": ";
-          if (t->current_basic_block)
-            logfile << t->current_basic_block->rip;
-          logfile << endl;
-        }
+
+        logging::println(logging::DEBUG, "[vcpu {}] current_basic_block = {}: ", i, (void*)t->current_basic_block);
+        if (t->current_basic_block)
+          logging::println(logging::DEBUG, "  [vcpu {}] current_basic_block = {}: {}", i, (void*)t->current_basic_block,
+                           (void*)(W64)t->current_basic_block->rip);
+        else
+          logging::println(logging::DEBUG, "  [vcpu {}] current_basic_block = {}", i, (void*)t->current_basic_block);
       }
 
       thread->flush_pipeline();
@@ -546,12 +512,12 @@ bool OutOfOrderCore::runcycle() {
       break;
 
     if unlikely ((sim_cycle - thread->last_commit_at_cycle) > 4096) {
-      stringbuf sb;
-      sb << "[vcpu ", thread->ctx.vcpuid, "] thread ", thread->threadid, ": WARNING: At cycle ", sim_cycle, ", ",
-          total_user_insns_committed, " user commits: no instructions have committed for ",
-          (sim_cycle - thread->last_commit_at_cycle), " cycles; the pipeline could be deadlocked", endl;
-      logfile << sb, flush;
-      cerr << sb, flush;
+      logging::println(logging::ERROR,
+                       "[vcpu {}] thread {}: WARNING: At cycle {}, {} user commits: no instructions have "
+                       "committed for {} cycles; the pipeline could be deadlocked",
+                       thread->ctx.vcpuid, thread->threadid, sim_cycle, total_user_insns_committed,
+                       (sim_cycle - thread->last_commit_at_cycle));
+      logging::flush();
       exiting = 1;
     }
   }
@@ -625,41 +591,41 @@ StateList& ReorderBufferEntry::get_ready_to_issue_list() const {
 //
 // Reorder Buffer
 //
-stringbuf& ReorderBufferEntry::get_operand_info(stringbuf& sb, int operand) const {
+std::string ReorderBufferEntry::get_operand_info(int operand) const {
   PhysicalRegister& physreg = *operands[operand];
   ReorderBufferEntry& sourcerob = *physreg.rob;
 
-  sb << "r", physreg.index();
+  std::string result = std::format("r{}", physreg.index());
   if (PHYS_REG_FILE_COUNT > 1)
-    sb << "@", getcore().physregfiles[physreg.rfid].name;
+    result += std::format("@{}", getcore().physregfiles[physreg.rfid].name);
 
   switch (physreg.state) {
   case PHYSREG_WRITTEN:
-    sb << " (written)";
+    result += " (written)";
     break;
   case PHYSREG_BYPASS:
-    sb << " (ready)";
+    result += " (ready)";
     break;
   case PHYSREG_WAITING:
-    sb << " (wait rob ", sourcerob.index(), " uuid ", sourcerob.uop.uuid, ")";
+    result += std::format(" (wait rob {} uuid {})", sourcerob.index(), sourcerob.uop.uuid);
     break;
   case PHYSREG_ARCH:
     break;
     if (physreg.index() == PHYS_REG_NULL)
-      sb << " (zero)";
+      result += " (zero)";
     else
-      sb << " (arch ", arch_reg_names[physreg.archreg], ")";
+      result += std::format(" (arch {})", arch_reg_names[physreg.archreg]);
     break;
   case PHYSREG_PENDINGFREE:
-    sb << " (pending free for ", arch_reg_names[physreg.archreg], ")";
+    result += std::format(" (pending free for {})", arch_reg_names[physreg.archreg]);
     break;
   default:
     // Cannot be in free state!
-    sb << " (FREE)";
+    result += " (FREE)";
     break;
   }
 
-  return sb;
+  return result;
 }
 
 ThreadContext& ReorderBufferEntry::getthread() const {
@@ -668,115 +634,67 @@ ThreadContext& ReorderBufferEntry::getthread() const {
 
 issueq_tag_t ReorderBufferEntry::get_tag() {
   int mask = ((1 << MAX_THREADS_BIT) - 1) << MAX_ROB_IDX_BIT;
-  if (logable(100))
-    logfile << " get_tag() thread ", (void*)threadid, " rob idx ", (void*)idx, " mask ", (void*)mask, endl;
+  logging::println(logging::VERBOSE, " get_tag() thread {} rob idx {} mask {}", (void*)threadid, (void*)idx,
+                   (void*)mask);
 
   assert(!(idx & mask));
   assert(!(threadid >> MAX_THREADS_BIT));
   //  int threadid = 1;
   issueq_tag_t rc = (idx | (threadid << MAX_ROB_IDX_BIT));
-  if (logable(100))
-    logfile << " tag ", (void*)rc, endl;
+  logging::println(logging::VERBOSE, " tag {}", (void*)rc);
   return rc;
 }
 
-ostream& ReorderBufferEntry::print_operand_info(ostream& os, int operand) const {
-  stringbuf sb;
-  get_operand_info(sb, operand);
-  os << sb;
-  return os;
-}
 
-ostream& ReorderBufferEntry::print(ostream& os) const {
-  stringbuf name, rainfo, rbinfo, rcinfo;
-  nameof(name, uop);
-  get_operand_info(rainfo, 0);
-  get_operand_info(rbinfo, 1);
-  get_operand_info(rcinfo, 2);
-
-  os << "rob ", intstring(index(), -3), " uuid ", intstring(uop.uuid, 16), " rip 0x", hexstring(uop.rip, 48), " ",
-      padstring(current_state_list->name, -24), " ", (uop.som ? "SOM" : "   "), " ", (uop.eom ? "EOM" : "   "), " @ ",
-      padstring((cluster >= 0) ? clusters[cluster].name : "???", -4), " ", padstring(name, -12), " r",
-      intstring(physreg->index(), -3), " ", padstring(arch_reg_names[uop.rd], -6);
-  if (isload(uop.opcode))
-    os << " ld", intstring(lsq->index(), -3);
-  else if (isstore(uop.opcode))
-    os << " st", intstring(lsq->index(), -3);
-  else
-    os << "      ";
-
-  os << " = ";
-  os << padstring(rainfo, -30);
-  os << padstring(rbinfo, -30);
-  os << padstring(rcinfo, -30);
-
-  return os;
-}
-
-void ThreadContext::print_rob(ostream& os) {
-  os << "ROB head ", ROB.head, " to tail ", ROB.tail, " (", ROB.count, " entries):", endl;
-  foreach_forward(ROB, i) {
-    ReorderBufferEntry& rob = ROB[i];
-    os << "  ", rob, endl;
-  }
-}
-
-void ThreadContext::print_lsq(ostream& os) {
-  os << "LSQ head ", LSQ.head, " to tail ", LSQ.tail, " (", LSQ.count, " entries):", endl;
-  foreach_forward(LSQ, i) {
-    LoadStoreQueueEntry& lsq = LSQ[i];
-    os << "  ", lsq, endl;
-  }
-}
-
-void ThreadContext::print_rename_tables(ostream& os) {
-  os << "SpecRRT:", endl;
-  os << specrrt;
-  os << "CommitRRT:", endl;
-  os << commitrrt;
-}
-
-void OutOfOrderCore::print_smt_state(ostream& os) {
-  os << "Print SMT statistics:", endl;
+void OutOfOrderCore::print_smt_state() {
+  logging::println("Print SMT statistics:");
 
   foreach (i, threadcount) {
     ThreadContext* thread = threads[i];
-    os << "Thread ", i, ":", endl, "  total_uops_committed ", thread->total_uops_committed, endl, "  uipc ",
-        double(thread->total_uops_committed) / double(iterations), endl, "  total_insns_committed ",
-        thread->total_insns_committed, "  ipc ", double(thread->total_insns_committed) / double(iterations), endl;
+    logging::println("Thread {}:", i);
+    logging::println("  total_uops_committed {}", thread->total_uops_committed);
+    logging::println("  uipc {}", double(thread->total_uops_committed) / double(iterations));
+    logging::println("  total_insns_committed {}", thread->total_insns_committed);
+    logging::println("  ipc {}", double(thread->total_insns_committed) / double(iterations));
   }
 }
 
-void ThreadContext::dump_smt_state(ostream& os) {
-  os << "SMT per-thread state for t", threadid, ":", endl;
-
-  print_rename_tables(os);
-  print_rob(os);
-  print_lsq(os);
-  os << flush;
+auto std::formatter<OutOfOrderModel::ThreadContext>::format(const OutOfOrderModel::ThreadContext& thread,
+                                                            std::format_context& fctx) const {
+  auto out = fctx.out();
+  out = std::format_to(out, "SMT per-thread state for t{}:\n", thread.threadid);
+  out = std::format_to(out, "SpecRRT:\n");
+  out = std::format_to(out, "{}", thread.specrrt);
+  out = std::format_to(out, "CommitRRT:\n");
+  out = std::format_to(out, "{}\n", thread.commitrrt);
+  out = std::format_to(out, "{}\n", thread.ROB);
+  out = std::format_to(out, "{}\n", thread.LSQ);
+  return out;
 }
 
-void OutOfOrderCore::dump_smt_state(ostream& os) {
-  os << "SMT common structures:", endl;
+auto std::formatter<OutOfOrderModel::OutOfOrderCore>::format(const OutOfOrderModel::OutOfOrderCore& core,
+                                                             std::format_context& ctx) const {
+  auto out = ctx.out();
 
-  print_list_of_state_lists<PhysicalRegister>(os, physreg_states, "Physical register states");
+  out = std::format_to(out, "SMT common structures:\n");
   foreach (i, PHYS_REG_FILE_COUNT) {
-    os << physregfiles[i];
+    out = std::format_to(out, "{}\n", core.physregfiles[i]);
   }
+  out = std::format_to(out, "Issue Queues: int0={} int1={} ld={} fp={}\n", core.issueq_int0.count,
+                       core.issueq_int1.count, core.issueq_ld.count, core.issueq_fp.count);
 
-  print_list_of_state_lists<ReorderBufferEntry>(os, rob_states, "ROB entry states");
-  os << "Issue Queues:", endl;
-  foreach_issueq(print(os));
-  caches.print(os);
+  out = std::format_to(out, "Caches: lfrq_count={} missbuf_free={}\n", core.caches.lfrq.count,
+                       core.caches.missbuf.freemap.count());
 
-  os << "Unaligned predictor:", endl;
-  os << "  ", unaligned_predictor.count(), " unaligned bits out of ", UNALIGNED_PREDICTOR_SIZE, " bits", endl;
-  os << "  Raw data: ", unaligned_predictor, endl;
+  out = std::format_to(out, "Unaligned predictor:\n");
+  out = std::format_to(out, "  {} unaligned bits out of {} bits\n", core.unaligned_predictor.count(),
+                       UNALIGNED_PREDICTOR_SIZE);
+  out = std::format_to(out, "  Raw data: {}\n", core.unaligned_predictor.to_string());
 
-  foreach (i, threadcount) {
-    ThreadContext* thread = threads[i];
-    thread->dump_smt_state(os);
+  foreach (i, core.threadcount) {
+    out = std::format_to(out, "{}\n", *core.threads[i]);
   }
+  return out;
 }
 
 //
@@ -819,21 +737,22 @@ void OutOfOrderCore::check_refcounts() {
     PhysicalRegisterFile& physregs = physregfiles[rfid];
     foreach (i, physregs.size) {
       if unlikely (physregs[i].refcount != refcounts[rfid][i]) {
-        logfile << "ERROR: r", i, " refcount is ", physregs[i].refcount, " but should be ", refcounts[rfid][i], endl;
+        logging::println(logging::ERROR, "ERROR: r{} refcount is {} but should be {}", i, physregs[i].refcount,
+                         refcounts[rfid][i]);
 
         foreach_forward(ROB, r) {
           ReorderBufferEntry& rob = ROB[r];
           foreach (j, MAX_OPERANDS) {
             if ((rob.operands[j]->index() == i) & (rob.operands[j]->rfid == rfid))
-              logfile << "  ROB ", r, " operand ", j, endl;
+              logging::println(logging::ERROR, "  ROB {} operand {}", r, j);
           }
         }
 
         foreach (j, TRANSREG_COUNT) {
           if ((commitrrt[j]->index() == i) & (commitrrt[j]->rfid == rfid))
-            logfile << "  CommitRRT ", arch_reg_names[j], endl;
+            logging::println(logging::ERROR, "  CommitRRT {}", arch_reg_names[j]);
           if ((specrrt[j]->index() == i) & (specrrt[j]->rfid == rfid))
-            logfile << "  SpecRRT ", arch_reg_names[j], endl;
+            logging::println(logging::ERROR, "  SpecRRT {}", arch_reg_names[j]);
         }
 
         errors = 1;
@@ -867,38 +786,15 @@ void OutOfOrderCore::check_rob() {
         assert(inrange(rob->index(), 0, ROB_SIZE - 1));
         assert(rob->current_state_list == &list);
         if (!((rob->current_state_list != &thread->rob_free_list) ? rob->entry_valid : (!rob->entry_valid))) {
-          logfile << "ROB ", rob->index(), " list = ", rob->current_state_list->name, " entry_valid ", rob->entry_valid,
-              endl, flush;
-          dump_smt_state(logfile);
+          logging::println(logging::ERROR, "ROB {} list = {} entry_valid {}", rob->index(),
+                           rob->current_state_list->name, static_cast<int>(rob->entry_valid));
+          logging::flush();
+          dump_smt_state();
           assert(false);
         }
       }
     }
   }
-}
-
-ostream& LoadStoreQueueEntry::print(ostream& os) const {
-  os << (store ? "st" : "ld"), intstring(index(), -3), " ";
-  os << "uuid ", intstring(rob->uop.uuid, 10), " ";
-  os << "rob ", intstring(rob->index(), -3), " ";
-  os << "r", intstring(rob->physreg->index(), -3);
-  if (PHYS_REG_FILE_COUNT > 1)
-    os << "@", getcore().physregfiles[rob->physreg->rfid].name;
-  os << " ";
-  if (invalid) {
-    os << "< Invalid: fault 0x", hexstring(data, 8), " > ";
-  } else {
-    if (datavalid)
-      os << bytemaskstring((const byte*)&data, bytemask, 8);
-    else
-      os << "<    Data Invalid     >";
-    os << " @ ";
-    if (addrvalid)
-      os << "0x", hexstring(physaddr << 3, 48);
-    else
-      os << "< Addr Inval >";
-  }
-  return os;
 }
 
 //
@@ -916,34 +812,31 @@ bool ThreadContext::handle_barrier() {
   int assistid = ctx.commitarf[REG_rip];
   assist_func_t assist = (assist_func_t)(Waddr)assistid_to_func[assistid];
 
-  if (logable(4)) {
-    logfile << "[vcpu ", ctx.vcpuid, "] Barrier (#", assistid, " -> ", (void*)assist, " ", assist_name(assist),
-        " called from ", (RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx)), "; return to ",
-        (void*)(Waddr)ctx.commitarf[REG_nextrip], ") at ", sim_cycle, " cycles, ", total_user_insns_committed,
-        " commits", endl, flush;
-  }
+  logging::println(logging::INFO,
+                   "[vcpu {}] Barrier (#{} -> {} {} called from {}; return to {}) at {} cycles, {} commits", ctx.vcpuid,
+                   assistid, (void*)assist, assist_name(assist), RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx),
+                   (void*)(Waddr)ctx.commitarf[REG_nextrip], sim_cycle, total_user_insns_committed);
+  logging::flush();
 
-  if (logable(6))
-    logfile << "Calling assist function at ", (void*)assist, "...", endl, flush;
+  logging::println(logging::DEBUG, "Calling assist function at {}...", (void*)assist);
+  logging::flush();
 
   update_assist_stats(assist);
-  if (logable(6)) {
-    logfile << "Before assist:", endl, ctx, endl;
-  }
+  logging::println(logging::DEBUG, "Before assist:");
+  logging::println(logging::DEBUG, "{}", ctx);
 
   assist(ctx);
 
-  if (logable(6)) {
-    logfile << "Done with assist", endl;
-    logfile << "New state:", endl;
-    logfile << ctx;
-  }
+  logging::println(logging::DEBUG, "Done with assist");
+  logging::println(logging::DEBUG, "New state:");
+  logging::println(logging::DEBUG, "{}", ctx);
 
   // Flush again, but restart at possibly modified rip
   flush_pipeline();
 
   if (requested_switch_to_native) {
-    logfile << "PTL call requested switch to native mode at rip ", (void*)(Waddr)ctx.commitarf[REG_rip], endl;
+    logging::println(logging::INFO, "PTL call requested switch to native mode at rip {}",
+                     (void*)(Waddr)ctx.commitarf[REG_rip]);
     return false;
   }
   return true;
@@ -954,11 +847,9 @@ bool ThreadContext::handle_exception() {
   core_to_external_state();
   flush_pipeline();
 
-  if (logable(4)) {
-    logfile << "[vcpu ", ctx.vcpuid, "] Exception ", exception_name(ctx.exception), " called from rip ",
-        (void*)(Waddr)ctx.commitarf[REG_rip], " at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits",
-        endl, flush;
-  }
+  logging::println(logging::INFO, "[vcpu {}] Exception {} called from rip {} at {} cycles, {} commits", ctx.vcpuid,
+                   ctx.exception, (void*)(Waddr)ctx.commitarf[REG_rip], sim_cycle, total_user_insns_committed);
+  logging::flush();
 
   //
   // CheckFailed and SkipBlock exceptions are raised by the chk uop.
@@ -980,8 +871,9 @@ bool ThreadContext::handle_exception() {
   //
   if (ctx.exception == EXCEPTION_SkipBlock) {
     ctx.commitarf[REG_rip] = chk_recovery_rip;
-    if (logable(6))
-      logfile << "SkipBlock pseudo-exception: skipping to ", (void*)(Waddr)ctx.commitarf[REG_rip], endl, flush;
+    logging::println(logging::DEBUG, "SkipBlock pseudo-exception: skipping to {}",
+                     (void*)(Waddr)ctx.commitarf[REG_rip]);
+    logging::flush();
     flush_pipeline();
     return true;
   }
@@ -1013,13 +905,12 @@ bool ThreadContext::handle_exception() {
     ctx.x86_exception = EXCEPTION_x86_gp_fault;
     break;
   default:
-    logfile << "Unsupported internal exception type ", exception_name(ctx.exception), endl, flush;
+    logging::println(logging::ERROR, "Unsupported internal exception type {}", static_cast<int>(ctx.exception));
+    logging::flush();
     assert(false);
   }
 
-  if (logable(4)) {
-    logfile << ctx;
-  }
+  logging::println(logging::INFO, "{}", ctx);
 
   ctx.propagate_x86_exception(ctx.x86_exception, ctx.error_code, ctx.cr2);
 
@@ -1045,23 +936,6 @@ void PhysicalRegister::fill_operand_info(PhysicalRegisterOperandInfo& opinfo) {
     opinfo.rob = rob->index();
     opinfo.uuid = rob->uop.uuid;
   }
-}
-
-ostream& OutOfOrderModel::operator<<(ostream& os, const PhysicalRegisterOperandInfo& opinfo) {
-  os << "[r", opinfo.physreg, " ", short_physreg_state_names[opinfo.state], " ";
-  switch (opinfo.state) {
-  case PHYSREG_WAITING:
-  case PHYSREG_BYPASS:
-  case PHYSREG_WRITTEN:
-    os << "rob ", opinfo.rob, " uuid ", opinfo.uuid;
-    break;
-  case PHYSREG_ARCH:
-  case PHYSREG_PENDINGFREE:
-    os << arch_reg_names[opinfo.archreg];
-    break;
-  };
-  os << "]";
-  return os;
 }
 
 bool EventLog::init(size_t bufsize) {
@@ -1090,15 +964,11 @@ void EventLog::reset() {
 }
 
 void EventLog::flush(bool only_to_tail) {
-  if unlikely (!logfile)
-    return;
-  if unlikely (!logfile->ok())
-    return;
-  print(*logfile, only_to_tail);
+  print(only_to_tail);
   tail = start;
 }
 
-ostream& EventLog::print(ostream& os, bool only_to_tail) {
+void EventLog::print(bool only_to_tail) {
   if (tail >= end)
     tail = start;
   if (tail < start)
@@ -1110,7 +980,7 @@ ostream& EventLog::print(ostream& os, bool only_to_tail) {
   size_t bufsize = end - start;
 
   if (!config.flush_event_log_every_cycle)
-    os << "#-------- Start of event log --------", endl;
+    logging::println(logging::INFO, "#-------- Start of event log --------");
 
   foreach (i, (only_to_tail ? (tail - start) : bufsize)) {
     if unlikely (p >= end)
@@ -1124,71 +994,71 @@ ostream& EventLog::print(ostream& os, bool only_to_tail) {
 
     if unlikely (p->cycle != cycle) {
       cycle = p->cycle;
-      os << "Cycle ", cycle, ":", endl;
+      logging::println(logging::INFO, "Cycle {}:", cycle);
     }
 
-    p->print(os);
+    logging::print(logging::INFO, "{}", *p);
     p++;
   }
 
   if (!config.flush_event_log_every_cycle)
-    os << "#-------- End of event log --------", endl;
-
-  return os;
+    logging::println(logging::INFO, "#-------- End of event log --------");
 }
 
-ostream& OutOfOrderCoreEvent::print(ostream& os) const {
-  bool ld = isload(uop.opcode);
-  bool st = isstore(uop.opcode);
-  bool br = isbranch(uop.opcode);
+auto std::formatter<OutOfOrderModel::OutOfOrderCoreEvent>::format(const OutOfOrderModel::OutOfOrderCoreEvent& ev,
+                                                                  std::format_context& ctx) const {
+  auto out = ctx.out();
+  bool ld = isload(ev.uop.opcode);
+  bool st = isstore(ev.uop.opcode);
+  bool br = isbranch(ev.uop.opcode);
 
-  stringbuf uopname;
-  nameof(uopname, uop);
+  std::string uopname = nameof(ev.uop);
 
-  os << intstring(uuid, 20), " t", threadid, " ";
-  switch (type) {
+  out = std::format_to(out, "{:>20} t{} ", ev.uuid, ev.threadid);
+  switch (ev.type) {
     //
     // Fetch Events
     //
   case EVENT_FETCH_STALLED:
-    os << "fetch  frontend stalled";
+    out = std::format_to(out, "fetch  frontend stalled");
     break;
   case EVENT_FETCH_ICACHE_WAIT:
-    os << "fetch  rip ", rip, ": wait for icache fill";
+    out = std::format_to(out, "fetch  rip {}: wait for icache fill", ev.rip);
     break;
   case EVENT_FETCH_FETCHQ_FULL:
-    os << "fetch  rip ", rip, ": fetchq full";
+    out = std::format_to(out, "fetch  rip {}: fetchq full", ev.rip);
     break;
   case EVENT_FETCH_IQ_QUOTA_FULL:
-    os << "fetch  rip ", rip, ": issue queue quota full = ", issueq_count, " ";
+    out = std::format_to(out, "fetch  rip {}: issue queue quota full = {} ", ev.rip, ev.issueq_count);
     break;
   case EVENT_FETCH_BOGUS_RIP:
-    os << "fetch  rip ", rip, ": bogus RIP or decode failed";
+    out = std::format_to(out, "fetch  rip {}: bogus RIP or decode failed", ev.rip);
     break;
   case EVENT_FETCH_ICACHE_MISS:
-    os << "fetch  rip ", rip, ": wait for icache fill of phys ",
-        (void*)(Waddr)((rip.mfnlo << 12) + lowbits(rip.rip, 12)), " on missbuf ", fetch.missbuf;
+    out = std::format_to(out, "fetch  rip {}: wait for icache fill of phys {} on missbuf {}", ev.rip,
+                         (void*)(Waddr)((ev.rip.mfnlo << 12) + lowbits(ev.rip.rip, 12)), ev.fetch.missbuf);
     break;
   case EVENT_FETCH_SPLIT:
-    os << "fetch  rip ", rip, ": split unaligned load or store ", uop;
+    out = std::format_to(out, "fetch  rip {}: split unaligned load or store {}", ev.rip, ev.uop);
     break;
   case EVENT_FETCH_ASSIST:
-    os << "fetch  rip ", rip, ": branch into assist microcode: ", uop;
+    out = std::format_to(out, "fetch  rip {}: branch into assist microcode: {}", ev.rip, ev.uop);
     break;
   case EVENT_FETCH_TRANSLATE:
-    os << "xlate  rip ", rip, ": ", fetch.bb_uop_count, " uops";
+    out = std::format_to(out, "xlate  rip {}: {} uops", ev.rip, ev.fetch.bb_uop_count);
     break;
   case EVENT_FETCH_OK: {
-    os << "fetch  rip ", rip, ": ", uop, " (uopid ", uop.bbindex;
-    if (uop.som)
-      os << "; SOM";
-    if (uop.eom)
-      os << "; EOM ", uop.bytes, " bytes";
-    os << ")";
-    if (uop.eom && fetch.predrip)
-      os << " -> pred ", (void*)fetch.predrip;
-    if (isload(uop.opcode) | isstore(uop.opcode)) {
-      os << "; unaligned pred slot ", OutOfOrderCore::hash_unaligned_predictor_slot(rip), " -> ", uop.unaligned;
+    out = std::format_to(out, "fetch  rip {}: {} (uopid {}", ev.rip, ev.uop, ev.uop.bbindex);
+    if (ev.uop.som)
+      out = std::format_to(out, "; SOM");
+    if (ev.uop.eom)
+      out = std::format_to(out, "; EOM {} bytes", ev.uop.bytes);
+    out = std::format_to(out, ")");
+    if (ev.uop.eom && ev.fetch.predrip)
+      out = std::format_to(out, " -> pred {}", (void*)ev.fetch.predrip);
+    if (isload(ev.uop.opcode) | isstore(ev.uop.opcode)) {
+      out = std::format_to(out, "; unaligned pred slot {} -> {}", OutOfOrderCore::hash_unaligned_predictor_slot(ev.rip),
+                           ev.uop.unaligned);
     }
     break;
   }
@@ -1196,543 +1066,562 @@ ostream& OutOfOrderCoreEvent::print(ostream& os) const {
     // Rename Events
     //
   case EVENT_RENAME_FETCHQ_EMPTY:
-    os << "rename fetchq empty";
+    out = std::format_to(out, "rename fetchq empty");
     break;
   case EVENT_RENAME_ROB_FULL:
-    os << "rename ROB full";
+    out = std::format_to(out, "rename ROB full");
     break;
   case EVENT_RENAME_PHYSREGS_FULL:
-    os << "rename physical register file full";
+    out = std::format_to(out, "rename physical register file full");
     break;
   case EVENT_RENAME_LDQ_FULL:
-    os << "rename load queue full";
+    out = std::format_to(out, "rename load queue full");
     break;
   case EVENT_RENAME_STQ_FULL:
-    os << "rename store queue full";
+    out = std::format_to(out, "rename store queue full");
     break;
   case EVENT_RENAME_MEMQ_FULL:
-    os << "rename memory queue full";
+    out = std::format_to(out, "rename memory queue full");
     break;
   case EVENT_RENAME_OK: {
-    os << "rename rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " r", intstring(physreg, -3), "@",
-        phys_reg_file_names[rfid];
+    out = std::format_to(out, "rename rob {:<3}({:<5}) r{:<3}@{}", ev.rob, uopname, ev.physreg,
+                         phys_reg_file_names[ev.rfid]);
     if (ld | st)
-      os << " lsq", lsq;
-    os << " = ";
+      out = std::format_to(out, " lsq{}", ev.lsq);
+    out = std::format_to(out, " = ");
     foreach (i, MAX_OPERANDS)
-      os << rename.opinfo[i], ((i < MAX_OPERANDS - 1) ? " " : "");
-    os << "; renamed";
-    os << " ", arch_reg_names[uop.rd], " (old r", rename.oldphys, ")";
-    if unlikely (!uop.nouserflags) {
-      if likely (uop.setflags & SETFLAG_ZF)
-        os << " zf (old r", rename.oldzf, ")";
-      if likely (uop.setflags & SETFLAG_CF)
-        os << " cf (old r", rename.oldcf, ")";
-      if likely (uop.setflags & SETFLAG_OF)
-        os << " of (old r", rename.oldof, ")";
+      out = std::format_to(out, "{}{}", ev.rename.opinfo[i], ((i < MAX_OPERANDS - 1) ? " " : ""));
+    out = std::format_to(out, "; renamed");
+    out = std::format_to(out, " {} (old r{})", arch_reg_names[ev.uop.rd], ev.rename.oldphys);
+    if unlikely (!ev.uop.nouserflags) {
+      if likely (ev.uop.setflags & SETFLAG_ZF)
+        out = std::format_to(out, " zf (old r{})", ev.rename.oldzf);
+      if likely (ev.uop.setflags & SETFLAG_CF)
+        out = std::format_to(out, " cf (old r{})", ev.rename.oldcf);
+      if likely (ev.uop.setflags & SETFLAG_OF)
+        out = std::format_to(out, " of (old r{})", ev.rename.oldof);
     }
     break;
   }
   case EVENT_FRONTEND:
-    os << "front  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " frontend stage ",
-        (FRONTEND_STAGES - frontend.cycles_left), " of ", FRONTEND_STAGES;
+    out = std::format_to(out, "front  rob {:<3}({:<5}) frontend stage {} of {}", ev.rob, uopname,
+                         (FRONTEND_STAGES - ev.frontend.cycles_left), FRONTEND_STAGES);
     break;
   case EVENT_CLUSTER_NO_CLUSTER:
   case EVENT_CLUSTER_OK: {
-    os << ((type == EVENT_CLUSTER_OK) ? "clustr" : "noclus"), " rob ", intstring(rob, -3), "(", padstring(uopname, -5),
-        ")", " allowed FUs = ", bitstring(fuinfo[uop.opcode].fu, FU_COUNT, true), " -> clusters ",
-        bitstring(select_cluster.allowed_clusters, MAX_CLUSTERS, true), " avail";
+    out = std::format_to(out, "{} rob {:<3}({:<5}) allowed FUs = {} -> clusters {} avail",
+                         ((ev.type == EVENT_CLUSTER_OK) ? "clustr" : "noclus"), ev.rob, uopname,
+                         bitstring(fuinfo[ev.uop.opcode].fu, FU_COUNT, true),
+                         bitstring(ev.select_cluster.allowed_clusters, MAX_CLUSTERS, true));
     foreach (i, MAX_CLUSTERS)
-      os << " ", select_cluster.iq_avail[i];
-    os << "-> ";
-    if (type == EVENT_CLUSTER_OK)
-      os << "cluster ", clusters[cluster].name;
+      out = std::format_to(out, " {}", ev.select_cluster.iq_avail[i]);
+    out = std::format_to(out, "-> ");
+    if (ev.type == EVENT_CLUSTER_OK)
+      out = std::format_to(out, "cluster {}", clusters[ev.cluster].name);
     else
-      os << "-> none";
-    break;
+      out = std::format_to(out, "-> none");
     break;
   }
   case EVENT_DISPATCH_NO_CLUSTER:
   case EVENT_DISPATCH_OK: {
-    os << ((type == EVENT_DISPATCH_OK) ? "disptc" : "nodisp"), " rob ", intstring(rob, -3), "(", padstring(uopname, -5),
-        ")", " operands ";
+    out = std::format_to(out, "{} rob {:<3}({:<5}) operands ", ((ev.type == EVENT_DISPATCH_OK) ? "disptc" : "nodisp"),
+                         ev.rob, uopname);
     foreach (i, MAX_OPERANDS)
-      os << dispatch.opinfo[i], ((i < MAX_OPERANDS - 1) ? " " : "");
-    if (type == EVENT_DISPATCH_OK)
-      os << " -> cluster ", clusters[cluster].name;
+      out = std::format_to(out, "{}{}", ev.dispatch.opinfo[i], ((i < MAX_OPERANDS - 1) ? " " : ""));
+    if (ev.type == EVENT_DISPATCH_OK)
+      out = std::format_to(out, " -> cluster {}", clusters[ev.cluster].name);
     else
-      os << " -> none";
+      out = std::format_to(out, " -> none");
     break;
   }
   case EVENT_ISSUE_NO_FU: {
-    os << "issue  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")";
-    os << "no FUs available in cluster ", clusters[cluster].name, ": ",
-        "fu_avail = ", bitstring(issue.fu_avail, FU_COUNT, true), ", ",
-        "op_fu = ", bitstring(fuinfo[uop.opcode].fu, FU_COUNT, true),
-        ", "
-        "fu_cl_mask = ",
-        bitstring(clusters[cluster].fu_mask, FU_COUNT, true);
+    out = std::format_to(out, "issue  rob {:<3}({:<5})", ev.rob, uopname);
+    out = std::format_to(out, "no FUs available in cluster {}: fu_avail = {}, op_fu = {}, fu_cl_mask = {}",
+                         clusters[ev.cluster].name, bitstring(ev.issue.fu_avail, FU_COUNT, true),
+                         bitstring(fuinfo[ev.uop.opcode].fu, FU_COUNT, true),
+                         bitstring(clusters[ev.cluster].fu_mask, FU_COUNT, true));
     break;
   }
   case EVENT_ISSUE_OK: {
-    stringbuf sb;
-    sb << "issue  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")";
-    sb << " on ", padstring(fu_names[fu], -4), " in ", padstring(cluster_names[cluster], -4), ": r",
-        intstring(physreg, -3), "@", phys_reg_file_names[rfid];
-    sb << " ";
-    print_value_and_flags(sb, issue.state.reg.rddata, issue.state.reg.rdflags);
-    sb << " =";
-    sb << " ";
-    print_value_and_flags(sb, issue.operand_data[RA], issue.operand_flags[RA]);
-    sb << ", ";
-    sb << " ";
-    print_value_and_flags(sb, issue.operand_data[RB], issue.operand_flags[RB]);
-    sb << ", ";
-    sb << " ";
-    print_value_and_flags(sb, issue.operand_data[RC], issue.operand_flags[RC]);
-    sb << " (", issue.cycles_left, " cycles left)";
-    if (issue.mispredicted)
-      sb << "; mispredicted (real ", (void*)(Waddr)issue.state.reg.rddata, " vs expected ", (void*)(Waddr)issue.predrip,
-          ")";
-    os << sb;
+    out = std::format_to(out, "issue  rob {:<3}({:<5})", ev.rob, uopname);
+    out = std::format_to(out, " on {:<4} in {:<4}: r{:<3}@{}", fu_names[ev.fu], cluster_names[ev.cluster], ev.physreg,
+                         phys_reg_file_names[ev.rfid]);
+    out = std::format_to(out, " {}", format_value_and_flags(ev.issue.state.reg.rddata, ev.issue.state.reg.rdflags));
+    out = std::format_to(out, " = {}", format_value_and_flags(ev.issue.operand_data[RA], ev.issue.operand_flags[RA]));
+    out = std::format_to(out, ",  {}", format_value_and_flags(ev.issue.operand_data[RB], ev.issue.operand_flags[RB]));
+    out = std::format_to(out, ",  {}", format_value_and_flags(ev.issue.operand_data[RC], ev.issue.operand_flags[RC]));
+    out = std::format_to(out, " ({} cycles left)", ev.issue.cycles_left);
+    if (ev.issue.mispredicted)
+      out = std::format_to(out, "; mispredicted (real {} vs expected {})", (void*)(Waddr)ev.issue.state.reg.rddata,
+                           (void*)(Waddr)ev.issue.predrip);
     break;
   }
   case EVENT_REPLAY: {
-    os << "replay rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " r", intstring(physreg, -3), "@",
-        phys_reg_file_names[rfid], " on cluster ", clusters[cluster].name, ": waiting on";
+    out = std::format_to(out, "replay rob {:<3}({:<5}) r{:<3}@{} on cluster {}: waiting on", ev.rob, uopname,
+                         ev.physreg, phys_reg_file_names[ev.rfid], clusters[ev.cluster].name);
     foreach (i, MAX_OPERANDS) {
-      if (!bit(replay.ready, i))
-        os << " ", replay.opinfo[i];
+      if (!bit(ev.replay.ready, i))
+        out = std::format_to(out, " {}", ev.replay.opinfo[i]);
     }
     break;
   }
   case EVENT_STORE_WAIT: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    os << "wait on ";
-    if (!loadstore.rcready)
-      os << " rc";
-    if (loadstore.inherit_sfr_used) {
-      os << ((loadstore.rcready) ? "" : " and "), loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid,
-          ", stq ", loadstore.inherit_sfr_lsq, ", rob ", loadstore.inherit_sfr_rob, ", r",
-          loadstore.inherit_sfr_physreg, ")";
+    out = std::format_to(out, "store{} rob {:<3}({:<5}) stq {} r{:<3} on {:<4} @ {} (phys {}): ",
+                         (ev.loadstore.load_store_second_phase ? "2" : " "), ev.rob, uopname, ev.lsq, ev.physreg,
+                         fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "wait on ");
+    if (!ev.loadstore.rcready)
+      out = std::format_to(out, " rc");
+    if (ev.loadstore.inherit_sfr_used) {
+      out = std::format_to(out, "{}{} (uuid {}, stq {}, rob {}, r{})", ((ev.loadstore.rcready) ? "" : " and "),
+                           ev.loadstore.inherit_sfr, ev.loadstore.inherit_sfr_uuid, ev.loadstore.inherit_sfr_lsq,
+                           ev.loadstore.inherit_sfr_rob, ev.loadstore.inherit_sfr_physreg);
     }
     break;
   }
   case EVENT_STORE_PARALLEL_FORWARDING_MATCH: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    os << "ignored parallel forwarding match with ldq ", loadstore.inherit_sfr_lsq, " (uuid ",
-        loadstore.inherit_sfr_uuid, " rob", loadstore.inherit_sfr_rob, " r", loadstore.inherit_sfr_physreg, ")";
+    out = std::format_to(out, "store{} rob {:<3}({:<5}) stq {} r{:<3} on {:<4} @ {} (phys {}): ",
+                         (ev.loadstore.load_store_second_phase ? "2" : " "), ev.rob, uopname, ev.lsq, ev.physreg,
+                         fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "ignored parallel forwarding match with ldq {} (uuid {} rob{} r{})",
+                         ev.loadstore.inherit_sfr_lsq, ev.loadstore.inherit_sfr_uuid, ev.loadstore.inherit_sfr_rob,
+                         ev.loadstore.inherit_sfr_physreg);
     break;
   }
   case EVENT_STORE_ALIASED_LOAD: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    os << "aliased with ldbuf ", loadstore.inherit_sfr_lsq, " (uuid ", loadstore.inherit_sfr_uuid, " rob",
-        loadstore.inherit_sfr_rob, " r", loadstore.inherit_sfr_physreg, ");", " (add colliding load rip ",
-        (void*)(Waddr)loadstore.inherit_sfr_rip, "; replay from rip ", rip, ")";
+    out = std::format_to(out, "store{} rob {:<3}({:<5}) stq {} r{:<3} on {:<4} @ {} (phys {}): ",
+                         (ev.loadstore.load_store_second_phase ? "2" : " "), ev.rob, uopname, ev.lsq, ev.physreg,
+                         fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out,
+                         "aliased with ldbuf {} (uuid {} rob{} r{}); (add colliding load rip {}; replay from rip {})",
+                         ev.loadstore.inherit_sfr_lsq, ev.loadstore.inherit_sfr_uuid, ev.loadstore.inherit_sfr_rob,
+                         ev.loadstore.inherit_sfr_physreg, (void*)(Waddr)ev.loadstore.inherit_sfr_rip, ev.rip);
     break;
   }
   case EVENT_STORE_ISSUED: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    if (loadstore.inherit_sfr_used) {
-      os << "inherit from ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid, ", rob",
-          loadstore.inherit_sfr_rob, ", lsq ", loadstore.inherit_sfr_lsq, ", r", loadstore.inherit_sfr_physreg, ");";
+    out = std::format_to(out, "store{} rob {:<3}({:<5}) stq {} r{:<3} on {:<4} @ {} (phys {}): ",
+                         (ev.loadstore.load_store_second_phase ? "2" : " "), ev.rob, uopname, ev.lsq, ev.physreg,
+                         fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    if (ev.loadstore.inherit_sfr_used) {
+      out = std::format_to(out, "inherit from {} (uuid {}, rob{}, lsq {}, r{});", ev.loadstore.inherit_sfr,
+                           ev.loadstore.inherit_sfr_uuid, ev.loadstore.inherit_sfr_rob, ev.loadstore.inherit_sfr_lsq,
+                           ev.loadstore.inherit_sfr_physreg);
     }
-    os << " <= ", hexstring(loadstore.data_to_store, 8 * (1 << uop.size)), " = ", loadstore.sfr;
+    out = std::format_to(out, " <= {} = {}", hexstring(ev.loadstore.data_to_store, 8 * (1 << ev.uop.size)),
+                         ev.loadstore.sfr);
     break;
   }
   case EVENT_STORE_LOCK_RELEASED: {
-    os << "lk-rel", " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " stq ", lsq, " r",
-        intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
-        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ", "lock released (original ld.acq uuid ",
-        loadstore.locking_uuid, " rob ", loadstore.locking_rob, " on vcpu ", loadstore.locking_vcpuid, ")";
+    out = std::format_to(out, "lk-rel rob {:<3}({:<5}) stq {} r{:<3} on {:<4} @ {} (phys {}): ", ev.rob, uopname,
+                         ev.lsq, ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "lock released (original ld.acq uuid {} rob {} on vcpu {})", ev.loadstore.locking_uuid,
+                         ev.loadstore.locking_rob, ev.loadstore.locking_vcpuid);
     break;
   }
   case EVENT_STORE_LOCK_ANNULLED: {
-    os << "lk-anl", " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " stq ", lsq, " r",
-        intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
-        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ", "lock annulled (original ld.acq uuid ",
-        loadstore.locking_uuid, " rob ", loadstore.locking_rob, " on vcpu ", loadstore.locking_vcpuid, ")";
+    out = std::format_to(out, "lk-anl rob {:<3}({:<5}) stq {} r{:<3} on {:<4} @ {} (phys {}): ", ev.rob, uopname,
+                         ev.lsq, ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "lock annulled (original ld.acq uuid {} rob {} on vcpu {})", ev.loadstore.locking_uuid,
+                         ev.loadstore.locking_rob, ev.loadstore.locking_vcpuid);
     break;
   }
   case EVENT_STORE_LOCK_REPLAY: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3),
-        "): ", "replay because vcpuid ", loadstore.locking_vcpuid, " uop uuid ", loadstore.locking_uuid, " has lock";
+    out = std::format_to(out, "store{} rob {:<3}({:<5}) stq {} r{:<3} on {:<4} @ {} (phys {}): ",
+                         (ev.loadstore.load_store_second_phase ? "2" : " "), ev.rob, uopname, ev.lsq, ev.physreg,
+                         fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "replay because vcpuid {} uop uuid {} has lock", ev.loadstore.locking_vcpuid,
+                         ev.loadstore.locking_uuid);
     break;
   }
 
   case EVENT_LOAD_WAIT: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    os << "wait on sfr ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid, ", stq ",
-        loadstore.inherit_sfr_lsq, ", rob ", loadstore.inherit_sfr_rob, ", r", loadstore.inherit_sfr_physreg, ")";
-    if (loadstore.predicted_alias)
-      os << "; stalled by predicted aliasing";
+    out = std::format_to(out, "{} rob {:<3}({:<5}) ldq {} r{:<3} on {:<4} @ {} (phys {}): ",
+                         (ev.loadstore.load_store_second_phase ? "load2 " : "load "), ev.rob, uopname, ev.lsq,
+                         ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "wait on sfr {} (uuid {}, stq {}, rob {}, r{})", ev.loadstore.inherit_sfr,
+                         ev.loadstore.inherit_sfr_uuid, ev.loadstore.inherit_sfr_lsq, ev.loadstore.inherit_sfr_rob,
+                         ev.loadstore.inherit_sfr_physreg);
+    if (ev.loadstore.predicted_alias)
+      out = std::format_to(out, "; stalled by predicted aliasing");
     break;
   }
   case EVENT_LOAD_HIT:
   case EVENT_LOAD_MISS: {
-    if (type == EVENT_LOAD_HIT)
-      os << (loadstore.load_store_second_phase ? "load2 " : "load  ");
+    if (ev.type == EVENT_LOAD_HIT)
+      out = std::format_to(out, "{}", (ev.loadstore.load_store_second_phase ? "load2 " : "load  "));
     else
-      os << (loadstore.load_store_second_phase ? "ldmis2" : "ldmiss");
+      out = std::format_to(out, "{}", (ev.loadstore.load_store_second_phase ? "ldmis2" : "ldmiss"));
 
-    os << " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3),
-        " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
-        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    if (loadstore.inherit_sfr_used) {
-      os << "inherit from ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid, ", rob",
-          loadstore.inherit_sfr_rob, ", lsq ", loadstore.inherit_sfr_lsq, ", r", loadstore.inherit_sfr_physreg, "); ";
+    out = std::format_to(out, " rob {:<3}({:<5}) ldq {} r{:<3} on {:<4} @ {} (phys {}): ", ev.rob, uopname, ev.lsq,
+                         ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    if (ev.loadstore.inherit_sfr_used) {
+      out = std::format_to(out, "inherit from {} (uuid {}, rob{}, lsq {}, r{}); ", ev.loadstore.inherit_sfr,
+                           ev.loadstore.inherit_sfr_uuid, ev.loadstore.inherit_sfr_rob, ev.loadstore.inherit_sfr_lsq,
+                           ev.loadstore.inherit_sfr_physreg);
     }
-    if (type == EVENT_LOAD_HIT)
-      os << "hit L1: value 0x", hexstring(loadstore.sfr.data, 64);
+    if (ev.type == EVENT_LOAD_HIT)
+      out = std::format_to(out, "hit L1: value 0x{:016x}", ev.loadstore.sfr.data);
     else
-      os << "missed L1 (lfrqslot ", lfrqslot, ") [value would be 0x", hexstring(loadstore.sfr.data, 64), "]";
+      out =
+          std::format_to(out, "missed L1 (lfrqslot {}) [value would be 0x{:016x}]", ev.lfrqslot, ev.loadstore.sfr.data);
     break;
   }
   case EVENT_LOAD_BANK_CONFLICT: {
-    os << "ldbank", " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
-        intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
-        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ", "L1 bank conflict over bank ",
-        lowbits(loadstore.sfr.physaddr, log2(CacheSubsystem::L1_DCACHE_BANKS));
+    out = std::format_to(out, "ldbank rob {:<3}({:<5}) ldq {} r{:<3} on {:<4} @ {} (phys {}): ", ev.rob, uopname,
+                         ev.lsq, ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "L1 bank conflict over bank {}",
+                         lowbits(ev.loadstore.sfr.physaddr, log2(CacheSubsystem::L1_DCACHE_BANKS)));
     break;
   }
   case EVENT_LOAD_TLB_MISS: {
-    os << (loadstore.load_store_second_phase ? "ldtlb2" : "ldtlb ");
-    os << " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3),
-        " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
-        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    if (loadstore.inherit_sfr_used) {
-      os << "inherit from ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid, ", rob",
-          loadstore.inherit_sfr_rob, ", lsq ", loadstore.inherit_sfr_lsq, ", r", loadstore.inherit_sfr_physreg, "); ";
+    out = std::format_to(out, "{}", (ev.loadstore.load_store_second_phase ? "ldtlb2" : "ldtlb "));
+    out = std::format_to(out, " rob {:<3}({:<5}) ldq {} r{:<3} on {:<4} @ {} (phys {}): ", ev.rob, uopname, ev.lsq,
+                         ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    if (ev.loadstore.inherit_sfr_used) {
+      out = std::format_to(out, "inherit from {} (uuid {}, rob{}, lsq {}, r{}); ", ev.loadstore.inherit_sfr,
+                           ev.loadstore.inherit_sfr_uuid, ev.loadstore.inherit_sfr_rob, ev.loadstore.inherit_sfr_lsq,
+                           ev.loadstore.inherit_sfr_physreg);
     } else
-      os << "DTLB miss", " [value would be 0x", hexstring(loadstore.sfr.data, 64), "]";
+      out = std::format_to(out, "DTLB miss [value would be 0x{:016x}]", ev.loadstore.sfr.data);
     break;
   }
   case EVENT_LOAD_LOCK_REPLAY: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3),
-        "): ", "replay because vcpuid ", loadstore.locking_vcpuid, " uop uuid ", loadstore.locking_uuid, " has lock";
+    out = std::format_to(out, "{} rob {:<3}({:<5}) ldq {} r{:<3} on {:<4} @ {} (phys {}): ",
+                         (ev.loadstore.load_store_second_phase ? "load2 " : "load "), ev.rob, uopname, ev.lsq,
+                         ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "replay because vcpuid {} uop uuid {} has lock", ev.loadstore.locking_vcpuid,
+                         ev.loadstore.locking_uuid);
     break;
   }
   case EVENT_LOAD_LOCK_OVERFLOW: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3),
-        "): ", "replay because locking required but no free interlock buffers", endl;
+    out = std::format_to(out, "{} rob {:<3}({:<5}) ldq {} r{:<3} on {:<4} @ {} (phys {}): ",
+                         (ev.loadstore.load_store_second_phase ? "load2 " : "load "), ev.rob, uopname, ev.lsq,
+                         ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "replay because locking required but no free interlock buffers\n");
     break;
   }
   case EVENT_LOAD_LOCK_ACQUIRED: {
-    os << "lk-acq", " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
-        intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
-        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ", "lock acquired";
+    out = std::format_to(out, "lk-acq rob {:<3}({:<5}) ldq {} r{:<3} on {:<4} @ {} (phys {}): ", ev.rob, uopname,
+                         ev.lsq, ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "lock acquired");
     break;
   }
   case EVENT_LOAD_LFRQ_FULL:
-    os << "load   rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
-        intstring(physreg, -3), ": LFRQ or miss buffer full; replaying";
+    out = std::format_to(out, "load   rob {:<3}({:<5}) ldq {} r{:<3}: LFRQ or miss buffer full; replaying", ev.rob,
+                         uopname, ev.lsq, ev.physreg);
     break;
   case EVENT_LOAD_HIGH_ANNULLED: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    os << "load was annulled (high unaligned load)";
+    out = std::format_to(out, "{} rob {:<3}({:<5}) ldq {} r{:<3} on {:<4} @ {} (phys {}): ",
+                         (ev.loadstore.load_store_second_phase ? "load2 " : "load "), ev.rob, uopname, ev.lsq,
+                         ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         (void*)(Waddr)(ev.loadstore.sfr.physaddr << 3));
+    out = std::format_to(out, "load was annulled (high unaligned load)");
     break;
   }
   case EVENT_LOAD_WAKEUP:
-    os << "ldwake rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
-        intstring(physreg, -3), " wakeup load via lfrq slot ", lfrqslot;
+    out = std::format_to(out, "ldwake rob {:<3}({:<5}) ldq {} r{:<3} wakeup load via lfrq slot {}", ev.rob, uopname,
+                         ev.lsq, ev.physreg, ev.lfrqslot);
     break;
   case EVENT_TLBWALK_HIT: {
-    os << "wlkhit rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
-        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level, "): hit for PTE at phys ",
-        (void*)loadstore.virtaddr;
+    out =
+        std::format_to(out, "wlkhit rob {:<3}({:<5}) ldq {} r{:<3} page table walk (level {}): hit for PTE at phys {}",
+                       ev.rob, uopname, ev.lsq, ev.physreg, ev.loadstore.tlb_walk_level, (void*)ev.loadstore.virtaddr);
     break;
     break;
   }
   case EVENT_TLBWALK_MISS: {
-    os << "wlkmis rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
-        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level, "): miss for PTE at phys ",
-        (void*)loadstore.virtaddr, ": lfrq ", lfrqslot;
+    out = std::format_to(
+        out, "wlkmis rob {:<3}({:<5}) ldq {} r{:<3} page table walk (level {}): miss for PTE at phys {}: lfrq {}",
+        ev.rob, uopname, ev.lsq, ev.physreg, ev.loadstore.tlb_walk_level, (void*)ev.loadstore.virtaddr, ev.lfrqslot);
     break;
     break;
   }
   case EVENT_TLBWALK_WAKEUP: {
-    os << "wlkwak rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
-        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level,
-        "): wakeup from cache miss for phys ", (void*)loadstore.virtaddr, ": lfrq ", lfrqslot;
+    out = std::format_to(
+        out,
+        "wlkwak rob {:<3}({:<5}) ldq {} r{:<3} page table walk (level {}): wakeup from cache miss for phys {}: lfrq {}",
+        ev.rob, uopname, ev.lsq, ev.physreg, ev.loadstore.tlb_walk_level, (void*)ev.loadstore.virtaddr, ev.lfrqslot);
     break;
     break;
   }
   case EVENT_TLBWALK_NO_LFRQ_MB: {
-    os << "wlknml rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
-        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level,
-        "): no LFRQ or MB for PTE at phys ", (void*)loadstore.virtaddr, ": lfrq ", lfrqslot;
+    out = std::format_to(
+        out,
+        "wlknml rob {:<3}({:<5}) ldq {} r{:<3} page table walk (level {}): no LFRQ or MB for PTE at phys {}: lfrq {}",
+        ev.rob, uopname, ev.lsq, ev.physreg, ev.loadstore.tlb_walk_level, (void*)ev.loadstore.virtaddr, ev.lfrqslot);
     break;
     break;
   }
   case EVENT_TLBWALK_COMPLETE: {
-    os << "wlkhit rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
-        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level, "): complete!";
+    out = std::format_to(out, "wlkhit rob {:<3}({:<5}) ldq {} r{:<3} page table walk (level {}): complete!", ev.rob,
+                         uopname, ev.lsq, ev.physreg, ev.loadstore.tlb_walk_level);
     break;
     break;
   }
   case EVENT_LOAD_EXCEPTION: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, ": exception ", exception_name(LO32(loadstore.sfr.data)), ", pfec ",
-        PageFaultErrorCode(HI32(loadstore.sfr.data));
+    out = std::format_to(out, "{} rob {:<3}({:<5}) stq {} r{:<3} on {:<4} @ {}: exception {}, pfec {}",
+                         (ev.loadstore.load_store_second_phase ? "load2 " : "load "), ev.rob, uopname, ev.lsq,
+                         ev.physreg, fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         exception_name(LO32(ev.loadstore.sfr.data)), PageFaultErrorCode(HI32(ev.loadstore.sfr.data)));
     break;
   }
   case EVENT_STORE_EXCEPTION: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
-        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
-        " @ ", (void*)(Waddr)loadstore.virtaddr, ": exception ", exception_name(LO32(loadstore.sfr.data)), ", pfec ",
-        PageFaultErrorCode(HI32(loadstore.sfr.data));
+    out = std::format_to(out, "store{} rob {:<3}({:<5}) stq {} r{:<3} on {:<4} @ {}: exception {}, pfec {}",
+                         (ev.loadstore.load_store_second_phase ? "2" : " "), ev.rob, uopname, ev.lsq, ev.physreg,
+                         fu_names[ev.fu], (void*)(Waddr)ev.loadstore.virtaddr,
+                         exception_name(LO32(ev.loadstore.sfr.data)), PageFaultErrorCode(HI32(ev.loadstore.sfr.data)));
     break;
   }
   case EVENT_ALIGNMENT_FIXUP:
-    os << "algnfx", " rip ", rip, ": set unaligned bit for uop ", uop.bbindex, " (unaligned predictor slot ",
-        OutOfOrderCore::hash_unaligned_predictor_slot(rip), ") and refetch";
+    out = std::format_to(out, "algnfx rip {}: set unaligned bit for uop {} (unaligned predictor slot {}) and refetch",
+                         ev.rip, ev.uop.bbindex, OutOfOrderCore::hash_unaligned_predictor_slot(ev.rip));
     break;
   case EVENT_FENCE_ISSUED:
-    os << "mfence rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " lsq ", lsq, " r",
-        intstring(physreg, -3), ": memory fence (", uop, ")";
+    out = std::format_to(out, "mfence rob {:<3}({:<5}) lsq {} r{:<3}: memory fence ({})", ev.rob, uopname, ev.lsq,
+                         ev.physreg, ev.uop);
     break;
   case EVENT_ANNUL_NO_FUTURE_UOPS:
-    os << "misspc rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", ": SOM rob ", annul.somidx, ", EOM rob ",
-        annul.eomidx, ": no future uops to annul";
+    out = std::format_to(out, "misspc rob {:<3}({:<5}): SOM rob {}, EOM rob {}: no future uops to annul", ev.rob,
+                         uopname, ev.annul.somidx, ev.annul.eomidx);
     break;
   case EVENT_ANNUL_MISSPECULATION: {
-    os << "misspc rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", ": SOM rob ", annul.somidx, ", EOM rob ",
-        annul.eomidx, ": annul from rob ", annul.startidx, " to rob ", annul.endidx;
+    out = std::format_to(out, "misspc rob {:<3}({:<5}): SOM rob {}, EOM rob {}: annul from rob {} to rob {}", ev.rob,
+                         uopname, ev.annul.somidx, ev.annul.eomidx, ev.annul.startidx, ev.annul.endidx);
     break;
   }
   case EVENT_ANNUL_EACH_ROB: {
-    os << "annul  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", ": annul rip ", rip;
-    os << (uop.som ? " SOM" : "    ");
-    os << (uop.eom ? " EOM" : "    ");
-    os << ": free";
-    os << " r", physreg;
+    out = std::format_to(out, "annul  rob {:<3}({:<5}): annul rip {}", ev.rob, uopname, ev.rip);
+    out = std::format_to(out, "{}", (ev.uop.som ? " SOM" : "    "));
+    out = std::format_to(out, "{}", (ev.uop.eom ? " EOM" : "    "));
+    out = std::format_to(out, ": free");
+    out = std::format_to(out, " r{}", ev.physreg);
     if (ld | st)
-      os << " lsq", lsq;
-    if (lfrqslot >= 0)
-      os << " lfrq", lfrqslot;
-    if (annul.annulras)
-      os << " ras";
+      out = std::format_to(out, " lsq{}", ev.lsq);
+    if (ev.lfrqslot >= 0)
+      out = std::format_to(out, " lfrq{}", ev.lfrqslot);
+    if (ev.annul.annulras)
+      out = std::format_to(out, " ras");
     break;
   }
   case EVENT_ANNUL_PSEUDOCOMMIT: {
-    os << "pseucm rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", ": r", physreg, " rebuild rrt:";
-    os << " arch ", arch_reg_names[uop.rd];
-    if likely (!uop.nouserflags) {
-      if (uop.setflags & SETFLAG_ZF)
-        os << " zf";
-      if (uop.setflags & SETFLAG_CF)
-        os << " cf";
-      if (uop.setflags & SETFLAG_OF)
-        os << " of";
+    out = std::format_to(out, "pseucm rob {:<3}({:<5}): r{} rebuild rrt:", ev.rob, uopname, ev.physreg);
+    out = std::format_to(out, " arch {}", arch_reg_names[ev.uop.rd]);
+    if likely (!ev.uop.nouserflags) {
+      if (ev.uop.setflags & SETFLAG_ZF)
+        out = std::format_to(out, " zf");
+      if (ev.uop.setflags & SETFLAG_CF)
+        out = std::format_to(out, " cf");
+      if (ev.uop.setflags & SETFLAG_OF)
+        out = std::format_to(out, " of");
     }
-    os << " = r", physreg;
+    out = std::format_to(out, " = r{}", ev.physreg);
     break;
   }
   case EVENT_ANNUL_FETCHQ_RAS:
-    os << "anlras rip ", rip, ": annul RAS update still in fetchq";
+    out = std::format_to(out, "anlras rip {}: annul RAS update still in fetchq", ev.rip);
     break;
   case EVENT_ANNUL_FLUSH:
-    os << "flush  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " rip ", rip;
+    out = std::format_to(out, "flush  rob {:<3}({:<5}) rip {}", ev.rob, uopname, ev.rip);
     break;
   case EVENT_REDISPATCH_DEPENDENTS:
-    os << "redisp rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " find all dependents";
+    out = std::format_to(out, "redisp rob {:<3}({:<5}) find all dependents", ev.rob, uopname);
     break;
   case EVENT_REDISPATCH_DEPENDENTS_DONE:
-    os << "redisp rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " redispatched ", (redispatch.count - 1),
-        " dependent uops";
+    out = std::format_to(out, "redisp rob {:<3}({:<5}) redispatched {} dependent uops", ev.rob, uopname,
+                         (ev.redispatch.count - 1));
     break;
   case EVENT_REDISPATCH_EACH_ROB: {
-    os << "redisp rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " from state ",
-        redispatch.current_state_list->name, ": dep on ";
-    if (redispatch.dependent_operands.none()) {
-      os << " [self]";
+    out = std::format_to(out, "redisp rob {:<3}({:<5}) from state {}: dep on ", ev.rob, uopname,
+                         ev.redispatch.current_state_list->name);
+    if (ev.redispatch.dependent_operands.none()) {
+      out = std::format_to(out, " [self]");
     } else {
       foreach (i, MAX_OPERANDS) {
-        if (redispatch.dependent_operands[i])
-          os << " ", redispatch.opinfo[i];
+        if (ev.redispatch.dependent_operands[i])
+          out = std::format_to(out, " {}", ev.redispatch.opinfo[i]);
       }
     }
 
-    os << "; redispatch ";
-    os << " [rob ", rob, "]";
-    os << " [physreg ", physreg, "]";
+    out = std::format_to(out, "; redispatch ");
+    out = std::format_to(out, " [rob {}]", ev.rob);
+    out = std::format_to(out, " [physreg {}]", ev.physreg);
     if (ld | st)
-      os << " [lsq ", lsq, "]";
-    if (redispatch.iqslot)
-      os << " [iqslot]";
-    if (lfrqslot >= 0)
-      os << " [lfrqslot ", lfrqslot, "]";
-    if (redispatch.opinfo[RS].physreg != PHYS_REG_NULL)
-      os << " [inheritsfr ", redispatch.opinfo[RS], "]";
+      out = std::format_to(out, " [lsq {}]", ev.lsq);
+    if (ev.redispatch.iqslot)
+      out = std::format_to(out, " [iqslot]");
+    if (ev.lfrqslot >= 0)
+      out = std::format_to(out, " [lfrqslot {}]", ev.lfrqslot);
+    if (ev.redispatch.opinfo[RS].physreg != PHYS_REG_NULL)
+      out = std::format_to(out, " [inheritsfr {}]", ev.redispatch.opinfo[RS]);
 
     break;
   }
   case EVENT_COMPLETE:
-    os << "complt rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " on ", padstring(fu_names[fu], -4),
-        ": r", intstring(physreg, -3);
+    out = std::format_to(out, "complt rob {:<3}({:<5}) on {:<4}: r{:<3}", ev.rob, uopname, fu_names[ev.fu], ev.physreg);
     break;
   case EVENT_FORWARD: {
-    os << "forwd", forwarding.forward_cycle, " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " (",
-        clusters[cluster].name, ") r", intstring(physreg, -3), " => ", "uuid ", forwarding.target_uuid, " rob ",
-        forwarding.target_rob, " (", clusters[forwarding.target_cluster].name, ") r", forwarding.target_physreg,
-        " operand ", forwarding.operand;
-    if (forwarding.target_st)
-      os << " => st", forwarding.target_lsq;
-    os << " [still waiting?";
+    out = std::format_to(
+        out, "forwd{} rob {:<3}({:<5}) ({}) r{:<3} => uuid {} rob {} ({}) r{} operand {}", ev.forwarding.forward_cycle,
+        ev.rob, uopname, clusters[ev.cluster].name, ev.physreg, ev.forwarding.target_uuid, ev.forwarding.target_rob,
+        clusters[ev.forwarding.target_cluster].name, ev.forwarding.target_physreg, ev.forwarding.operand);
+    if (ev.forwarding.target_st)
+      out = std::format_to(out, " => st{}", ev.forwarding.target_lsq);
+    out = std::format_to(out, " [still waiting?");
     foreach (i, MAX_OPERANDS) {
-      if (!bit(forwarding.target_operands_ready, i))
-        os << " r", (char)('a' + i);
+      if (!bit(ev.forwarding.target_operands_ready, i))
+        out = std::format_to(out, " r{}", (char)('a' + i));
     }
-    if (forwarding.target_all_operands_ready)
-      os << " READY";
-    os << "]";
+    if (ev.forwarding.target_all_operands_ready)
+      out = std::format_to(out, " READY");
+    out = std::format_to(out, "]");
     break;
   }
   case EVENT_BROADCAST: {
-    os << "brcst", forwarding.forward_cycle, " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")",
-        " from cluster ", clusters[cluster].name, " to cluster ", clusters[forwarding.target_cluster].name,
-        " on forwarding cycle ", forwarding.forward_cycle;
+    out = std::format_to(out, "brcst{} rob {:<3}({:<5}) from cluster {} to cluster {} on forwarding cycle {}",
+                         ev.forwarding.forward_cycle, ev.rob, uopname, clusters[ev.cluster].name,
+                         clusters[ev.forwarding.target_cluster].name, ev.forwarding.forward_cycle);
     break;
   }
   case EVENT_WRITEBACK: {
-    os << "write  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " (cluster ", clusters[cluster].name,
-        ") r", intstring(physreg, -3), "@", phys_reg_file_names[rfid], " = 0x", hexstring(writeback.data, 64), " ",
-        flagstring(writeback.flags);
-    if (writeback.transient)
-      os << " (transient)";
-    os << " (", writeback.consumer_count, " consumers";
-    if (writeback.all_consumers_sourced_from_bypass)
-      os << ", all from bypass";
-    if (writeback.no_branches_between_renamings)
-      os << ", no intervening branches";
-    if (writeback.dest_renamed_before_writeback)
-      os << ", dest renamed before writeback";
-    os << ")";
+    out = std::format_to(out, "write  rob {:<3}({:<5}) (cluster {}) r{:<3}@{} = 0x{:016x} {}", ev.rob, uopname,
+                         clusters[ev.cluster].name, ev.physreg, phys_reg_file_names[ev.rfid], ev.writeback.data,
+                         flagstring(ev.writeback.flags));
+    if (ev.writeback.transient)
+      out = std::format_to(out, " (transient)");
+    out = std::format_to(out, " ({} consumers", ev.writeback.consumer_count);
+    if (ev.writeback.all_consumers_sourced_from_bypass)
+      out = std::format_to(out, ", all from bypass");
+    if (ev.writeback.no_branches_between_renamings)
+      out = std::format_to(out, ", no intervening branches");
+    if (ev.writeback.dest_renamed_before_writeback)
+      out = std::format_to(out, ", dest renamed before writeback");
+    out = std::format_to(out, ")");
     break;
   }
   case EVENT_COMMIT_FENCE_COMPLETED:
-    os << "mfcmit rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")",
-        " fence committed: wake up waiting memory uops";
+    out = std::format_to(out, "mfcmit rob {:<3}({:<5}) fence committed: wake up waiting memory uops", ev.rob, uopname);
     break;
   case EVENT_COMMIT_EXCEPTION_DETECTED:
-    os << "detect rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " exception ",
-        exception_name(LO32(commit.state.reg.rddata)), " (", LO32(commit.state.reg.rddata), "), error code ",
-        hexstring(HI32(commit.state.reg.rddata), 16), ", origvirt ", (void*)(Waddr)commit.origvirt;
+    out = std::format_to(out, "detect rob {:<3}({:<5}) exception {} ({}), error code {:04x}, origvirt {}", ev.rob,
+                         uopname, exception_name(LO32(ev.commit.state.reg.rddata)), LO32(ev.commit.state.reg.rddata),
+                         HI32(ev.commit.state.reg.rddata), (void*)(Waddr)ev.commit.origvirt);
     break;
   case EVENT_COMMIT_EXCEPTION_ACKNOWLEDGED:
-    os << "except rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " exception ",
-        exception_name(LO32(commit.state.reg.rddata)), " [EOM #", commit.total_user_insns_committed, "]";
+    out = std::format_to(out, "except rob {:<3}({:<5}) exception {} [EOM #{}]", ev.rob, uopname,
+                         exception_name(LO32(ev.commit.state.reg.rddata)), ev.commit.total_user_insns_committed);
     break;
   case EVENT_COMMIT_SKIPBLOCK:
-    os << "skipbk rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " skip block: advance rip by ",
-        uop.bytes, " to ", (void*)(Waddr)(rip.rip + uop.bytes), " [EOM #", commit.total_user_insns_committed, "]";
+    out = std::format_to(out, "skipbk rob {:<3}({:<5}) skip block: advance rip by {} to {} [EOM #{}]", ev.rob, uopname,
+                         ev.uop.bytes, (void*)(Waddr)(ev.rip.rip + ev.uop.bytes), ev.commit.total_user_insns_committed);
     break;
   case EVENT_COMMIT_SMC_DETECTED:
-    os << "smcdet rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " self-modifying code at rip ", rip,
-        " detected (mfn was dirty); invalidate and retry [EOM #", commit.total_user_insns_committed, "]";
+    out = std::format_to(out,
+                         "smcdet rob {:<3}({:<5}) self-modifying code at rip {} detected (mfn was dirty); invalidate "
+                         "and retry [EOM #{}]",
+                         ev.rob, uopname, ev.rip, ev.commit.total_user_insns_committed);
     break;
   case EVENT_COMMIT_MEM_LOCKED:
-    os << "waitlk rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " wait for lock on physaddr ",
-        (void*)(commit.state.st.physaddr << 3), " to be released";
+    out = std::format_to(out, "waitlk rob {:<3}({:<5}) wait for lock on physaddr {} to be released", ev.rob, uopname,
+                         (void*)(ev.commit.state.st.physaddr << 3));
     break;
   case EVENT_COMMIT_OK: {
-    os << "commit rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")";
-    if likely (archdest_can_commit[uop.rd])
-      os << " [rrt ", arch_reg_names[uop.rd], " = r", physreg, " 0x", hexstring(commit.state.reg.rddata, 64), "]";
+    out = std::format_to(out, "commit rob {:<3}({:<5})", ev.rob, uopname);
+    if likely (archdest_can_commit[ev.uop.rd])
+      out = std::format_to(out, " [rrt {} = r{} 0x{:016x}]", arch_reg_names[ev.uop.rd], ev.physreg,
+                           ev.commit.state.reg.rddata);
 
-    if ((!uop.nouserflags) && uop.setflags) {
-      os << " [flags ", ((uop.setflags & SETFLAG_ZF) ? "z" : ""), ((uop.setflags & SETFLAG_CF) ? "c" : ""),
-          ((uop.setflags & SETFLAG_OF) ? "o" : ""), " -> ", flagstring(commit.state.reg.rdflags), "]";
+    if ((!ev.uop.nouserflags) && ev.uop.setflags) {
+      out = std::format_to(out, " [flags {}{}{} -> {}]", ((ev.uop.setflags & SETFLAG_ZF) ? "z" : ""),
+                           ((ev.uop.setflags & SETFLAG_CF) ? "c" : ""), ((ev.uop.setflags & SETFLAG_OF) ? "o" : ""),
+                           flagstring(ev.commit.state.reg.rdflags));
     }
 
-    if (uop.eom)
-      os << " [rip = ", (void*)(Waddr)commit.target_rip, "]";
+    if (ev.uop.eom)
+      out = std::format_to(out, " [rip = {}]", (void*)(Waddr)ev.commit.target_rip);
 
-    if unlikely (st && (commit.state.st.bytemask != 0))
-      os << " [mem ", (void*)(Waddr)(commit.state.st.physaddr << 3), " = ",
-          bytemaskstring((const byte*)&commit.state.st.data, commit.state.st.bytemask, 8), " mask ",
-          bitstring(commit.state.st.bytemask, 8, true), "]";
+    if unlikely (st && (ev.commit.state.st.bytemask != 0))
+      out =
+          std::format_to(out, " [mem {} = {} mask {}]", (void*)(Waddr)(ev.commit.state.st.physaddr << 3),
+                         bytemaskstring((const unsigned char*)&ev.commit.state.st.data, ev.commit.state.st.bytemask, 8),
+                         bitstring(ev.commit.state.st.bytemask, 8, true));
 
-    if unlikely (commit.pteupdate.a | commit.pteupdate.d | commit.pteupdate.ptwrite) {
-      os << " [pte:";
-      if (commit.pteupdate.a)
-        os << " a";
-      if (commit.pteupdate.d)
-        os << " d";
-      if (commit.pteupdate.ptwrite)
-        os << " w";
-      os << "]";
+    if unlikely (ev.commit.pteupdate.a | ev.commit.pteupdate.d | ev.commit.pteupdate.ptwrite) {
+      out = std::format_to(out, " [pte:");
+      if (ev.commit.pteupdate.a)
+        out = std::format_to(out, " a");
+      if (ev.commit.pteupdate.d)
+        out = std::format_to(out, " d");
+      if (ev.commit.pteupdate.ptwrite)
+        out = std::format_to(out, " w");
+      out = std::format_to(out, "]");
     }
 
     if unlikely (ld | st) {
-      os << " [lsq ", lsq, "]";
-      os << " [upslot ", OutOfOrderCore::hash_unaligned_predictor_slot(rip), " = ", commit.ld_st_truly_unaligned, "]";
+      out = std::format_to(out, " [lsq {}]", ev.lsq);
+      out = std::format_to(out, " [upslot {} = {}]", OutOfOrderCore::hash_unaligned_predictor_slot(ev.rip),
+                           ev.commit.ld_st_truly_unaligned);
     }
 
-    if likely (commit.oldphysreg > 0) {
-      if unlikely (commit.oldphysreg_refcount) {
-        os << " [pending free old r", commit.oldphysreg, " ref by";
-        os << " refcount ", commit.oldphysreg_refcount;
-        os << "]";
+    if likely (ev.commit.oldphysreg > 0) {
+      if unlikely (ev.commit.oldphysreg_refcount) {
+        out = std::format_to(out, " [pending free old r{} ref by", ev.commit.oldphysreg);
+        out = std::format_to(out, " refcount {}", ev.commit.oldphysreg_refcount);
+        out = std::format_to(out, "]");
       } else {
-        os << " [free old r", commit.oldphysreg, "]";
+        out = std::format_to(out, " [free old r{}]", ev.commit.oldphysreg);
       }
     }
 
-    os << " [commit r", physreg, "]";
+    out = std::format_to(out, " [commit r{}]", ev.physreg);
 
     foreach (i, MAX_OPERANDS) {
-      if unlikely (commit.operand_physregs[i] != PHYS_REG_NULL)
-        os << " [unref r", commit.operand_physregs[i], "]";
+      if unlikely (ev.commit.operand_physregs[i] != PHYS_REG_NULL)
+        out = std::format_to(out, " [unref r{}]", ev.commit.operand_physregs[i]);
     }
 
     if unlikely (br) {
-      os << " [brupdate", (commit.taken ? " tk" : " nt"), (commit.predtaken ? " pt" : " np"),
-          ((commit.taken == commit.predtaken) ? " ok" : " MP"), "]";
+      out = std::format_to(out, " [brupdate{}{} {}]", (ev.commit.taken ? " tk" : " nt"),
+                           (ev.commit.predtaken ? " pt" : " np"),
+                           ((ev.commit.taken == ev.commit.predtaken) ? " ok" : " MP"));
     }
 
-    if (uop.eom)
-      os << " [EOM #", commit.total_user_insns_committed, "]";
+    if (ev.uop.eom)
+      out = std::format_to(out, " [EOM #{}]", ev.commit.total_user_insns_committed);
     break;
   }
   case EVENT_COMMIT_ASSIST: {
-    os << "assist rob ", intstring(rob, -3), " calling assist ", (void*)rip.rip, " (#",
-        assist_index((assist_func_t)rip.rip), ": ", assist_name((assist_func_t)rip.rip), ")";
+    out = std::format_to(out, "assist rob {:<3} calling assist {} (#{}: {})", ev.rob, (void*)ev.rip.rip,
+                         assist_index((assist_func_t)ev.rip.rip), assist_name((assist_func_t)ev.rip.rip));
     break;
   }
   case EVENT_RECLAIM_PHYSREG:
-    os << "free   r", physreg, " no longer referenced; moving to free state";
+    out = std::format_to(out, "free   r{} no longer referenced; moving to free state", ev.physreg);
     break;
   case EVENT_RELEASE_MEM_LOCK: {
-    os << "unlkcm", " phys ", (void*)(loadstore.sfr.physaddr << 3), ": lock release committed";
+    out = std::format_to(out, "unlkcm phys {}: lock release committed", (void*)(ev.loadstore.sfr.physaddr << 3));
     break;
   }
   default:
-    os << "?????? unknown event type ", type;
+    out = std::format_to(out, "?????? unknown event type {}", ev.type);
     break;
   }
 
-  os << endl;
-  return os;
+  out = std::format_to(out, "\n");
+  return out;
 }
 
 OutOfOrderMachine::OutOfOrderMachine(const char* name) {
@@ -1776,25 +1665,26 @@ bool OutOfOrderMachine::init(PTLsimConfig& config) {
 // is hit (as configured elsewhere in config).
 //
 int OutOfOrderMachine::run(PTLsimConfig& config) {
-  logfile << "Starting out-of-order core toplevel loop", endl, flush;
+  logging::println("Starting out-of-order core toplevel loop");
+  logging::flush();
 
   // All VCPUs are running:
   stopped = 0;
 
   if unlikely (iterations >= config.start_log_at_iteration) {
-    if unlikely (!logenable)
-      logfile << "Start logging at level ", config.loglevel, " in cycle ", iterations, endl, flush;
+    logging::println("Start logging at level {} in cycle {}", config.loglevel, iterations);
+    logging::flush();
+
     logenable = 1;
   }
 
   cores[0]->reset();
   cores[0]->flush_pipeline_all();
 
-  logfile << "IssueQueue states:", endl;
+  logging::println("IssueQueue states:");
 
   if unlikely (config.event_log_enabled && (!cores[0]->eventlog.start)) {
     cores[0]->eventlog.init(config.event_log_ring_buffer_size);
-    cores[0]->eventlog.logfile = &logfile;
   }
 
   bool exiting = false;
@@ -1802,8 +1692,10 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
 
   for (;;) {
     if unlikely (iterations >= config.start_log_at_iteration) {
-      if unlikely (!logenable)
-        logfile << "Start logging at level ", config.loglevel, " in cycle ", iterations, endl, flush;
+      if unlikely (!logenable) {
+        logging::println("Start logging at level {} in cycle {}", config.loglevel, iterations);
+        logging::flush();
+      }
       logenable = 1;
     }
 
@@ -1818,14 +1710,14 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
     exiting |= core.runcycle();
 
     if unlikely (check_for_async_sim_break() && (!stopping)) {
-      logfile << "Waiting for all VCPUs to reach stopping point, starting at cycle ", sim_cycle, endl;
+      logging::println("Waiting for all VCPUs to reach stopping point, starting at cycle {}", sim_cycle);
       // force_logging_enabled();
       OutOfOrderCore& core = *cores[0];
       foreach (i, core.threadcount)
         core.threads[i]->stop_at_next_eom = 1;
       if (config.abort_at_end) {
         config.abort_at_end = 0;
-        logfile << "Abort immediately: do not wait for next x86 boundary nor flush pipelines", endl;
+        logging::println("Abort immediately: do not wait for next x86 boundary nor flush pipelines");
         stopped = 1;
         exiting = 1;
       }
@@ -1839,7 +1731,8 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
     iterations++;
 
     if unlikely (stopping) {
-      // logfile << "Waiting for all VCPUs to stop at ", sim_cycle, ": mask = ", stopped, " (need ", contextcount, " VCPUs)", endl;
+      logging::println(logging::TRACE, "Waiting for all VCPUs to stop at {}: mask = {} (need {} VCPUs)", sim_cycle,
+                       stopped.to_string(), contextcount);
       exiting |= (stopped.count() == contextcount);
     }
 
@@ -1847,8 +1740,8 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
       break;
   }
 
-  logfile << "Exiting out-of-order core at ", total_user_insns_committed, " commits, ", total_uops_committed,
-      " uops and ", iterations, " iterations (cycles)", endl;
+  logging::println("Exiting out-of-order core at {} commits, {} uops and {} iterations (cycles)",
+                   total_user_insns_committed, total_uops_committed, iterations);
 
   OutOfOrderCore& core = *cores[0]; /// only one core for now.
 
@@ -1857,15 +1750,15 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
 
     thread->core_to_external_state();
 
-    if (logable(6) | ((sim_cycle - thread->last_commit_at_cycle) > 1024) | config.dump_state_now) {
-      logfile << "Core State at end for thread ", thread->threadid, ": ", endl;
-      logfile << thread->ctx;
+    if (((sim_cycle - thread->last_commit_at_cycle) > 1024) | config.dump_state_now) {
+      logging::println(logging::TRACE, "Core State at end for thread {}:", thread->threadid);
+      logging::println(logging::TRACE, "{}", thread->ctx);
     }
   }
 
   config.dump_state_now = 0;
 
-  dump_state(logfile);
+  dump_state();
 
   // Flush everything to remove any remaining refs to basic blocks
   flush_all_pipelines();
@@ -1884,14 +1777,16 @@ void OutOfOrderMachine::reset() {
 
 void OutOfOrderCore::flush_tlb(Context& ctx, int threadid, bool selective, Waddr virtaddr) {
   ThreadContext& thread = *threads[threadid];
-  if (logable(5)) {
-    logfile << "[vcpu ", ctx.vcpuid, "] core ", coreid, ", thread ", threadid, ": Flush TLBs";
-    if (selective)
-      logfile << " for virtaddr ", (void*)virtaddr, endl;
-    logfile << endl;
-    //logfile << "DTLB before: ", endl, caches.dtlb, endl;
-    //logfile << "ITLB before: ", endl, caches.itlb, endl;
-  }
+
+  logging::print(logging::DEBUG, "[vcpu {}] core {}, thread {}: Flush TLBs", ctx.vcpuid, coreid, threadid);
+  if (selective)
+    logging::println(logging::DEBUG, " for virtaddr {}", (void*)virtaddr);
+  logging::println(logging::DEBUG, "");
+  logging::println(logging::TRACE, "DTLB before:");
+  logging::println(logging::TRACE, "{}", caches.dtlb);
+  logging::println(logging::TRACE, "ITLB before:");
+  logging::println(logging::TRACE, "{}", caches.itlb);
+
   int dn;
   int in;
 
@@ -1902,11 +1797,12 @@ void OutOfOrderCore::flush_tlb(Context& ctx, int threadid, bool selective, Waddr
     dn = caches.dtlb.flush_thread(threadid);
     in = caches.itlb.flush_thread(threadid);
   }
-  if (logable(5)) {
-    logfile << "Flushed ", dn, " DTLB slots and ", in, " ITLB slots", endl;
-    //logfile << "DTLB after: ", endl, caches.dtlb, endl;
-    //logfile << "ITLB after: ", endl, caches.itlb, endl;
-  }
+
+  logging::println(logging::DEBUG, "Flushed {} DTLB slots and {} ITLB slots", dn, in);
+  logging::println(logging::TRACE, "DTLB after:");
+  logging::println(logging::TRACE, "{}", caches.dtlb);
+  logging::println(logging::TRACE, "ITLB after:");
+  logging::println(logging::TRACE, "{}", caches.itlb);
 }
 
 void OutOfOrderMachine::flush_tlb(Context& ctx) {
@@ -1923,38 +1819,49 @@ void OutOfOrderMachine::flush_tlb_virt(Context& ctx, Waddr virtaddr) {
   cores[coreid]->flush_tlb(ctx, threadid, true, virtaddr);
 }
 
-void OutOfOrderMachine::dump_state(ostream& os) {
-  os << " dump_state include event if -ringbuf enabled: ", endl;
-  //  foreach (i, contextcount) {
+void OutOfOrderMachine::dump_state() {
+  logging::println(logging::INFO, "dump_state include event if -ringbuf enabled:");
   foreach (i, MAX_SMT_CORES) {
-    os << " dump_state for core ", i, endl, flush;
+    logging::println(logging::INFO, "dump_state for core {}", i);
+    logging::flush();
     if (!cores[i])
       continue;
     OutOfOrderCore& core = *cores[i];
-    Context& ctx = contextof(i);
     if unlikely (config.event_log_enabled)
-      core.eventlog.print(logfile);
+      core.eventlog.print();
     else
-      os << " config.event_log_enabled is not enabled ", config.event_log_enabled, endl;
+      logging::println(logging::INFO, "config.event_log_enabled is not enabled: {}", config.event_log_enabled);
 
-    core.dump_smt_state(os);
-    core.print_smt_state(os);
+    core.dump_smt_state();
+    core.print_smt_state();
   }
-  os << "Memory interlock buffer:", endl, flush;
-  interlocks.print(os);
-#if 0
+  logging::println(logging::INFO, "Memory interlock buffer:");
+  logging::flush();
+  logging::println(logging::INFO, "{}", interlocks);
   //
   // For debugging only:
   //
-  foreach (i, threadcount) {
-    ThreadContext* thread = *cores[0]->threads[i];
-    os << "Thread ", i, ":", endl;
-    os << "  rip:                                 ", (void*)thread.ctx.commitarf[REG_rip], endl;
-    os << "  consecutive_commits_inside_spinlock: ", thread.consecutive_commits_inside_spinlock, endl;
-    os << "  State:", endl;
-    os << thread.ctx;
+  foreach (i, cores[0]->threadcount) {
+    ThreadContext* thread = cores[0]->threads[i];
+    logging::println(logging::TRACE, "Thread {}:", i);
+    logging::println(logging::TRACE, "  rip:                                 {}",
+                     (void*)thread->ctx.commitarf[REG_rip]);
+    logging::println(logging::TRACE, "  consecutive_commits_inside_spinlock: {}",
+                     thread->consecutive_commits_inside_spinlock);
+    logging::println(logging::TRACE, "  State:");
+    logging::println(logging::TRACE, "{}", thread->ctx);
   }
-#endif
+}
+
+// Stub implementation for dump_smt_state - prints core state using logging
+void OutOfOrderCore::dump_smt_state() {
+  logging::println(logging::INFO, "Core {} SMT state:", coreid);
+  foreach (i, threadcount) {
+    if (threads[i]) {
+      logging::println(logging::INFO, "  Thread {}: ROB count {}, LSQ count {}", i, threads[i]->ROB.count,
+                       threads[i]->LSQ.count);
+    }
+  }
 }
 
 void OutOfOrderMachine::update_stats(PTLsimStats& stats) {
@@ -2000,4 +1907,78 @@ OutOfOrderMachine ooomodel("ooo");
 
 OutOfOrderCore& OutOfOrderModel::coreof(int coreid) {
   return *ooomodel.cores[coreid];
+}
+
+// Formatter implementations
+auto std::formatter<OutOfOrderModel::PhysicalRegister>::format(const OutOfOrderModel::PhysicalRegister& physreg,
+                                                               std::format_context& ctx) const {
+  using namespace OutOfOrderModel;
+  std::string vf = format_value_and_flags(physreg.data, physreg.flags);
+  auto out = std::format_to(ctx.out(), "TH {} rfid {}", physreg.threadid, physreg.rfid);
+  out = std::format_to(out, "  r{:<3} state {:<12} {}", physreg.index(), physreg.get_state_list().name, vf);
+  if (physreg.rob)
+    out = std::format_to(out, " rob {} (uuid {})", physreg.rob->index(), physreg.rob->uop.uuid);
+  out = std::format_to(out, " refcount {}", physreg.refcount);
+  return out;
+}
+
+auto std::formatter<OutOfOrderModel::PhysicalRegisterFile>::format(const OutOfOrderModel::PhysicalRegisterFile& prf,
+                                                                   std::format_context& ctx) const {
+  auto out = std::format_to(ctx.out(), "PhysicalRegisterFile<{}, rfid {}, size {}>:\n", prf.name, prf.rfid, prf.size);
+  for (int i = 0; i < prf.size; i++) {
+    out = std::format_to(out, "{}\n", prf[i]);
+  }
+  return out;
+}
+
+auto std::formatter<OutOfOrderModel::ReorderBufferEntry>::format(const OutOfOrderModel::ReorderBufferEntry& rob,
+                                                                 std::format_context& ctx) const {
+  using namespace OutOfOrderModel;
+  std::string name = nameof(rob.uop);
+  std::string rainfo = rob.get_operand_info(0);
+  std::string rbinfo = rob.get_operand_info(1);
+  std::string rcinfo = rob.get_operand_info(2);
+
+  auto out = std::format_to(
+      ctx.out(), "rob {:<3} uuid {:>16} rip 0x{:x} {:<24} {} {} @ {:<4} {:<12} r{:<3} {:<6}", rob.index(), rob.uop.uuid,
+      (W64)rob.uop.rip, rob.current_state_list->name, (rob.uop.som ? "SOM" : "   "), (rob.uop.eom ? "EOM" : "   "),
+      (rob.cluster >= 0) ? clusters[rob.cluster].name : "???", name, rob.physreg->index(), arch_reg_names[rob.uop.rd]);
+
+  if (isload(rob.uop.opcode))
+    out = std::format_to(out, " ld{:<3}", rob.lsq->index());
+  else if (isstore(rob.uop.opcode))
+    out = std::format_to(out, " st{:<3}", rob.lsq->index());
+  else
+    out = std::format_to(out, "      ");
+
+  out = std::format_to(out, " = ");
+  out = std::format_to(out, "{:<30}{:<30}{:<30}", rainfo, rbinfo, rcinfo);
+  return out;
+}
+
+auto std::formatter<OutOfOrderModel::LoadStoreQueueEntry>::format(const OutOfOrderModel::LoadStoreQueueEntry& lsq,
+                                                                  std::format_context& ctx) const {
+  using namespace OutOfOrderModel;
+  auto out = std::format_to(ctx.out(), "{}{:<3} uuid {:>10} rob {:<3} r{:<3}", (lsq.store ? "st" : "ld"), lsq.index(),
+                            lsq.rob->uop.uuid, lsq.rob->index(), lsq.rob->physreg->index());
+
+  if (PHYS_REG_FILE_COUNT > 1)
+    out = std::format_to(out, "@{}", lsq.getcore().physregfiles[lsq.rob->physreg->rfid].name);
+
+  out = std::format_to(out, " ");
+
+  if (lsq.invalid) {
+    out = std::format_to(out, "< Invalid: fault 0x{:02x} > ", lsq.data);
+  } else {
+    if (lsq.datavalid)
+      out = std::format_to(out, "{}", bytemaskstring((const unsigned char*)&lsq.data, lsq.bytemask, 8));
+    else
+      out = std::format_to(out, "<    Data Invalid     >");
+    out = std::format_to(out, " @ ");
+    if (lsq.addrvalid)
+      out = std::format_to(out, "0x{:012x}", lsq.physaddr << 3);
+    else
+      out = std::format_to(out, "< Addr Inval >");
+  }
+  return out;
 }
