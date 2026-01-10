@@ -13,7 +13,7 @@ typedef unsigned char W8;
 typedef signed char W8s;
 #define null NULL
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 typedef W64 Waddr;
 #else
 typedef W32 Waddr;

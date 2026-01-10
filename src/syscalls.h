@@ -66,7 +66,7 @@ struct kernel_sigaction {
 
 long sys_rt_sigaction(int sig, const struct kernel_sigaction* act, struct kernel_sigaction* oldact, size_t sigsetsize);
 int sys_getrlimit(int resource, struct rlimit* rlim);
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 W64 sys_arch_prctl(int code, void* addr);
 W64 sys_ptrace(int request, pid_t pid, W64 addr, W64 data);
 #else
@@ -81,7 +81,7 @@ W32 sys_ptrace(int request, pid_t pid, W32 addr, W32 data);
 #define syslinkage extern "C"
 #endif
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 
 #undef __syscall_return
 #define __syscall_return(type, res) return (type)(res);

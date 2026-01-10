@@ -125,7 +125,7 @@ void print_banner(ostream& os, const PTLsimStats& stats, int argc, char** argv) 
   sys_uname(&hostinfo);
 
   os << "//  ", endl;
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
   os << "//  PTLsim: Cycle Accurate x86-64 Simulator", endl;
 #else
   os << "//  PTLsim: Cycle Accurate x86 Simulator (32-bit version)", endl;
@@ -246,7 +246,7 @@ bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
     current_bbcache_dump_filename = config.bbcache_dump_filename;
   }
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
   config.start_log_at_rip = signext64(config.start_log_at_rip, 48);
   config.log_backwards_from_trigger_rip = signext64(config.log_backwards_from_trigger_rip, 48);
   config.start_at_rip = signext64(config.start_at_rip, 48);

@@ -811,7 +811,7 @@ W64 idstream::size() const {
 
 void* idstream::mmap(long long size) {
   void* p = sys_mmap(NULL, size, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, filehandle(), 0);
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
   if ((W64s)p == -1LL)
     return null;
 #else
@@ -1112,7 +1112,7 @@ using namespace superstl;
 //
 // Division functions
 //
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 
 #define do_div(n, base)                                                                                                \
   ({                                                                                                                   \

@@ -68,7 +68,7 @@ void Raspsim::propagate_x86_exception(byte exception, W32 errorcode, Waddr virta
   sys_exit(1);
 }
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 //
 // SYSCALL instruction from x86-64 mode
 //
@@ -102,7 +102,7 @@ void Raspsim::handle_syscall_64bit() {
         "); returning to ", (void*)ctx.commitarf[REG_rip], endl, flush;
 }
 
-#endif // __x86_64__
+#endif // PTLSIM_AMD64
 
 void Raspsim::handle_syscall_32bit(int semantics) {
   Context& ctx{Raspsim::getContext()};

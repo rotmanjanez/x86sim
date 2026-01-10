@@ -14,11 +14,11 @@ inline void capture_uop_context(const IssueState& state, W64 ra, W64 rb, W64 rc,
                                 int opcode, int size, int cond = 0, int extshift = 0, W64 riptaken = 0,
                                 W64 ripseq = 0) {}
 
-#ifndef __x86_64__
+#ifndef PTLSIM_AMD64
 #define EMULATE_64BIT
 #endif
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 typedef W64 Wmax;
 #else
 typedef W32 Wmax;
@@ -64,7 +64,7 @@ template byte x86_genflags<byte>(byte r);
 template byte x86_genflags<W16>(W16 r);
 template byte x86_genflags<W32>(W32 r);
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 template byte x86_genflags<W64>(W64 r);
 #else
 template<>
@@ -692,7 +692,7 @@ inline void uop_impl_mulhl(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflag
 uopimpl_func_t implmap_mulhl[4] = {&uop_impl_mulhl<W8>, &uop_impl_mulhl<W16>, &uop_impl_mulhl<W32>,
                                    &uop_impl_mulhl<W64>};
 
-#ifndef __x86_64__
+#ifndef PTLSIM_AMD64
 template<int genflags>
 struct x86_op_mull<W64, genflags> {
   W64 operator()(W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags, byte& cf, byte& of) {
@@ -1146,7 +1146,7 @@ inline void floatop(IssueState& state, W64 raraw, W64 rbraw, W64 rcraw, W16 rafl
 // This looks strange since 32-bit x86 can only move from 64-bit memory to XMM.
 // x86-64 can use movd to go straight from a GPR into the XMM register.
 //
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 #define MOV_TO_XMM "movq"
 #define W64_CONSTRAINT "rm"
 #else
@@ -1366,7 +1366,7 @@ make_intsrc_fp_convop(fcvt_q2d, (rd.d = (double)(W64s)rb.w64));
 make_intdest_fp_convop_allrounds(fcvt_s2i, W32, cvtss2si, cvttss2si);
 make_intdest_fp_convop_allrounds(fcvt_d2i, W32, cvtsd2si, cvttsd2si);
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 make_intdest_fp_convop_allrounds(fcvt_s2q, W64, cvtss2si, cvttss2si);
 make_intdest_fp_convop_allrounds(fcvt_d2q, W64, cvtsd2si, cvttsd2si);
 #else
@@ -2080,7 +2080,7 @@ uopimpl_func_t get_synthcode_for_cond_branch(int opcode, int cond, int size, boo
   uopimpl_func_t func;
 
   switch (opcode) {
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
   case OP_br_sub:
     func = implmap_br_sub[cond][size][except];
     break;
