@@ -475,11 +475,7 @@ bool ThreadContext::fetch() {
       //
     }
 
-#ifdef PTLSIM_HYPERVISOR
-    Waddr physaddr = (fetchrip.mfnlo << 12) + lowbits(fetchrip, 12);
-#else
     Waddr physaddr = fetchrip;
-#endif
 
     W64 req_icache_block = floor(physaddr, ICACHE_FETCH_GRANULARITY);
     if ((!current_basic_block->invalidblock) && (req_icache_block != current_icache_block)) {
@@ -1535,22 +1531,6 @@ void ThreadContext::flush_mem_lock_release_list(int start) {
   queued_mem_lock_release_count = start;
 }
 
-#ifdef PTLSIM_HYPERVISOR
-//
-// For debugging purposes only
-//
-#if 0
-bool rip_is_in_spinlock(W64 rip) {
-  bool inside_spinlock_now =
-    inrange(rip, 0xffffffff803d3fbcULL, 0xffffffff803d404fULL) | // .text.lock.spinlock
-    inrange(rip, 0xffffffff803d2c82ULL, 0xffffffff803d2ccfULL) | // .text.lock.mutex
-    inrange(rip, 0xffffffff80135f50ULL, 0xffffffff80135f8fULL) | // current_fs_time
-    inrange(rip, 0xffffffff801499b6ULL, 0xffffffff80149a22ULL);  // hrtimer_run_queues
-
-  return inside_spinlock_now;
-}
-#endif
-#endif
 
 int ReorderBufferEntry::commit() {
   OutOfOrderCore& core = getcore();
@@ -1627,12 +1607,7 @@ int ReorderBufferEntry::commit() {
       all_ready_to_commit = false;
     }
 
-#ifdef PTLSIM_HYPERVISOR
-    bool force_fp_unavailable =
-        (subrob.uop.is_sse | subrob.uop.is_x87) && (ctx.cr0.ts | (subrob.uop.is_x87 & ctx.cr0.em));
-#else
     bool force_fp_unavailable = (subrob.uop.is_sse & ctx.no_sse) | (subrob.uop.is_x87 & ctx.no_x87);
-#endif
     if unlikely (force_fp_unavailable) {
       subrob.physreg->data = EXCEPTION_FloatingPointNotAvailable;
       subrob.physreg->flags = FLAG_INV;
@@ -1806,43 +1781,6 @@ int ReorderBufferEntry::commit() {
   //
 
   release_mem_lock();
-
-#ifdef PTLSIM_HYPERVISOR
-  //
-  // For debugging purposes, check the list of address ranges specified
-  // with the -deadlock-debug-range 0xAA-0xBB,0xCC-0xDD,... option. If
-  // the commit rip has been within one of these ranges on this vcpu for
-  // more than (value of -deadlock-debug-limit) commits, dump all state,
-  // dump the event log and abort the simulation.
-  //
-#if 0
-  {
-    W64 rip = uop.rip.rip;
-    bool inside_spinlock_now = rip_is_in_spinlock(rip);
-    bool thread0_stuck_in_spinlock = rip_is_in_spinlock(core.thread[0]->ctx.commitarf[REG_rip]);
-    bool thread1_stuck_in_spinlock = rip_is_in_spinlock(core.thread[1]->ctx.commitarf[REG_rip]);
-
-    if unlikely (inside_spinlock_now)
-                  thread.consecutive_commits_inside_spinlock++;
-    else thread.consecutive_commits_inside_spinlock = 0;
-
-    if (thread.consecutive_commits_inside_spinlock >= 512) {
-      logfile << "WARNING: at cycle ", sim_cycle, ": vcpu ", thread.ctx.vcpuid, " potentially deadlocked inside spinlock (commit rip ", (void*)ctx.commitarf[REG_rip],
-        ", count ", thread.consecutive_commits_inside_spinlock, ", int mask ", sshinfo.vcpu_info[thread.ctx.vcpuid].evtchn_upcall_mask, endl, flush;
-      logfile << "Thread 0 rip ", (void*)core.thread[0]->ctx.commitarf[REG_rip], endl;
-      logfile << "Thread 1 rip ", (void*)core.thread[1]->ctx.commitarf[REG_rip], endl;
-
-      thread.consecutive_commits_inside_spinlock = 0;
-
-      if (thread0_stuck_in_spinlock && thread1_stuck_in_spinlock) {
-        logfile << "Both threads stuck in spinlock", endl;
-        //core.machine.dump_state(logfile); // This is implied by assert().
-        assert(false);
-      }
-    }
-  }
-#endif
-#endif
 
   if (st)
     assert(lsq->addrvalid && lsq->datavalid);

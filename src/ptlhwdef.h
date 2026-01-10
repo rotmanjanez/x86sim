@@ -143,16 +143,7 @@ struct RIPVirtPhys : public RIPVirtPhysBase {
   RIPVirtPhys& update(Context& ctx, int bytes = PAGE_SIZE);
 
   // Make sure we don't accidentally cast to W64 for comparisons
-  bool operator==(const RIPVirtPhys& b) const {
-#ifdef PTLSIM_HYPERVISOR
-    const W64* ap = (const W64*)this;
-    const W64* bp = (const W64*)&b;
-
-    return ((ap[0] == bp[0]) & (ap[1] == bp[1]));
-#else
-    return (rip == b.rip);
-#endif
-  }
+  bool operator==(const RIPVirtPhys& b) const { return (rip == b.rip); }
 };
 
 static inline ostream& operator<<(ostream& os, const RIPVirtPhysBase& rvp) {
@@ -474,233 +465,8 @@ struct PTEUpdate : public PTEUpdateBase {
   RawDataAccessors(PTEUpdate, byte);
 };
 
-#ifdef PTLSIM_HYPERVISOR
-
-struct TrapTarget {
-#ifdef __x86_64__
-  W64 rip : 48, cpl : 2, maskevents : 1, cs : 13;
-#else
-  W32 rip;
-  W16 pad;
-  W16 cs;
-#endif
-};
-
-union VirtAddr {
-  struct {
-    W64 offset : 12, level1 : 9, level2 : 9, level3 : 9, level4 : 9, signext : 16;
-  } lm;
-  struct {
-    W64 offset : 12, level1 : 9, level2 : 9, level3 : 9, level4 : 9, signext : 16;
-  } pae;
-  struct {
-    W32 offset : 12, level1 : 10, level2 : 10;
-  } x86;
-
-  RawDataAccessors(VirtAddr, W64);
-};
-
-#define DefinePTESetField(T, func, field)                                                                              \
-  inline T func(W64 val) const {                                                                                       \
-    T pte(*this);                                                                                                      \
-    pte.field = val;                                                                                                   \
-    return pte;                                                                                                        \
-  }
-
-typedef struct Level4PTE {
-  W64 p : 1, rw : 1, us : 1, pwt : 1, pcd : 1, a : 1, ign : 1, mbz : 2, avl : 3, mfn : 40, avlhi : 11, nx : 1;
-  RawDataAccessors(Level4PTE, W64);
-
-  DefinePTESetField(Level4PTE, P, p);
-  DefinePTESetField(Level4PTE, W, rw);
-  DefinePTESetField(Level4PTE, U, us);
-  DefinePTESetField(Level4PTE, WT, pwt);
-  DefinePTESetField(Level4PTE, CD, pcd);
-  DefinePTESetField(Level4PTE, A, a);
-  DefinePTESetField(Level4PTE, NX, nx);
-  DefinePTESetField(Level4PTE, AVL, avl);
-  DefinePTESetField(Level4PTE, MFN, mfn);
-};
-
-struct Level3PTE {
-  W64 p : 1, rw : 1, us : 1, pwt : 1, pcd : 1, a : 1, ign : 1, mbz : 2, avl : 3, mfn : 40, avlhi : 11, nx : 1;
-  RawDataAccessors(Level3PTE, W64);
-
-  DefinePTESetField(Level3PTE, P, p);
-  DefinePTESetField(Level3PTE, W, rw);
-  DefinePTESetField(Level3PTE, U, us);
-  DefinePTESetField(Level3PTE, WT, pwt);
-  DefinePTESetField(Level3PTE, CD, pcd);
-  DefinePTESetField(Level3PTE, A, a);
-  DefinePTESetField(Level3PTE, NX, nx);
-  DefinePTESetField(Level3PTE, AVL, avl);
-  DefinePTESetField(Level3PTE, MFN, mfn);
-};
-
-struct Level2PTE {
-  W64 p : 1, rw : 1, us : 1, pwt : 1, pcd : 1, a : 1, d : 1, psz : 1, mbz : 1, avl : 3, mfn : 40, avlhi : 11, nx : 1;
-  RawDataAccessors(Level2PTE, W64);
-
-  DefinePTESetField(Level2PTE, P, p);
-  DefinePTESetField(Level2PTE, W, rw);
-  DefinePTESetField(Level2PTE, U, us);
-  DefinePTESetField(Level2PTE, WT, pwt);
-  DefinePTESetField(Level2PTE, CD, pcd);
-  DefinePTESetField(Level2PTE, A, a);
-  DefinePTESetField(Level2PTE, D, d);
-  DefinePTESetField(Level2PTE, PSZ, psz);
-  DefinePTESetField(Level2PTE, NX, nx);
-  DefinePTESetField(Level2PTE, AVL, avl);
-  DefinePTESetField(Level2PTE, MFN, mfn);
-};
-
-struct Level1PTE {
-  W64 p : 1, rw : 1, us : 1, pwt : 1, pcd : 1, a : 1, d : 1, pat : 1, g : 1, avl : 3, mfn : 40, avlhi : 11, nx : 1;
-  RawDataAccessors(Level1PTE, W64);
-
-  void accum(const Level1PTE& l) {
-    p &= l.p;
-    rw &= l.rw;
-    us &= l.us;
-    nx |= l.nx;
-  }
-  void accum(const Level2PTE& l) {
-    p &= l.p;
-    rw &= l.rw;
-    us &= l.us;
-    nx |= l.nx;
-  }
-  void accum(const Level3PTE& l) {
-    p &= l.p;
-    rw &= l.rw;
-    us &= l.us;
-    nx |= l.nx;
-  }
-  void accum(const Level4PTE& l) {
-    p &= l.p;
-    rw &= l.rw;
-    us &= l.us;
-    nx |= l.nx;
-  }
-
-  DefinePTESetField(Level1PTE, P, p);
-  DefinePTESetField(Level1PTE, W, rw);
-  DefinePTESetField(Level1PTE, U, us);
-  DefinePTESetField(Level1PTE, WT, pwt);
-  DefinePTESetField(Level1PTE, CD, pcd);
-  DefinePTESetField(Level1PTE, A, a);
-  DefinePTESetField(Level1PTE, D, d);
-  DefinePTESetField(Level1PTE, G, g);
-  DefinePTESetField(Level1PTE, NX, nx);
-  DefinePTESetField(Level1PTE, AVL, avl);
-  DefinePTESetField(Level1PTE, MFN, mfn);
-};
-
-ostream& operator<<(ostream& os, const Level1PTE& pte);
-ostream& operator<<(ostream& os, const Level2PTE& pte);
-ostream& operator<<(ostream& os, const Level3PTE& pte);
-ostream& operator<<(ostream& os, const Level4PTE& pte);
-
-#define X86_CR0_PE 0x00000001 // Enable Protected Mode    (RW)
-#define X86_CR0_MP 0x00000002 // Monitor Coprocessor      (RW)
-#define X86_CR0_EM 0x00000004 // Require FPU Emulation    (RO)
-#define X86_CR0_TS 0x00000008 // Task Switched            (RW)
-#define X86_CR0_ET 0x00000010 // Extension type           (RO)
-#define X86_CR0_NE 0x00000020 // Numeric Error Reporting  (RW)
-#define X86_CR0_WP 0x00010000 // Supervisor Write Protect (RW)
-#define X86_CR0_AM 0x00040000 // Alignment Checking       (RW)
-#define X86_CR0_NW 0x20000000 // Not Write-Through        (RW)
-#define X86_CR0_CD 0x40000000 // Cache Disable            (RW)
-#define X86_CR0_PG 0x80000000 // Paging                   (RW)
-
-struct CR0 {
-  W64 pe : 1, mp : 1, em : 1, ts : 1, et : 1, ne : 1, res6 : 10, wp : 1, res17 : 1, am : 1, res19 : 10, nw : 1, cd : 1,
-      pg : 1, res32 : 32;
-  RawDataAccessors(CR0, W64);
-};
-
-ostream& operator<<(ostream& os, const CR0& cr0);
-// CR2 is page fault linear address
-
-// CR3 is page table physical base
-
-#define X86_CR4_VME 0x0001        // enable vm86 extensions
-#define X86_CR4_PVI 0x0002        // virtual interrupts flag enable
-#define X86_CR4_TSD 0x0004        // disable time stamp at ipl 3
-#define X86_CR4_DE 0x0008         // enable debugging extensions
-#define X86_CR4_PSE 0x0010        // enable page size extensions
-#define X86_CR4_PAE 0x0020        // enable physical address extensions
-#define X86_CR4_MCE 0x0040        // Machine check enable
-#define X86_CR4_PGE 0x0080        // enable global pages
-#define X86_CR4_PCE 0x0100        // enable performance counters at ipl 3
-#define X86_CR4_OSFXSR 0x0200     // enable fast FPU save and restore
-#define X86_CR4_OSXMMEXCPT 0x0400 // enable unmasked SSE exceptions
-#define X86_CR4_VMXE 0x2000       // enable VMX
-
-struct CR4 {
-  W64 vme : 1, pvi : 1, tsd : 1, de : 1, pse : 1, pae : 1, mce : 1, pge : 1, pce : 1, osfxsr : 1, osxmmexcpt : 1,
-      res11 : 53;
-  RawDataAccessors(CR4, W64);
-};
-
-ostream& operator<<(ostream& os, const CR4& cr4);
-
-struct DebugReg {
-  W64 l0 : 1, g0 : 1, l1 : 1, g1 : 1, l2 : 1, g2 : 1, l3 : 1, g3 : 1, le : 1, ge : 1, res1 : 3, gd : 1, res2 : 2,
-      t0 : 2, s0 : 2, t1 : 2, s1 : 2, t2 : 2, s2 : 2, t3 : 2, s3 : 2;
-  RawDataAccessors(DebugReg, W64);
-};
-
-enum {
-  DEBUGREG_TYPE_EXEC = 0,
-  DEBUGREG_TYPE_WRITE = 1,
-  DEBUGREG_TYPE_IO = 2,
-  DEBUGREG_TYPE_RW = 3,
-};
-
-enum {
-  DEBUGREG_SIZE_1 = 0,
-  DEBUGREG_SIZE_2 = 1,
-  DEBUGREG_SIZE_8 = 2,
-  DEBUGREG_SIZE_4 = 3,
-};
-
-// Extended Feature Enable Register
-struct EFER {
-  W32 sce : 1, pad1 : 7, lme : 1, pad2 : 1, lma : 1, nxe : 1, svme : 1, pad3 : 1, ffxsr : 1, pad4 : 17;
-  RawDataAccessors(EFER, W32);
-};
-
-struct vcpu_guest_context;
-struct vcpu_extended_context;
-
-Level1PTE page_table_walk(W64 rawvirt, W64 toplevel_mfn, bool do_special_translations = true);
-void page_table_acc_dirty_update(W64 rawvirt, W64 toplevel_mfn, const PTEUpdate& update);
-W64 host_mfn_to_sim_mfn(W64 hostmfn);
-W64 sim_mfn_to_host_mfn(W64 simmfn);
-
-//
-// This is the same format as Xen's vcpu_runstate_info_t
-// but solves some header file problems by placing it here.
-//
-struct RunstateInfo {
-  // VCPU's current state (RUNSTATE_*).
-  int state;
-  // When was current state entered (system time, ns)?
-  W64 state_entry_time;
-  //
-  // Time spent in each RUNSTATE_* (ns). The sum of these times is
-  // guaranteed not to drift from system time.
-  //
-  W64 time[4];
-};
-
-#else
-
 // Dummy type for usermode
 typedef W64 Level1PTE;
-
-#endif
 
 //
 // This is the complete x86 user-visible context for a single VCPU.
@@ -733,59 +499,6 @@ struct ContextBase {
 
   W32 internal_eflags; // parts of EFLAGS that are infrequently updated
 
-#ifdef PTLSIM_HYPERVISOR
-  Waddr x86_exception;
-
-  byte kernel_mode;       // VGCF_IN_KERNEL
-  byte kernel_in_syscall; // VGCF_IN_SYSCALL
-  byte i387_valid;        // VGCF_I387_VALID
-  byte failsafe_disables_events;
-  byte syscall_disables_events;
-  byte saved_upcall_mask;
-  byte running;
-  byte dirty; // VCPU was just brought online
-
-  CR0 cr0;
-  Waddr cr1, cr2, cr3;
-  CR4 cr4;
-  Waddr cr5, cr6, cr7;
-  Waddr kernel_ptbase_mfn, user_ptbase_mfn;
-  DebugReg dr0, dr1, dr2, dr3, dr4, dr5, dr6, dr7;
-  Waddr kernel_ss, kernel_sp;
-
-  Waddr event_callback_rip;
-  Waddr failsafe_callback_rip;
-  Waddr syscall_rip;
-
-  Waddr fs_base;
-  Waddr gs_base_kernel;
-  Waddr gs_base_user;
-  EFER efer;
-
-  struct TrapTarget idt[256]; // Virtual IDT
-  Waddr ldtvirt;
-  Waddr gdtpages[16];
-  W16 ldtsize;
-  W16 gdtsize;
-
-  Waddr vm_assist;
-
-  W64 base_tsc;
-  W64 base_system_time;
-  W64 core_freq_hz;
-  double sys_time_cycles_to_nsec_coeff;
-
-  W16s virq_to_port[32];
-  W64 timer_cycle;
-  W64 poll_timer_cycle;
-
-  RunstateInfo runstate;
-  RunstateInfo* user_runstate;
-
-  static const int PTE_CACHE_SIZE = 16;
-  W64 cached_pte_virt[PTE_CACHE_SIZE];
-  Level1PTE cached_pte[PTE_CACHE_SIZE];
-#else
   // Always running in userspace version:
   byte running;
 
@@ -793,14 +506,9 @@ struct ContextBase {
   Waddr cr2;
 
   byte no_x87, no_sse;
-#endif
 
   inline void reset() {
     setzero(commitarf);
-#ifdef PTLSIM_HYPERVISOR
-    setzero(cached_pte_virt);
-    setzero(cached_pte);
-#endif
 
     exception = 0;
   }
@@ -854,44 +562,8 @@ struct Context : public ContextBase {
 
   Context() {}
 
-#ifdef PTLSIM_HYPERVISOR
-  void restorefrom(const vcpu_guest_context& ctx);
-  void restorefrom(const vcpu_extended_context& ctx);
-  void saveto(vcpu_guest_context& ctx);
-  void saveto(vcpu_extended_context& ctx);
-
-  bool gdt_entry_valid(W16 idx);
-  SegmentDescriptor get_gdt_entry(W16 idx);
-
-#ifndef PTLSIM_PUBLIC_ONLY
-  Level1PTE virt_to_host_pte(W64 rawvirt);
-  Level1PTE virt_to_pte(W64 rawvirt);
-#endif
-
-  W64 virt_to_pte_phys_addr(Waddr virtaddr, int level = 0);
-
-  int virt_to_pte_span(Level1PTE* ptes, W64 virtaddr, int pagecount);
-
-  // Flush the context mini-TLB and propagate flush to any core-specific TLBs
-  void flush_tlb(bool propagate_flush_to_model = true);
-  void flush_tlb_virt(Waddr virtaddr, bool propagate_flush_to_model = true);
-  void print_tlb(ostream& os);
-
-  void update_pte_acc_dirty(W64 rawvirt, const PTEUpdate& update) {
-    return page_table_acc_dirty_update(rawvirt, cr3 >> 12, update);
-  }
-
-  bool create_bounce_frame(W16 target_cs, Waddr target_rip, int action);
-
-  bool check_events() const;
-  bool event_upcall();
-  bool change_runstate(int newstate);
-
-  int page_table_level_count() const { return 4; }
-#else
   void update_pte_acc_dirty(W64 rawvirt, const PTEUpdate& update) {}
   void update_shadow_segment_descriptors();
-#endif
 };
 
 stringbuf& operator<<(stringbuf& os, const Context& ctx);
@@ -1378,9 +1050,6 @@ typedef void (*uopimpl_func_t)(IssueState& state, W64 ra, W64 rb, W64 rc, W16 ra
 #define PTLSIM_VIRT_BASE 0
 #endif
 
-#ifdef PTLSIM_HYPERVISOR
-typedef shortptr<BasicBlock, W32, PTLSIM_VIRT_BASE> BasicBlockPtr;
-#else
 #if 0
 typedef shortptr<BasicBlock> BasicBlockPtr;
 #else
@@ -1388,7 +1057,6 @@ typedef shortptr<BasicBlock> BasicBlockPtr;
  * So turn it into a normal pointer basically
  */
 typedef shortptr<BasicBlock, W64> BasicBlockPtr;
-#endif
 #endif
 
 struct BasicBlockChunkList : public ChunkList<BasicBlockPtr, BB_PTRS_PER_CHUNK> {

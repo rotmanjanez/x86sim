@@ -22,10 +22,6 @@
 // threaded mode.
 //
 
-#ifdef PTLSIM_HYPERVISOR
-#define ENABLE_SMT
-#endif
-
 static const int MAX_THREADS_BIT = 4;  // up to 16 threads
 static const int MAX_ROB_IDX_BIT = 12; // up to 4096 ROB entries
 

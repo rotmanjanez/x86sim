@@ -77,12 +77,8 @@ struct PTLsimStats { // rootnode:
       W64 timestamp;
       char hostname[64];
       char kernel_version[32];
-#ifdef PTLSIM_HYPERVISOR
-      char hypervisor_version[32];
-#else
       char executable[128];
       char args[256];
-#endif
       W64 native_cpuid;
       W64 native_hz;
     } run;
@@ -149,11 +145,6 @@ struct PTLsimStats { // rootnode:
   struct external {
     W64 assists[ASSIST_COUNT]; // label: assist_names
     W64 traps[256];            // label: x86_exception_names
-#ifdef PTLSIM_HYPERVISOR
-    EventsInMode cycles_in_mode;
-    EventsInMode insns_in_mode;
-    EventsInMode uops_in_mode;
-#endif
   } external;
 };
 

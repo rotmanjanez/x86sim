@@ -485,11 +485,7 @@ TraceDecoder::TraceDecoder(Waddr rip, bool use64, bool kernel, bool df) {
 TraceDecoder::TraceDecoder(Context& ctx, Waddr rip) {
   reset();
   use64 = ctx.use64;
-#ifdef PTLSIM_HYPERVISOR
-  kernel = ctx.kernel_mode;
-#else
   kernel = 0;
-#endif
   dirflag = ((ctx.internal_eflags & FLAG_DF) != 0);
 
   bb.reset();
@@ -1789,14 +1785,7 @@ void assist_exec_page_fault(Context& ctx) {
   Waddr faultaddr = ctx.commitarf[REG_ar1];
   PageFaultErrorCode pfec = ctx.commitarf[REG_ar2];
 
-#ifdef PTLSIM_HYPERVISOR
-  Level1PTE pte = ctx.virt_to_pte(faultaddr);
-  bool page_now_valid = (pte.p & (!pte.nx) & ((!ctx.kernel_mode) ? pte.us : 1));
-  if unlikely (!page_now_valid)
-    ctx.flush_tlb_virt(faultaddr);
-#else
   bool page_now_valid = asp_check_exec((byte*)faultaddr);
-#endif
   if unlikely (page_now_valid) {
     if (logable(3)) {
       logfile << "Spurious PageFaultOnExec detected at fault rip ", (void*)(Waddr)ctx.commitarf[REG_selfrip],
@@ -1819,15 +1808,7 @@ void assist_gp_fault(Context& ctx) {
 
 bool TraceDecoder::invalidate() {
   if likely ((rip - bb.rip) > valid_byte_count) {
-#ifdef PTLSIM_HYPERVISOR
-    // NOTE: contextof(0) is for debugging purposes only
-    Level1PTE pte = contextof(0).virt_to_pte(ripstart);
-    mfn_t mfn = (pte.p) ? pte.mfn : RIPVirtPhys::INVALID;
-    if unlikely (!pte.p)
-      contextof(0).flush_tlb_virt(ripstart);
-#else
     int mfn = 0;
-#endif
     if (logable(3)) {
       logfile << "Translation crosses into invalid page (mfn ", mfn, "): ripstart ", (void*)ripstart, ", rip ",
           (void*)rip, ", faultaddr ", (void*)faultaddr, "; expected ", (rip - ripstart), " bytes but only got ",
@@ -1976,21 +1957,6 @@ int TraceDecoder::fillbuf(Context& ctx, byte* insnbytes, int insnbytes_bufsize) 
   valid_byte_count = ctx.copy_from_user(insnbytes, bb.rip, insnbytes_bufsize, pfec, faultaddr, true, ptelo, ptehi);
   return valid_byte_count;
 }
-
-#ifdef PTLSIM_HYPERVISOR
-int TraceDecoder::fillbuf_phys_prechecked(byte* insnbytes, int insnbytes_bufsize, Level1PTE ptelo, Level1PTE ptehi) {
-  this->insnbytes = insnbytes;
-  this->insnbytes_bufsize = insnbytes_bufsize;
-  byteoffset = 0;
-  faultaddr = 0;
-  pfec = 0;
-  invalid = 0;
-  this->ptelo = ptelo;
-  this->ptehi = ptehi;
-  valid_byte_count = copy_from_user_phys_prechecked(insnbytes, bb.rip, insnbytes_bufsize, ptelo, ptehi, faultaddr);
-  return valid_byte_count;
-}
-#endif
 
 //
 // Decode and translate one x86 instruction

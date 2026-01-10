@@ -318,22 +318,6 @@ int ThreadContext::get_priority() const {
 //
 bool OutOfOrderCore::runcycle() {
   bool exiting = 0;
-  //
-  // Detect edge triggered transition from 0->1 for
-  // pending interrupt events, then wait for current
-  // x86 insn EOM uop to commit before redirecting
-  // to the interrupt handler.
-  //
-
-#ifdef PTLSIM_HYPERVISOR
-  foreach (i, threadcount) {
-    ThreadContext* thread = threads[i];
-    bool current_interrupts_pending = thread->ctx.check_events();
-    bool edge_triggered = ((!thread->prev_interrupts_pending) & current_interrupts_pending);
-    thread->handle_interrupt_at_next_eom |= edge_triggered;
-    thread->prev_interrupts_pending = current_interrupts_pending;
-  }
-#endif
 
   //
   // Compute reserved issue queue entries to avoid starvation:
@@ -383,16 +367,6 @@ bool OutOfOrderCore::runcycle() {
     for_each_cluster(j) thread->transfer(j);
   }
 
-  //
-  // Clock the TLB miss page table walk state machine
-  // This may use up load ports, so do it before other
-  // loads can issue
-  //
-#ifdef PTLSIM_HYPERVISOR
-  foreach (i, threadcount) {
-    threads[i]->tlbwalk();
-  }
-#endif
 
   //
   // Always clock the issue queues: they're independent of all threads
@@ -565,34 +539,6 @@ bool OutOfOrderCore::runcycle() {
     }
     }
   }
-
-#ifdef PTLSIM_HYPERVISOR
-  if unlikely (vcpu_online_map_changed) {
-    vcpu_online_map_changed = 0;
-    foreach (i, contextcount) {
-      Context& vctx = contextof(i);
-      if likely (!vctx.dirty)
-        continue;
-      //
-      // The VCPU is coming up for the first time after booting or being
-      // taken offline by the user.
-      //
-      // Force the active core model to flush any cached (uninitialized)
-      // internal state (like register file copies) it might have, since
-      // it did not know anything about this VCPU prior to now: if it
-      // suddenly gets marked as running without this, the core model
-      // will try to execute from bogus state data.
-      //
-      logfile << "VCPU ", vctx.vcpuid, " context was dirty: update core model internal state", endl;
-
-      ThreadContext* tc = threads[vctx.vcpuid];
-      assert(tc);
-      assert(&tc->ctx == &vctx);
-      tc->flush_pipeline();
-      vctx.dirty = 0;
-    }
-  }
-#endif
 
   foreach (i, threadcount) {
     ThreadContext* thread = threads[i];
@@ -983,9 +929,6 @@ bool ThreadContext::handle_barrier() {
   update_assist_stats(assist);
   if (logable(6)) {
     logfile << "Before assist:", endl, ctx, endl;
-#ifdef PTLSIM_HYPERVISOR
-    logfile << sshinfo, endl;
-#endif
   }
 
   assist(ctx);
@@ -994,20 +937,15 @@ bool ThreadContext::handle_barrier() {
     logfile << "Done with assist", endl;
     logfile << "New state:", endl;
     logfile << ctx;
-#ifdef PTLSIM_HYPERVISOR
-    logfile << sshinfo;
-#endif
   }
 
   // Flush again, but restart at possibly modified rip
   flush_pipeline();
 
-#ifndef PTLSIM_HYPERVISOR
   if (requested_switch_to_native) {
     logfile << "PTL call requested switch to native mode at rip ", (void*)(Waddr)ctx.commitarf[REG_rip], endl;
     return false;
   }
-#endif
   return true;
 }
 
@@ -1081,9 +1019,6 @@ bool ThreadContext::handle_exception() {
 
   if (logable(4)) {
     logfile << ctx;
-#ifdef PTLSIM_HYPERVISOR
-    logfile << sshinfo;
-#endif
   }
 
   ctx.propagate_x86_exception(ctx.x86_exception, ctx.error_code, ctx.cr2);
@@ -1095,32 +1030,6 @@ bool ThreadContext::handle_exception() {
 }
 
 bool ThreadContext::handle_interrupt() {
-#ifdef PTLSIM_HYPERVISOR
-  // Release resources of everything in the pipeline:
-  core_to_external_state();
-  flush_pipeline();
-
-  if (logable(6)) {
-    logfile << "[vcpu ", threadid, "] interrupts pending at ", sim_cycle, " cycles, ", total_user_insns_committed,
-        " commits", endl, flush;
-    logfile << "Context at interrupt:", endl;
-    logfile << ctx;
-    logfile << sshinfo;
-    logfile.flush();
-  }
-
-  ctx.event_upcall();
-
-  if (logable(6)) {
-    logfile << "[vcpu ", threadid, "] after interrupt redirect:", endl;
-    logfile << ctx;
-    logfile << sshinfo;
-    logfile.flush();
-  }
-
-  // Flush again, but restart at modified rip
-  flush_pipeline();
-#endif
   return true;
 }
 
@@ -1904,20 +1813,6 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
     int running_thread_count = 0;
     foreach (i, core.threadcount) {
       ThreadContext* thread = core.threads[i];
-#ifdef PTLSIM_HYPERVISOR
-      running_thread_count += thread->ctx.running;
-      if unlikely (!thread->ctx.running) {
-        if unlikely (stopping) {
-          // Thread is already waiting for an event: stop it now
-          logfile << "[vcpu ", thread->ctx.vcpuid, "] Already stopped at cycle ", sim_cycle, endl;
-          stopped[thread->ctx.vcpuid] = 1;
-        } else {
-          if (thread->ctx.check_events())
-            thread->handle_interrupt();
-        }
-        continue;
-      }
-#endif
     }
 
     exiting |= core.runcycle();

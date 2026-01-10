@@ -74,9 +74,6 @@ const int MISSBUF_COUNT = 16;
 const int MAIN_MEM_LATENCY = 100; // above and beyond L1 + L2 latency
 
 // TLBs
-#ifdef PTLSIM_HYPERVISOR
-#define USE_TLB
-#endif
 const int ITLB_SIZE = 32;
 const int DTLB_SIZE = 32;
 

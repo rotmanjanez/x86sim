@@ -123,15 +123,6 @@ extern W64 total_basic_blocks_committed;
 // Configuration Options:
 //
 struct PTLsimConfig {
-#ifdef PTLSIM_HYPERVISOR
-  W64 domain;
-  bool run;
-  bool stop;
-  bool native;
-  bool kill;
-  bool flush_command_queue;
-  bool simswitch;
-#endif
 
   stringbuf core_name;
 
@@ -157,36 +148,16 @@ struct PTLsimConfig {
   bool dump_state_now;
   bool abort_at_end;
 
-#ifndef PTLSIM_HYPERVISOR
   // Starting Point
   W64 start_at_rip;
   bool include_dyn_linker;
   bool trigger_mode;
   W64 pause_at_startup;
-#endif
 
   // Stopping Point
   W64 stop_at_user_insns;
   W64 stop_at_iteration;
   W64 stop_at_rip;
-
-#ifdef PTLSIM_HYPERVISOR
-  // Event tracing
-  stringbuf event_trace_record_filename;
-  bool event_trace_record_stop;
-  stringbuf event_trace_replay_filename;
-
-  // Core features
-  W64 core_freq_hz;
-  W64 timer_interrupt_freq_hz;
-  bool pseudo_real_time_clock;
-  bool realtime;
-  bool mask_interrupts;
-  W64 console_mfn;
-  bool pause;
-  stringbuf perfctr_name;
-  bool force_native;
-#endif
 
   // Out of order core features
   bool perfect_cache;
@@ -195,11 +166,9 @@ struct PTLsimConfig {
   // Other info
   stringbuf bbcache_dump_filename;
 
-#ifndef PTLSIM_HYPERVISOR
   // Simulation Mode
   W64 sequential_mode_insns;
   bool exit_after_fullsim;
-#endif
   void reset();
 };
 

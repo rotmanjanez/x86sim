@@ -76,9 +76,6 @@ const int MISSBUF_COUNT = 64;
 const int MAIN_MEM_LATENCY = 140; // Core 2 Duo 2.4 GHz has 160 cycle total L2 latency
 
 // TLBs
-#ifdef PTLSIM_HYPERVISOR
-#define USE_TLB
-#endif
 const int ITLB_SIZE = 32;
 const int DTLB_SIZE = 32;
 

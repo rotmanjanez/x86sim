@@ -33,16 +33,6 @@ W64 total_basic_blocks_committed = 0;
 #endif
 
 void PTLsimConfig::reset() {
-#ifdef PTLSIM_HYPERVISOR
-  domain = (W64)(-1);
-  run = 0;
-  stop = 0;
-  native = 0;
-  kill = 0;
-  flush_command_queue = 0;
-  simswitch = 0;
-#endif
-
   quiet = 0;
   core_name = "ooo";
   log_filename = "ptlsim.log";
@@ -63,62 +53,18 @@ void PTLsimConfig::reset() {
   dump_state_now = 0;
   abort_at_end = 0;
 
-#ifndef PTLSIM_HYPERVISOR
-  // Starting Point
-  start_at_rip = INVALIDRIP;
-  include_dyn_linker = 1;
-  trigger_mode = 0;
-  pause_at_startup = 0;
-#endif
-
   stop_at_user_insns = infinity;
   stop_at_iteration = infinity;
   stop_at_rip = INVALIDRIP;
-
-#ifdef PTLSIM_HYPERVISOR
-  event_trace_record_filename.reset();
-  event_trace_record_stop = 0;
-  event_trace_replay_filename.reset();
-
-  core_freq_hz = 0;
-  // default timer frequency is 100 hz in time-xen.c:
-  timer_interrupt_freq_hz = 100;
-  pseudo_real_time_clock = 0;
-  realtime = 0;
-  mask_interrupts = 0;
-  console_mfn = 0;
-  pause = 0;
-  perfctr_name.reset();
-  force_native = 0;
-#endif
 
   perfect_cache = 0;
   static_branchpred = 0;
 
   bbcache_dump_filename.reset();
-
-#ifndef PTLSIM_HYPERVISOR
-  sequential_mode_insns = 0;
-  exit_after_fullsim = 0;
-#endif
 }
 
 template<>
 void ConfigurationParser<PTLsimConfig>::setup() {
-#ifdef PTLSIM_HYPERVISOR
-  // Full system only
-  section("PTLmon Control");
-  add(domain, "domain", "Domain to access");
-
-  section("Action (specify only one)");
-  add(run, "run", "Run under simulation");
-  add(stop, "stop", "Stop current simulation run and wait for command");
-  add(native, "native", "Switch to native mode");
-  add(kill, "kill", "Kill PTLsim inside domain (and ptlmon), then shutdown domain");
-  add(flush_command_queue, "flush", "Flush all queued commands, stop the current simulation run and wait");
-  add(simswitch, "switch", "Switch back to PTLsim while in native mode");
-#endif
-
   section("Simulation Control");
 
   add(core_name, "core", "Run using specified core (-core <corename>)");
@@ -146,50 +92,25 @@ void ConfigurationParser<PTLsimConfig>::setup() {
   add(log_backwards_from_trigger_rip, "ringbuf-trigger-rip",
       "Print event ring buffer when first uop in this rip is committed");
 
-#ifndef PTLSIM_HYPERVISOR
   // Userspace only
   section("Start Point");
   add(start_at_rip, "startrip", "Start at rip <startrip>");
   add(include_dyn_linker, "excludeld", "Exclude dynamic linker execution");
   add(trigger_mode, "trigger", "Trigger mode: wait for user process to do simcall before entering PTL mode");
   add(pause_at_startup, "pause-at-startup", "Pause for N seconds after starting up (to allow debugger to attach)");
-#endif
 
   section("Trace Stop Point");
   add(stop_at_user_insns, "stopinsns", "Stop after executing <stopinsns> user instructions");
   add(stop_at_iteration, "stopiter", "Stop after <stop> iterations (does not apply to cycle-accurate cores)");
   add(stop_at_rip, "stoprip", "Stop before rip <stoprip> is translated for the first time");
 
-#ifdef PTLSIM_HYPERVISOR
-  // Full system only
-  section("Event Trace Recording");
-  add(event_trace_record_filename, "event-record", "Save replayable events (interrupts, DMAs, etc) to this file");
-  add(event_trace_record_stop, "event-record-stop", "Stop recording events");
-  add(event_trace_replay_filename, "event-replay",
-      "Replay events (interrupts, DMAs, etc) to this file, starting at checkpoint");
-
-  section("Timers and Interrupts");
-  add(core_freq_hz, "corefreq", "Core clock frequency in Hz (default uses host system frequency)");
-  add(timer_interrupt_freq_hz, "timerfreq", "Timer interrupt frequency in Hz");
-  add(pseudo_real_time_clock, "pseudo-rtc", "Real time clock always starts at time saved in checkpoint");
-  add(realtime, "realtime", "Operate in real time: no time dilation (not accurate for I/O intensive workloads!)");
-  add(mask_interrupts, "maskints", "Mask all interrupts (required for guaranteed deterministic behavior)");
-  add(console_mfn, "console-mfn", "Track the specified Xen console MFN");
-  add(pause, "pause", "Pause domain after using -native");
-  add(perfctr_name, "perfctr", "Performance counter generic name for hardware profiling during native mode");
-  add(force_native, "force-native", "Force native mode: ignore attempts to switch to simulation");
-#endif
-
   section("Out of Order Core (ooocore)");
   add(perfect_cache, "perfect-cache", "Perfect cache performance: all loads and stores hit in L1");
 
   section("Miscellaneous");
   add(bbcache_dump_filename, "bbdump", "Basic block cache dump filename");
-#ifndef PTLSIM_HYPERVISOR
-  // Userspace only
   add(sequential_mode_insns, "seq", "Run in sequential mode for <seq> instructions before switching to out of order");
   add(exit_after_fullsim, "exitend", "Kill the thread after full simulation completes rather than going native");
-#endif
 };
 
 #ifndef CONFIG_ONLY
@@ -204,11 +125,7 @@ void print_banner(ostream& os, const PTLsimStats& stats, int argc, char** argv) 
 
   os << "//  ", endl;
 #ifdef __x86_64__
-#ifdef PTLSIM_HYPERVISOR
-  os << "//  PTLsim: Cycle Accurate x86-64 Full System SMP/SMT Simulator", endl;
-#else
   os << "//  PTLsim: Cycle Accurate x86-64 Simulator", endl;
-#endif
 #else
   os << "//  PTLsim: Cycle Accurate x86 Simulator (32-bit version)", endl;
 #endif
@@ -219,7 +136,6 @@ void print_banner(ostream& os, const PTLsimStats& stats, int argc, char** argv) 
       stringify(__GNUC_MINOR__), endl;
   os << "//  Running on ", hostinfo.nodename, ".", hostinfo.domainname, endl;
   os << "//  ", endl;
-#ifndef PTLSIM_HYPERVISOR
   os << "//  Arguments: ";
   foreach (i, argc) {
     os << argv[i];
@@ -227,7 +143,6 @@ void print_banner(ostream& os, const PTLsimStats& stats, int argc, char** argv) 
       os << ' ';
   }
   os << endl;
-#endif
   os << endl;
   os << flush;
 }
@@ -333,22 +248,14 @@ bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
 #ifdef __x86_64__
   config.start_log_at_rip = signext64(config.start_log_at_rip, 48);
   config.log_backwards_from_trigger_rip = signext64(config.log_backwards_from_trigger_rip, 48);
-#ifndef PTLSIM_HYPERVISOR
   config.start_at_rip = signext64(config.start_at_rip, 48);
-#endif
   config.stop_at_rip = signext64(config.stop_at_rip, 48);
 #endif
 
   if (first_time) {
     if (!config.quiet) {
-#ifndef PTLSIM_HYPERVISOR
       print_banner(cerr, stats, argc, argv);
-#endif
       print_sysinfo(cerr);
-#ifdef PTLSIM_HYPERVISOR
-      if (!(config.run | config.native | config.kill))
-        cerr << "PTLsim is now waiting for a command.", endl, flush;
-#endif
     }
     print_banner(logfile, stats, argc, argv);
     print_sysinfo(logfile);
@@ -357,14 +264,6 @@ bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
     logfile.flush();
     first_time = false;
   }
-
-#ifdef PTLSIM_HYPERVISOR
-  int total = config.run + config.stop + config.native + config.kill;
-  if (total > 1) {
-    logfile << "Warning: only one action (from -run, -stop, -native, -kill) can be specified at once", endl, flush;
-    cerr << "Warning: only one action (from -run, -stop, -native, -kill) can be specified at once", endl, flush;
-  }
-#endif
 
   return true;
 }

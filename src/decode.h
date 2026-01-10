@@ -302,9 +302,6 @@ struct TraceDecoder {
   bool memory_fence_if_locked(bool end_of_x86_insn = 0, int type = MF_TYPE_LFENCE | MF_TYPE_SFENCE);
 
   int fillbuf(Context& ctx, byte* insnbytes_, int insnbytes_bufsize_);
-#ifdef PTLSIM_HYPERVISOR
-  int fillbuf_phys_prechecked(byte* insnbytes_, int insnbytes_bufsize_, Level1PTE ptelo, Level1PTE ptehi);
-#endif
   inline W64 fetch(int n) {
     W64 r = lowbits(*((W64*)&insnbytes[byteoffset]), n * 8);
     rip += n;
@@ -628,9 +625,6 @@ struct HashtableKeyManager<RIPVirtPhys, setcount> {
   static inline int hash(const RIPVirtPhys& key) {
     W64 rip = key.rip;
     W64 slot = foldbits<log2(setcount)>(rip);
-#ifdef PTLSIM_HYPERVISOR
-    slot ^= key.mfnlo;
-#endif
     return slot;
   }
 

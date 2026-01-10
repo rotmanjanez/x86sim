@@ -33,13 +33,13 @@ bool TraceDecoder::decode_sse() {
   case 0x251: // sqrt
   case 0x252: // rsqrt
   case 0x253: // rcp
-      //case 0x254: // and (scalar version does not exist)
-      //case 0x255: // andn
-      //case 0x256: // or
-      //case 0x257: // xor
+              //case 0x254: // and (scalar version does not exist)
+              //case 0x255: // andn
+              //case 0x256: // or
+              //case 0x257: // xor
   case 0x258: // add
   case 0x259: // mul
-      // 0x25a, 0x25b are conversions with different form
+              // 0x25a, 0x25b are conversions with different form
   case 0x25c: // sub
   case 0x25d: // min
   case 0x25e: // div
@@ -56,7 +56,7 @@ bool TraceDecoder::decode_sse() {
   case 0x357: // xor
   case 0x358: // add
   case 0x359: // mul
-      // 0x35a, 0x25b are conversions with different form
+              // 0x35a, 0x25b are conversions with different form
   case 0x35c: // sub
   case 0x35d: // min
   case 0x35e: // div
@@ -67,13 +67,13 @@ bool TraceDecoder::decode_sse() {
   case 0x451: // sqrt
   case 0x452: // rsqrt
   case 0x453: // rcp
-      //case 0x454: // and (scalar version does not exist)
-      //case 0x455: // andn
-      //case 0x456: // or
-      //case 0x457: // xor
+              //case 0x454: // and (scalar version does not exist)
+              //case 0x455: // andn
+              //case 0x456: // or
+              //case 0x457: // xor
   case 0x458: // add
   case 0x459: // mul
-      // 0x45a, 0x25b are conversions with different form
+              // 0x45a, 0x25b are conversions with different form
   case 0x45c: // sub
   case 0x45d: // min
   case 0x45e: // div
@@ -90,7 +90,7 @@ bool TraceDecoder::decode_sse() {
   case 0x557: // xor
   case 0x558: // add
   case 0x559: // mul
-      // 0x55a, 0x25b are conversions with different form
+              // 0x55a, 0x25b are conversions with different form
   case 0x55c: // sub
   case 0x55d: // min
   case 0x55e: // div

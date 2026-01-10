@@ -566,27 +566,7 @@ ostream& operator<<(ostream& os, const TransOpBase& op) {
 }
 
 ostream& RIPVirtPhysBase::print(ostream& os) const {
-#ifdef PTLSIM_HYPERVISOR
-  os << "[", (void*)(Waddr)rip;
-  os << (use64 ? " 64b" : " 32b");
-  os << (kernel ? " krn" : "");
-  os << (df ? " df" : "");
-  os << " mfn ";
-  if (mfnlo != INVALID)
-    os << mfnlo;
-  else
-    os << "inv";
-  if (mfnlo != mfnhi) {
-    os << "|";
-    if (mfnhi != INVALID)
-      os << mfnhi;
-    else
-      os << "inv";
-  }
-  os << "]";
-#else
   os << (void*)(Waddr)rip;
-#endif
   return os;
 }
 
@@ -799,42 +779,6 @@ stringbuf& operator<<(stringbuf& os, const SegmentDescriptorCache& seg) {
   return os;
 }
 
-#ifdef PTLSIM_HYPERVISOR
-ostream& operator<<(ostream& os, const CR0& cr0) {
-  os << hexstring(cr0, 64);
-  os << " ";
-  os << (cr0.pe ? " PE" : " pe");
-  os << (cr0.mp ? " MP" : " mp");
-  os << (cr0.em ? " EM" : " em");
-  os << (cr0.ts ? " TS" : " ts");
-  os << (cr0.et ? " ET" : " et");
-  os << (cr0.ne ? " NE" : " ne");
-  os << (cr0.wp ? " WP" : " wp");
-  os << (cr0.am ? " AM" : " am");
-  os << (cr0.nw ? " NW" : " nw");
-  os << (cr0.cd ? " CD" : " cd");
-  os << (cr0.pg ? " PG" : " pg");
-  return os;
-}
-
-ostream& operator<<(ostream& os, const CR4& cr4) {
-  os << hexstring(cr4, 64);
-  os << " ";
-  os << (cr4.vme ? " VME" : " vme");
-  os << (cr4.pvi ? " PVI" : " pvi");
-  os << (cr4.tsd ? " TSD" : " tsd");
-  os << (cr4.de ? " DBE" : " dbe");
-  os << (cr4.pse ? " PSE" : " pse");
-  os << (cr4.pae ? " PAE" : " pae");
-  os << (cr4.mce ? " MCE" : " mce");
-  os << (cr4.pge ? " PGE" : " pge");
-  os << (cr4.pce ? " PCE" : " pce");
-  os << (cr4.osfxsr ? " FXS" : " fxs");
-  os << (cr4.osxmmexcpt ? " MME" : " mme");
-  return os;
-}
-#endif
-
 stringbuf& operator<<(stringbuf& os, const Context& ctx) {
   static const int arfwidth = 4;
 
@@ -846,20 +790,6 @@ stringbuf& operator<<(stringbuf& os, const Context& ctx) {
       os << endl;
   }
 
-#ifdef PTLSIM_HYPERVISOR
-  os << "  Flags:", endl;
-  os << "    Running?   ", ((ctx.running) ? "running" : "blocked"), endl;
-  if unlikely (ctx.dirty)
-    os << "    Context is dirty: refresh any internal state cached by active core model", endl;
-  os << "    Mode:      ", ((ctx.kernel_mode) ? "kernel" : "user"), ((ctx.kernel_in_syscall) ? " (in syscall)" : ""),
-      endl;
-  os << "    32/64:     ", ((ctx.use64) ? "64-bit x86-64" : "32-bit x86"), endl;
-  os << "    x87 state: ", ((ctx.i387_valid) ? "valid" : "invalid"), endl;
-  os << "    Event dis: ", ((ctx.syscall_disables_events) ? " syscall" : ""),
-      ((ctx.failsafe_disables_events) ? " failsafe" : ""), endl;
-  os << "    IntEFLAGS: ", hexstring(ctx.internal_eflags, 32), " (df ", ((ctx.internal_eflags & FLAG_DF) != 0), ")",
-      endl;
-#endif
   os << "  Segment Registers:", endl;
   os << "    cs ", ctx.seg[SEGID_CS], endl;
   os << "    ss ", ctx.seg[SEGID_SS], endl;
@@ -867,47 +797,6 @@ stringbuf& operator<<(stringbuf& os, const Context& ctx) {
   os << "    es ", ctx.seg[SEGID_ES], endl;
   os << "    fs ", ctx.seg[SEGID_FS], endl;
   os << "    gs ", ctx.seg[SEGID_GS], endl;
-#ifdef PTLSIM_HYPERVISOR
-  os << "  Segment Control Registers:", endl;
-  os << "    ldt ", hexstring(ctx.ldtvirt, 64), "  ld# ", hexstring(ctx.ldtsize, 64), "  gd# ",
-      hexstring(ctx.gdtsize, 64), endl;
-  os << "    gdt mfns";
-  foreach (i, 16) {
-    os << " ", ctx.gdtpages[i];
-  }
-  os << endl;
-  os << "    fsB ", hexstring(ctx.fs_base, 64), "  gsB ", hexstring(ctx.gs_base_user, 64), "  gkB ",
-      hexstring(ctx.gs_base_kernel, 64), endl;
-  os << "  Control Registers:", endl;
-  os << "    cr0 ", ctx.cr0, endl;
-  os << "    cr2 ", hexstring(ctx.cr2, 64), "  fault virtual address", endl;
-  os << "    cr3 ", hexstring(ctx.cr3, 64), "  page table base (mfn ", (ctx.cr3 >> 12), ")", endl;
-  os << "    cr4 ", ctx.cr4, endl;
-  os << "    kss ", hexstring(ctx.kernel_ss, 64), "  ksp ", hexstring(ctx.kernel_sp, 64), "  vma ",
-      hexstring(ctx.vm_assist, 64), endl;
-  os << "    kPT ", intstring(ctx.kernel_ptbase_mfn, 16), endl;
-  os << "    uPT ", intstring(ctx.user_ptbase_mfn, 16), endl;
-  os << "  Debug Registers:", endl;
-  os << "    dr0 ", hexstring(ctx.dr0, 64), "  dr1 ", hexstring(ctx.dr1, 64), "  dr2 ", hexstring(ctx.dr2, 64),
-      "  dr3 ", hexstring(ctx.dr3, 64), endl;
-  os << "    dr4 ", hexstring(ctx.dr4, 64), "  dr5 ", hexstring(ctx.dr5, 64), "  dr6 ", hexstring(ctx.dr6, 64),
-      "  dr7 ", hexstring(ctx.dr7, 64), endl;
-  os << "  Callbacks:", endl;
-  os << "    event_callback_rip    ", hexstring(ctx.event_callback_rip, 64), endl;
-  os << "    failsafe_callback_rip ", hexstring(ctx.failsafe_callback_rip, 64), endl;
-  os << "    syscall_rip           ", hexstring(ctx.syscall_rip, 64), endl;
-  os << "  Virtual IDT Trap Table:", endl;
-  foreach (i, lengthof(ctx.idt)) {
-    const TrapTarget& tt = ctx.idt[i];
-    if (tt.rip) {
-      os << "    ", intstring(i, 3), "  0x", hexstring(i, 8), ": ", hexstring((tt.cs << 3) | 3, 16), ":",
-          hexstring(signext64(tt.rip, 48), 64), " cpl ", tt.cpl, (tt.maskevents ? " mask-events" : ""), endl;
-    }
-  }
-  os << "  Exception and Event Control:", endl;
-  os << "    exception ", intstring(ctx.x86_exception, 2), "  errorcode ", hexstring(ctx.error_code, 32),
-      "  saved_upcall_mask ", hexstring(ctx.saved_upcall_mask, 8), endl;
-#endif
 
   os << "  FPU:", endl;
   os << "    FP Control Word: 0x", hexstring(ctx.fpcw, 32), endl;
