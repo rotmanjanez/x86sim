@@ -307,9 +307,9 @@ void assist_popf(Context& ctx) {
 
   // Update internal flags too (only update non-standard flags in internal_flags_bits):
   // Equivalent to these uops:
-  // this << TransOp(OP_and, REG_temp1, REG_temp0, REG_imm, REG_zero, 2, ~(FLAG_ZAPS|FLAG_CF|FLAG_OF));
-  // TransOp stp(OP_st, REG_mem, REG_ctx, REG_imm, REG_temp1, 2, offsetof(Context, internal_eflags)); stp.internal = 1; this << stp;
-  // this << TransOp(OP_movrcc, REG_temp0, REG_zero, REG_temp0, REG_zero, 3, 0, 0, FLAGS_DEFAULT_ALU);
+  // put(TransOp(OP_and, REG_temp1, REG_temp0, REG_imm, REG_zero, 2, ~(FLAG_ZAPS|FLAG_CF|FLAG_OF)));
+  // TransOp stp(OP_st, REG_mem, REG_ctx, REG_imm, REG_temp1, 2, offsetof(Context, internal_eflags)); stp.internal = 1; put(stp);
+  // put(TransOp(OP_movrcc, REG_temp0, REG_zero, REG_temp0, REG_zero, 3, 0, 0, FLAGS_DEFAULT_ALU));
 }
 
 //
@@ -538,7 +538,7 @@ bool TraceDecoder::decode_complex() {
     int size = (1 << sizeshift);
     int offset = 0;
 
-#define PUSH(reg) this << TransOp(OP_st, REG_mem, REG_rsp, REG_imm, reg, sizeshift, offset);
+#define PUSH(reg) put(TransOp(OP_st, REG_mem, REG_rsp, REG_imm, reg, sizeshift, offset));
 
     offset -= size;
     PUSH(REG_rax);
@@ -558,7 +558,7 @@ bool TraceDecoder::decode_complex() {
     PUSH(REG_rdi);
 #undef PUSH
 
-    this << TransOp(OP_sub, REG_rsp, REG_rsp, REG_imm, REG_zero, sizeshift, -offset);
+    put(TransOp(OP_sub, REG_rsp, REG_rsp, REG_imm, REG_zero, sizeshift, -offset));
     break;
   }
 
@@ -575,7 +575,7 @@ bool TraceDecoder::decode_complex() {
     int size = (1 << sizeshift);
     int offset = 0;
 
-#define POP(reg) this << TransOp(OP_ld, reg, REG_rsp, REG_imm, REG_zero, sizeshift, offset);
+#define POP(reg) put(TransOp(OP_ld, reg, REG_rsp, REG_imm, REG_zero, sizeshift, offset));
 
     POP(REG_rdi);
     offset += size;
@@ -594,7 +594,7 @@ bool TraceDecoder::decode_complex() {
     offset += size;
 #undef POP
 
-    this << TransOp(OP_add, REG_rsp, REG_rsp, REG_imm, REG_zero, sizeshift, offset);
+    put(TransOp(OP_add, REG_rsp, REG_rsp, REG_imm, REG_zero, sizeshift, offset));
 
     break;
   }
@@ -650,7 +650,7 @@ bool TraceDecoder::decode_complex() {
       int rdreg = arch_pseudo_reg_to_arch_reg[rd.reg.reg];
       bool rdhigh = reginfo[rd.reg.reg].hibyte;
 
-      this << TransOp(OP_mov, REG_temp0, REG_zero, rdreg, REG_zero, 3); // save old rdreg
+      put(TransOp(OP_mov, REG_temp0, REG_zero, rdreg, REG_zero, 3)); // save old rdreg
 
       bool moveonly = (!rdhigh && !rahigh);
 
@@ -669,11 +669,11 @@ bool TraceDecoder::decode_complex() {
                          MaskControlInfo(0, 64, 0); // straight move (but cannot synthesize from mask uop)
 
       if (moveonly) {
-        this << TransOp(OP_mov, rdreg, rdreg, rareg, REG_zero, sizeshift);
-        this << TransOp(OP_mov, rareg, rareg, REG_temp0, REG_zero, sizeshift);
+        put(TransOp(OP_mov, rdreg, rdreg, rareg, REG_zero, sizeshift));
+        put(TransOp(OP_mov, rareg, rareg, REG_temp0, REG_zero, sizeshift));
       } else {
-        this << TransOp(OP_maskb, rdreg, rdreg, rareg, REG_imm, 3, 0, maskctl1);
-        this << TransOp(OP_maskb, rareg, rareg, REG_temp0, REG_imm, 3, 0, maskctl2);
+        put(TransOp(OP_maskb, rdreg, rdreg, rareg, REG_imm, 3, 0, maskctl1));
+        put(TransOp(OP_maskb, rareg, rareg, REG_temp0, REG_imm, 3, 0, maskctl2));
       }
     } else {
       // xchg [mem],reg is always locked:
@@ -683,9 +683,9 @@ bool TraceDecoder::decode_complex() {
         break;
 
       if (rahigh)
-        this << TransOp(OP_maskb, REG_temp7, REG_zero, rareg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+        put(TransOp(OP_maskb, REG_temp7, REG_zero, rareg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)));
       else
-        this << TransOp(OP_mov, REG_temp7, REG_zero, rareg, REG_zero, 3);
+        put(TransOp(OP_mov, REG_temp7, REG_zero, rareg, REG_zero, 3));
 
       //
       // ld t6 = [mem]
@@ -699,9 +699,9 @@ bool TraceDecoder::decode_complex() {
         // need to merge 8-bit or 16-bit data:
         operand_load(REG_temp0, rd);
         if (reginfo[rd.reg.reg].hibyte)
-          this << TransOp(OP_maskb, REG_temp6, destreg, REG_temp0, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
+          put(TransOp(OP_maskb, REG_temp6, destreg, REG_temp0, REG_imm, 3, 0, MaskControlInfo(56, 8, 56)));
         else
-          this << TransOp(OP_mov, REG_temp6, destreg, REG_temp0, REG_zero, sizeshift);
+          put(TransOp(OP_mov, REG_temp6, destreg, REG_temp0, REG_zero, sizeshift));
       }
 
       //
@@ -714,7 +714,7 @@ bool TraceDecoder::decode_complex() {
       //
       TransOp dummyop(OP_sel, REG_temp7, REG_temp7, REG_temp6, REG_zero, 3);
       dummyop.cond = COND_c;
-      this << dummyop;
+      put(dummyop);
 
       //
       // st [mem] = t0
@@ -725,7 +725,7 @@ bool TraceDecoder::decode_complex() {
       // mov ra = zero,t6
       // Always move the full size: the temporary was already merged above
       //
-      this << TransOp(OP_mov, destreg, REG_zero, REG_temp6, REG_zero, 3);
+      put(TransOp(OP_mov, destreg, REG_zero, REG_temp6, REG_zero, 3));
 
       if (memory_fence_if_locked(1))
         break;
@@ -746,7 +746,7 @@ bool TraceDecoder::decode_complex() {
     int rdreg = (rd.type == OPTYPE_MEM) ? REG_temp0 : arch_pseudo_reg_to_arch_reg[rd.reg.reg];
     TransOp ldp(OP_ld, rdreg, REG_ctx, REG_imm, REG_zero, 1, offsetof_(Context, seg[modrm.reg].selector));
     ldp.internal = 1;
-    this << ldp;
+    put(ldp);
 
     prefixes &= ~PFX_LOCK;
     if (rd.type == OPTYPE_MEM)
@@ -769,7 +769,7 @@ bool TraceDecoder::decode_complex() {
     if (ra.type == OPTYPE_MEM)
       operand_load(REG_temp0, ra);
 
-    this << TransOp(OP_mov, REG_ar1, REG_zero, rareg, REG_zero, 3);
+    put(TransOp(OP_mov, REG_ar1, REG_zero, rareg, REG_zero, 3));
     immediate(REG_ar2, 3, modrm.reg);
 
     microcode_assist(ASSIST_WRITE_SEGREG, ripstart, rip);
@@ -788,7 +788,7 @@ bool TraceDecoder::decode_complex() {
       sizeshift = 3; // There is no way to encode 32-bit pushes and pops in 64-bit mode:
     int rdreg = (rd.type == OPTYPE_REG) ? arch_pseudo_reg_to_arch_reg[rd.reg.reg] : REG_temp7;
 
-    this << TransOp(OP_ld, rdreg, REG_rsp, REG_imm, REG_zero, sizeshift, 0);
+    put(TransOp(OP_ld, rdreg, REG_rsp, REG_imm, REG_zero, sizeshift, 0));
 
     //
     // Special ordering semantics: if the destination is memory
@@ -807,11 +807,11 @@ bool TraceDecoder::decode_complex() {
     if (rd.type == OPTYPE_MEM) {
       prefixes &= ~PFX_LOCK;
       result_store(REG_temp7, REG_temp0, rd);
-      this << TransOp(OP_add, REG_rsp, REG_rsp, REG_imm, REG_zero, 3, (1 << sizeshift));
+      put(TransOp(OP_add, REG_rsp, REG_rsp, REG_imm, REG_zero, 3, (1 << sizeshift)));
     } else {
       // Only update %rsp if the target register (if any) itself is not itself %rsp
       if (rdreg != REG_rsp)
-        this << TransOp(OP_add, REG_rsp, REG_rsp, REG_imm, REG_zero, 3, (1 << sizeshift));
+        put(TransOp(OP_add, REG_rsp, REG_rsp, REG_imm, REG_zero, 3, (1 << sizeshift)));
     }
 
     break;
@@ -827,9 +827,9 @@ bool TraceDecoder::decode_complex() {
     int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
     int rdreg = REG_rax;
 
-    this << TransOp(OP_mov, REG_temp0, REG_zero, rdreg, REG_zero, 3);      // save old rdreg
-    this << TransOp(OP_mov, rdreg, rdreg, rareg, REG_zero, sizeshift);     // dl = al
-    this << TransOp(OP_mov, rareg, rareg, REG_temp0, REG_zero, sizeshift); // al = olddl
+    put(TransOp(OP_mov, REG_temp0, REG_zero, rdreg, REG_zero, 3));      // save old rdreg
+    put(TransOp(OP_mov, rdreg, rdreg, rareg, REG_zero, sizeshift));     // dl = al
+    put(TransOp(OP_mov, rareg, rareg, REG_temp0, REG_zero, sizeshift)); // al = olddl
     break;
   }
 
@@ -853,19 +853,19 @@ bool TraceDecoder::decode_complex() {
     int size = (1 << sizeshift);
 
     if (last_flags_update_was_atomic) {
-      this << TransOp(OP_movccr, REG_temp0, REG_zero, REG_zf, REG_zero, 3);
+      put(TransOp(OP_movccr, REG_temp0, REG_zero, REG_zf, REG_zero, 3));
     } else {
-      this << TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
-      this << TransOp(OP_movccr, REG_temp0, REG_zero, REG_temp0, REG_zero, 3);
+      put(TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
+      put(TransOp(OP_movccr, REG_temp0, REG_zero, REG_temp0, REG_zero, 3));
     }
 
     TransOp ldp(OP_ld, REG_temp1, REG_ctx, REG_imm, REG_zero, 2, offsetof_(Context, internal_eflags));
     ldp.internal = 1;
-    this << ldp;
-    this << TransOp(OP_or, REG_temp1, REG_temp1, REG_temp0, REG_zero, 2); // merge in standard flags
+    put(ldp);
+    put(TransOp(OP_or, REG_temp1, REG_temp1, REG_temp0, REG_zero, 2)); // merge in standard flags
 
-    this << TransOp(OP_sub, REG_rsp, REG_rsp, REG_imm, REG_zero, 3, size);
-    this << TransOp(OP_st, REG_mem, REG_rsp, REG_imm, REG_temp1, sizeshift, 0);
+    put(TransOp(OP_sub, REG_rsp, REG_rsp, REG_imm, REG_zero, 3, size));
+    put(TransOp(OP_st, REG_mem, REG_rsp, REG_imm, REG_temp1, sizeshift, 0));
 
     break;
   }
@@ -877,8 +877,8 @@ bool TraceDecoder::decode_complex() {
     int sizeshift = (opsize_prefix) ? 1 : ((use64) ? 3 : 2);
     int size = (1 << sizeshift);
 
-    this << TransOp(OP_ld, REG_ar1, REG_rsp, REG_imm, REG_zero, sizeshift, 0);
-    this << TransOp(OP_add, REG_rsp, REG_rsp, REG_imm, REG_zero, 3, size);
+    put(TransOp(OP_ld, REG_ar1, REG_rsp, REG_imm, REG_zero, sizeshift, 0));
+    put(TransOp(OP_add, REG_rsp, REG_rsp, REG_imm, REG_zero, 3, size));
 
     microcode_assist(ASSIST_POPF, ripstart, rip);
     end_of_block = 1;
@@ -887,18 +887,18 @@ bool TraceDecoder::decode_complex() {
 
   case 0x9e: { // sahf: %flags[7:0] = %ah
     EndOfDecode();
-    this << TransOp(OP_maskb, REG_temp0, REG_zero, REG_rax, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+    put(TransOp(OP_maskb, REG_temp0, REG_zero, REG_rax, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)));
     // only low 8 bits affected (OF not included)
-    this << TransOp(OP_movrcc, REG_temp0, REG_zero, REG_temp0, REG_zero, 3, 0, 0, SETFLAG_ZF | SETFLAG_CF);
+    put(TransOp(OP_movrcc, REG_temp0, REG_zero, REG_temp0, REG_zero, 3, 0, 0, SETFLAG_ZF | SETFLAG_CF));
     if unlikely (no_partial_flag_updates_per_insn)
-      this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+      put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
     break;
   }
 
   case 0x9f: { // lahf: %ah = %flags[7:0]
     EndOfDecode();
-    this << TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
-    this << TransOp(OP_maskb, REG_rax, REG_rax, REG_temp0, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
+    put(TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
+    put(TransOp(OP_maskb, REG_rax, REG_rax, REG_temp0, REG_imm, 3, 0, MaskControlInfo(56, 8, 56)));
     break;
   }
 
@@ -907,25 +907,25 @@ bool TraceDecoder::decode_complex() {
     //++MTY TODO: this is very rare: move to slowpath decoder
     // TransOp(int opcode, int rd, int ra, int rb, int rc, int size, W64s rbimm = 0, W64s rcimm = 0, W32 setflags = 0)
     EndOfDecode();
-    this << TransOp(OP_movrcc, REG_temp0, REG_zero, REG_imm, REG_zero, 3, FLAG_CF, 0, 0);
-    this << TransOp(OP_xorcc, REG_temp0, REG_cf, REG_temp0, REG_zero, 3, FLAG_CF, 0, SETFLAG_CF);
+    put(TransOp(OP_movrcc, REG_temp0, REG_zero, REG_imm, REG_zero, 3, FLAG_CF, 0, 0));
+    put(TransOp(OP_xorcc, REG_temp0, REG_cf, REG_temp0, REG_zero, 3, FLAG_CF, 0, SETFLAG_CF));
     if unlikely (no_partial_flag_updates_per_insn)
-      this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+      put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
     break;
   }
 
   case 0xf8: { // clc
     EndOfDecode();
-    this << TransOp(OP_movrcc, REG_temp0, REG_zero, REG_imm, REG_zero, 3, 0, 0, SETFLAG_CF);
+    put(TransOp(OP_movrcc, REG_temp0, REG_zero, REG_imm, REG_zero, 3, 0, 0, SETFLAG_CF));
     if unlikely (no_partial_flag_updates_per_insn)
-      this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+      put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
     break;
   }
   case 0xf9: { // stc
     EndOfDecode();
-    this << TransOp(OP_movrcc, REG_temp0, REG_zero, REG_imm, REG_zero, 3, FLAG_CF, 0, SETFLAG_CF);
+    put(TransOp(OP_movrcc, REG_temp0, REG_zero, REG_imm, REG_zero, 3, FLAG_CF, 0, SETFLAG_CF));
     if unlikely (no_partial_flag_updates_per_insn)
-      this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+      put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
     break;
   }
 
@@ -936,7 +936,7 @@ bool TraceDecoder::decode_complex() {
       end_of_block = 1;
     } else {
       // DF was already clear in this context: no-op
-      this << TransOp(OP_nop, REG_temp0, REG_zero, REG_zero, REG_zero, 3);
+      put(TransOp(OP_nop, REG_temp0, REG_zero, REG_zero, REG_zero, 3));
     }
     break;
   }
@@ -948,7 +948,7 @@ bool TraceDecoder::decode_complex() {
       end_of_block = 1;
     } else {
       // DF was already set in this context: no-op
-      this << TransOp(OP_nop, REG_temp0, REG_zero, REG_zero, REG_zero, 3);
+      put(TransOp(OP_nop, REG_temp0, REG_zero, REG_zero, REG_zero, 3));
     }
     break;
   }
@@ -976,7 +976,7 @@ bool TraceDecoder::decode_complex() {
       if (rep) {
         TransOp chk(OP_chk_sub, REG_temp0, REG_rcx, REG_zero, REG_imm, addrsizeshift, 0, EXCEPTION_SkipBlock);
         chk.cond = COND_ne; // make sure rcx is not equal to zero
-        this << chk;
+        put(chk);
         bb.repblock = 1;
         bb.brtype = BRTYPE_REP;
       }
@@ -1016,33 +1016,33 @@ bool TraceDecoder::decode_complex() {
         if (rep && rep != PFX_REPZ)
           MakeInvalid(); // only rep is allowed for movs and rep == repz here
 
-        this << TransOp(OP_ld, REG_temp0, REG_rsi, REG_imm, REG_zero, sizeshift, 0);
-        this << TransOp(OP_st, REG_mem, REG_rdi, REG_imm, REG_temp0, sizeshift, 0);
-        this << TransOp(OP_add, REG_rsi, REG_rsi, REG_imm, REG_zero, addrsizeshift, increment);
-        this << TransOp(OP_add, REG_rdi, REG_rdi, REG_imm, REG_zero, addrsizeshift, increment);
+        put(TransOp(OP_ld, REG_temp0, REG_rsi, REG_imm, REG_zero, sizeshift, 0));
+        put(TransOp(OP_st, REG_mem, REG_rdi, REG_imm, REG_temp0, sizeshift, 0));
+        put(TransOp(OP_add, REG_rsi, REG_rsi, REG_imm, REG_zero, addrsizeshift, increment));
+        put(TransOp(OP_add, REG_rdi, REG_rdi, REG_imm, REG_zero, addrsizeshift, increment));
         if (rep) {
           if (!last_flags_update_was_atomic)
-            this << TransOp(OP_collcc, REG_temp5, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+            put(TransOp(OP_collcc, REG_temp5, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
 
           TransOp sub(OP_sub, REG_rcx, REG_rcx, REG_imm, REG_zero, addrsizeshift, 1, 0, SETFLAG_ZF);
           sub.nouserflags = 1; // it still generates flags, but does not rename the user flags
-          this << sub;
+          put(sub);
           TransOp br(OP_br, REG_rip, REG_rcx, REG_zero, REG_zero, addrsizeshift);
           br.cond = COND_ne; // repeat while nonzero
           br.riptaken = (Waddr)ripstart;
           br.ripseq = (Waddr)rip;
-          this << br;
+          put(br);
         }
         break;
       }
       case 0xa6:
       case 0xa7: {
         // cmps
-        this << TransOp(OP_ld, REG_temp0, REG_rsi, REG_imm, REG_zero, sizeshift, 0);
-        this << TransOp(OP_ld, REG_temp1, REG_rdi, REG_imm, REG_zero, sizeshift, 0);
-        this << TransOp(OP_add, REG_rsi, REG_rsi, REG_imm, REG_zero, addrsizeshift, increment);
-        this << TransOp(OP_add, REG_rdi, REG_rdi, REG_imm, REG_zero, addrsizeshift, increment);
-        this << TransOp(OP_sub, REG_temp2, REG_temp0, REG_temp1, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU);
+        put(TransOp(OP_ld, REG_temp0, REG_rsi, REG_imm, REG_zero, sizeshift, 0));
+        put(TransOp(OP_ld, REG_temp1, REG_rdi, REG_imm, REG_zero, sizeshift, 0));
+        put(TransOp(OP_add, REG_rsi, REG_rsi, REG_imm, REG_zero, addrsizeshift, increment));
+        put(TransOp(OP_add, REG_rdi, REG_rdi, REG_imm, REG_zero, addrsizeshift, increment));
+        put(TransOp(OP_sub, REG_temp2, REG_temp0, REG_temp1, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU));
 
         if (rep) {
           /*
@@ -1072,18 +1072,18 @@ bool TraceDecoder::decode_complex() {
           TransOp sub(OP_sub, REG_rcx, REG_rcx, REG_imm, REG_zero, addrsizeshift, 1, 0,
                       SETFLAG_ZF); // sub     rcx = rcx,1 [zf internal]
           sub.nouserflags = 1;     // it still generates flags, but does not rename the user flags
-          this << sub;
+          put(sub);
           TransOp orxf((rep == PFX_REPZ) ? OP_ornotcc : OP_orcc, REG_temp0, REG_rcx, REG_temp2, REG_zero,
                        (use64 ? 3 : 2), 0, 0, FLAGS_DEFAULT_ALU);
           orxf.nouserflags = 1;
-          this << orxf;
+          put(orxf);
           if (!last_flags_update_was_atomic)
-            this << TransOp(OP_collcc, REG_temp5, REG_temp2, REG_temp2, REG_temp2, 3);
+            put(TransOp(OP_collcc, REG_temp5, REG_temp2, REG_temp2, REG_temp2, 3));
           TransOp br(OP_br, REG_rip, REG_temp0, REG_zero, REG_zero, 3);
           br.cond = COND_ne; // repeat while nonzero
           br.riptaken = (Waddr)ripstart;
           br.ripseq = (Waddr)rip;
-          this << br;
+          put(br);
         }
 
         break;
@@ -1093,20 +1093,20 @@ bool TraceDecoder::decode_complex() {
         // stos
         if (rep && rep != PFX_REPZ)
           MakeInvalid(); // only rep is allowed for movs and rep == repz here
-        this << TransOp(OP_st, REG_mem, REG_rdi, REG_imm, REG_rax, sizeshift, 0);
-        this << TransOp(OP_add, REG_rdi, REG_rdi, REG_imm, REG_zero, addrsizeshift, increment);
+        put(TransOp(OP_st, REG_mem, REG_rdi, REG_imm, REG_rax, sizeshift, 0));
+        put(TransOp(OP_add, REG_rdi, REG_rdi, REG_imm, REG_zero, addrsizeshift, increment));
         if (rep) {
           TransOp sub(OP_sub, REG_rcx, REG_rcx, REG_imm, REG_zero, addrsizeshift, 1, 0,
                       SETFLAG_ZF); // sub     rcx = rcx,1 [zf internal]
           sub.nouserflags = 1;     // it still generates flags, but does not rename the user flags
-          this << sub;
+          put(sub);
           if (!last_flags_update_was_atomic)
-            this << TransOp(OP_collcc, REG_temp5, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+            put(TransOp(OP_collcc, REG_temp5, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
           TransOp br(OP_br, REG_rip, REG_rcx, REG_zero, REG_zero, 3);
           br.cond = COND_ne; // repeat while nonzero
           br.riptaken = (Waddr)ripstart;
           br.ripseq = (Waddr)rip;
-          this << br;
+          put(br);
         }
         break;
       }
@@ -1116,53 +1116,53 @@ bool TraceDecoder::decode_complex() {
           MakeInvalid(); // only rep is allowed for movs and rep == repz here
 
         if (sizeshift >= 2) {
-          this << TransOp(OP_ld, REG_rax, REG_rsi, REG_imm, REG_zero, sizeshift, 0);
+          put(TransOp(OP_ld, REG_rax, REG_rsi, REG_imm, REG_zero, sizeshift, 0));
         } else {
-          this << TransOp(OP_ld, REG_temp0, REG_rsi, REG_imm, REG_zero, sizeshift, 0);
-          this << TransOp(OP_mov, REG_rax, REG_rax, REG_temp0, REG_zero, sizeshift);
+          put(TransOp(OP_ld, REG_temp0, REG_rsi, REG_imm, REG_zero, sizeshift, 0));
+          put(TransOp(OP_mov, REG_rax, REG_rax, REG_temp0, REG_zero, sizeshift));
         }
 
-        this << TransOp(OP_add, REG_rsi, REG_rsi, REG_imm, REG_zero, addrsizeshift, increment);
+        put(TransOp(OP_add, REG_rsi, REG_rsi, REG_imm, REG_zero, addrsizeshift, increment));
 
         if (rep) {
           TransOp sub(OP_sub, REG_rcx, REG_rcx, REG_imm, REG_zero, addrsizeshift, 1, 0,
                       SETFLAG_ZF); // sub     rcx = rcx,1 [zf internal]
           sub.nouserflags = 1;     // it still generates flags, but does not rename the user flags
-          this << sub;
+          put(sub);
           if (!last_flags_update_was_atomic)
-            this << TransOp(OP_collcc, REG_temp5, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+            put(TransOp(OP_collcc, REG_temp5, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
           TransOp br(OP_br, REG_rip, REG_rcx, REG_zero, REG_zero, 3);
           br.cond = COND_ne; // repeat while nonzero
           br.riptaken = (Waddr)ripstart;
           br.ripseq = (Waddr)rip;
-          this << br;
+          put(br);
         }
         break;
       }
       case 0xae:
       case 0xaf: {
         // scas
-        this << TransOp(OP_ld, REG_temp1, REG_rdi, REG_imm, REG_zero, sizeshift, 0); // ldSZ    t1 = [rdi]
-        this << TransOp(OP_add, REG_rdi, REG_rdi, REG_imm, REG_zero, addrsizeshift, increment);
-        this << TransOp(OP_sub, REG_temp2, REG_temp1, REG_rax, REG_zero, sizeshift, 0, 0,
-                        FLAGS_DEFAULT_ALU); // sub    t2 = t1,rax (zco)
+        put(TransOp(OP_ld, REG_temp1, REG_rdi, REG_imm, REG_zero, sizeshift, 0)); // ldSZ    t1 = [rdi]
+        put(TransOp(OP_add, REG_rdi, REG_rdi, REG_imm, REG_zero, addrsizeshift, increment));
+        put(TransOp(OP_sub, REG_temp2, REG_temp1, REG_rax, REG_zero, sizeshift, 0, 0,
+                    FLAGS_DEFAULT_ALU)); // sub    t2 = t1,rax (zco)
 
         if (rep) {
           TransOp sub(OP_sub, REG_rcx, REG_rcx, REG_imm, REG_zero, addrsizeshift, 1, 0,
                       SETFLAG_ZF); // sub     rcx = rcx,1 [zf internal]
           sub.nouserflags = 1;     // it still generates flags, but does not rename the user flags
-          this << sub;
+          put(sub);
           TransOp orxf((rep == PFX_REPZ) ? OP_ornotcc : OP_orcc, REG_temp0, REG_rcx, REG_temp2, REG_zero, 3, 0, 0,
                        FLAGS_DEFAULT_ALU);
           orxf.nouserflags = 1;
-          this << orxf;
+          put(orxf);
           if (!last_flags_update_was_atomic)
-            this << TransOp(OP_collcc, REG_temp5, REG_temp2, REG_temp2, REG_temp2, 3);
+            put(TransOp(OP_collcc, REG_temp5, REG_temp2, REG_temp2, REG_temp2, 3));
           TransOp br(OP_br, REG_rip, REG_temp0, REG_zero, REG_zero, 3);
           br.cond = COND_ne; // repeat while nonzero
           br.riptaken = (Waddr)ripstart;
           br.ripseq = (Waddr)rip;
-          this << br;
+          put(br);
         }
 
         break;
@@ -1244,16 +1244,16 @@ bool TraceDecoder::decode_complex() {
     int tempreg = REG_temp8;
 
     // Only lower 8 bit of offset matter
-    this << TransOp(OP_mov, indexreg, REG_zero, srcreg, REG_zero, 0);
+    put(TransOp(OP_mov, indexreg, REG_zero, srcreg, REG_zero, 0));
 
-    this << TransOp(OP_add, tempreg, basereg, indexreg, REG_zero,
-                    (use64 ? (addrsize_prefix ? 2 : 3) : (addrsize_prefix ? 1 : 2)));
+    put(TransOp(OP_add, tempreg, basereg, indexreg, REG_zero,
+                (use64 ? (addrsize_prefix ? 2 : 3) : (addrsize_prefix ? 1 : 2))));
 
     // NB: Standard OP_ld does not merge
-    this << TransOp(OP_ld, destreg, tempreg, REG_imm, REG_zero /*srcreg*/, 0);
+    put(TransOp(OP_ld, destreg, tempreg, REG_imm, REG_zero /*srcreg*/, 0));
 
     // Merge the low 8 bits only
-    this << TransOp(OP_mov, srcreg, srcreg, destreg, REG_zero, 0);
+    put(TransOp(OP_mov, srcreg, srcreg, destreg, REG_zero, 0));
 #endif
     break;
   }
@@ -1280,24 +1280,24 @@ bool TraceDecoder::decode_complex() {
 
     TransOp testop(OP_and, REG_temp1, REG_rcx, REG_rcx, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU);
     testop.nouserflags = 1;
-    this << testop;
+    put(testop);
 
     // ornotcc: raflags | (~rbflags)
     if ((op == 0xe0) | (op == 0xe1)) {
       TransOp mergeop((op == 0xe0) ? OP_ornotcc : OP_orcc, REG_temp1, REG_temp1, REG_zf, REG_zero, 3, 0, 0,
                       FLAGS_DEFAULT_ALU);
       mergeop.nouserflags = 1;
-      this << mergeop;
+      put(mergeop);
     }
 
     if (!last_flags_update_was_atomic)
-      this << TransOp(OP_collcc, REG_temp5, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+      put(TransOp(OP_collcc, REG_temp5, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
 
     TransOp transop(OP_br, REG_rip, REG_temp1, REG_zero, REG_zero, 3, 0);
     transop.cond = COND_e;
     transop.riptaken = (Waddr)rip + ra.imm.imm;
     transop.ripseq = (Waddr)rip;
-    this << transop;
+    put(transop);
 
     break;
   };
@@ -1316,16 +1316,16 @@ bool TraceDecoder::decode_complex() {
 
     TransOp testop(OP_and, REG_temp1, REG_rcx, REG_rcx, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU);
     testop.nouserflags = 1;
-    this << testop;
+    put(testop);
 
     if (!last_flags_update_was_atomic)
-      this << TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+      put(TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
 
     TransOp transop(OP_br, REG_rip, REG_temp1, REG_zero, REG_zero, 3, 0);
     transop.cond = COND_e;
     transop.riptaken = (Waddr)rip + ra.imm.imm;
     transop.ripseq = (Waddr)rip;
-    this << transop;
+    put(transop);
     break;
   }
 
@@ -1336,8 +1336,8 @@ bool TraceDecoder::decode_complex() {
 
     int sizeshift = (op == 0xe6) ? 0 : (opsize_prefix ? 1 : 2);
 
-    this << TransOp(OP_mov, REG_ar1, REG_zero, REG_imm, REG_zero, 3, ra.imm.imm & 0xff);
-    this << TransOp(OP_mov, REG_ar2, REG_zero, REG_imm, REG_zero, 0, sizeshift);
+    put(TransOp(OP_mov, REG_ar1, REG_zero, REG_imm, REG_zero, 3, ra.imm.imm & 0xff));
+    put(TransOp(OP_mov, REG_ar2, REG_zero, REG_imm, REG_zero, 0, sizeshift));
     microcode_assist(ASSIST_IOPORT_OUT, ripstart, rip);
     end_of_block = 1;
     break;
@@ -1349,8 +1349,8 @@ bool TraceDecoder::decode_complex() {
 
     int sizeshift = (op == 0xee) ? 0 : (opsize_prefix ? 1 : 2);
 
-    this << TransOp(OP_mov, REG_ar1, REG_zero, REG_rdx, REG_zero, 1);
-    this << TransOp(OP_mov, REG_ar2, REG_zero, REG_imm, REG_zero, 0, sizeshift);
+    put(TransOp(OP_mov, REG_ar1, REG_zero, REG_rdx, REG_zero, 1));
+    put(TransOp(OP_mov, REG_ar2, REG_zero, REG_imm, REG_zero, 0, sizeshift));
     microcode_assist(ASSIST_IOPORT_OUT, ripstart, rip);
     end_of_block = 1;
     break;
@@ -1363,8 +1363,8 @@ bool TraceDecoder::decode_complex() {
 
     int sizeshift = (op == 0xe4) ? 0 : (opsize_prefix ? 1 : 2);
 
-    this << TransOp(OP_mov, REG_ar1, REG_zero, REG_imm, REG_zero, 3, ra.imm.imm & 0xff);
-    this << TransOp(OP_mov, REG_ar2, REG_zero, REG_imm, REG_zero, 0, sizeshift);
+    put(TransOp(OP_mov, REG_ar1, REG_zero, REG_imm, REG_zero, 3, ra.imm.imm & 0xff));
+    put(TransOp(OP_mov, REG_ar2, REG_zero, REG_imm, REG_zero, 0, sizeshift));
     microcode_assist(ASSIST_IOPORT_IN, ripstart, rip);
     end_of_block = 1;
     break;
@@ -1376,8 +1376,8 @@ bool TraceDecoder::decode_complex() {
 
     int sizeshift = (op == 0xec) ? 0 : (opsize_prefix ? 1 : 2);
 
-    this << TransOp(OP_mov, REG_ar1, REG_zero, REG_rdx, REG_zero, 1);
-    this << TransOp(OP_mov, REG_ar2, REG_zero, REG_imm, REG_zero, 0, sizeshift);
+    put(TransOp(OP_mov, REG_ar1, REG_zero, REG_rdx, REG_zero, 1));
+    put(TransOp(OP_mov, REG_ar2, REG_zero, REG_imm, REG_zero, 0, sizeshift));
     microcode_assist(ASSIST_IOPORT_IN, ripstart, rip);
     end_of_block = 1;
     break;
@@ -1438,21 +1438,21 @@ bool TraceDecoder::decode_complex() {
 
       if (size == 0) {
         // ax <- al * src
-        this << TransOp(OP_mov, REG_temp0, REG_zero, srcreg, REG_zero, 3);
-        this << TransOp(highop, REG_temp1, REG_rax, REG_temp0, REG_zero, size, 0, 0, SETFLAG_CF | SETFLAG_OF);
-        this << TransOp(OP_mull, REG_rax, REG_rax, REG_temp0, REG_zero, size);
+        put(TransOp(OP_mov, REG_temp0, REG_zero, srcreg, REG_zero, 3));
+        put(TransOp(highop, REG_temp1, REG_rax, REG_temp0, REG_zero, size, 0, 0, SETFLAG_CF | SETFLAG_OF));
+        put(TransOp(OP_mull, REG_rax, REG_rax, REG_temp0, REG_zero, size));
         // insert high byte
-        this << TransOp(OP_maskb, REG_rax, REG_rax, REG_temp1, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
+        put(TransOp(OP_maskb, REG_rax, REG_rax, REG_temp1, REG_imm, 3, 0, MaskControlInfo(56, 8, 56)));
       } else {
         // dx:ax = ax * src
         // edx:eax = eax * src
         // rdx:rax = rax * src
-        this << TransOp(OP_mov, REG_temp0, REG_zero, srcreg, REG_zero, 3);
-        this << TransOp(highop, REG_rdx, REG_rax, REG_temp0, REG_zero, size, 0, 0, SETFLAG_CF | SETFLAG_OF);
-        this << TransOp(OP_mull, REG_rax, REG_rax, REG_temp0, REG_zero, size);
+        put(TransOp(OP_mov, REG_temp0, REG_zero, srcreg, REG_zero, 3));
+        put(TransOp(highop, REG_rdx, REG_rax, REG_temp0, REG_zero, size, 0, 0, SETFLAG_CF | SETFLAG_OF));
+        put(TransOp(OP_mull, REG_rax, REG_rax, REG_temp0, REG_zero, size));
       }
       if unlikely (no_partial_flag_updates_per_insn)
-        this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+        put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
       break;
     }
     default:
@@ -1492,10 +1492,10 @@ bool TraceDecoder::decode_complex() {
         int divop = (modrm.reg == 6) ? OP_div : OP_divs;
         int remop = (modrm.reg == 6) ? OP_rem : OP_rems;
 
-        this << TransOp(divop, REG_temp0, REG_rdx, REG_rax, REG_temp2, sizeshift);
-        this << TransOp(remop, REG_temp1, REG_rdx, REG_rax, REG_temp2, sizeshift);
-        this << TransOp(OP_mov, REG_rax, REG_rax, REG_temp0, REG_zero, sizeshift);
-        this << TransOp(OP_mov, REG_rdx, REG_rdx, REG_temp1, REG_zero, sizeshift);
+        put(TransOp(divop, REG_temp0, REG_rdx, REG_rax, REG_temp2, sizeshift));
+        put(TransOp(remop, REG_temp1, REG_rdx, REG_rax, REG_temp2, sizeshift));
+        put(TransOp(OP_mov, REG_rax, REG_rax, REG_temp0, REG_zero, sizeshift));
+        put(TransOp(OP_mov, REG_rdx, REG_rdx, REG_temp1, REG_zero, sizeshift));
       } else {
         //
         // Byte-sized operands:
@@ -1513,14 +1513,14 @@ bool TraceDecoder::decode_complex() {
         int remop = (modrm.reg == 6) ? OP_rem : OP_rems;
 
         // Put dividend[15:8] into temp3
-        this << TransOp(OP_maskb, REG_temp3, REG_zero, REG_rax, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+        put(TransOp(OP_maskb, REG_temp3, REG_zero, REG_rax, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)));
 
-        this << TransOp(divop, REG_temp0, REG_temp3, REG_rax, REG_temp2, sizeshift);
-        this << TransOp(remop, REG_temp1, REG_temp3, REG_rax, REG_temp2, sizeshift);
+        put(TransOp(divop, REG_temp0, REG_temp3, REG_rax, REG_temp2, sizeshift));
+        put(TransOp(remop, REG_temp1, REG_temp3, REG_rax, REG_temp2, sizeshift));
 
-        this << TransOp(OP_mov, REG_rax, REG_rax, REG_temp0, REG_zero, sizeshift); // quotient in %al
-        this << TransOp(OP_maskb, REG_rax, REG_rax, REG_temp1, REG_imm, 3, 0,
-                        MaskControlInfo(56, 8, 56)); // remainder in %ah
+        put(TransOp(OP_mov, REG_rax, REG_rax, REG_temp0, REG_zero, sizeshift)); // quotient in %al
+        put(TransOp(OP_maskb, REG_rax, REG_rax, REG_temp1, REG_imm, 3, 0,
+                    MaskControlInfo(56, 8, 56))); // remainder in %ah
 
         /*
         // Byte-size divides have special semantics
@@ -1529,7 +1529,7 @@ bool TraceDecoder::decode_complex() {
           {ASSIST_IDIV8, ASSIST_IDIV16, ASSIST_IDIV32, ASSIST_IDIV64}
         };
 
-        this << TransOp(OP_mov, REG_ar1, REG_zero, REG_temp2, REG_zero, 3);
+        put(TransOp(OP_mov, REG_ar1, REG_zero, REG_temp2, REG_zero, 3));
         microcode_assist(subop_and_size_to_assist_idx[modrm.reg - 6][sizeshift], ripstart, rip);
         end_of_block = 1;
         */
@@ -1638,9 +1638,9 @@ bool TraceDecoder::decode_complex() {
       int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
 
       // bt has no output - just flags:
-      this << TransOp(opcode, (opcode == OP_bt) ? REG_temp0 : rdreg, rdreg, rareg, REG_zero, 3, 0, 0, SETFLAG_CF);
+      put(TransOp(opcode, (opcode == OP_bt) ? REG_temp0 : rdreg, rdreg, rareg, REG_zero, 3, 0, 0, SETFLAG_CF));
       if unlikely (no_partial_flag_updates_per_insn)
-        this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+        put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
       break;
     } else {
       if (opcode == OP_bt)
@@ -1655,19 +1655,19 @@ bool TraceDecoder::decode_complex() {
       rd.mem.size = (use64 ? (addrsize_prefix ? 2 : 3) : (addrsize_prefix ? 1 : 2));
       address_generate_and_load_or_store(REG_temp1, REG_zero, rd, OP_add, 0, 0, true);
 
-      this << TransOp(OP_sar, REG_temp2, rareg, REG_imm, REG_zero, 3, 3);       // byte index
-      this << TransOp(OP_add, REG_temp2, REG_temp1, REG_temp2, REG_zero, 3, 3); // add offset
+      put(TransOp(OP_sar, REG_temp2, rareg, REG_imm, REG_zero, 3, 3));       // byte index
+      put(TransOp(OP_add, REG_temp2, REG_temp1, REG_temp2, REG_zero, 3, 3)); // add offset
       TransOp ldop(OP_ld, REG_temp0, REG_temp2, REG_imm, REG_zero, 0, 0);
       ldop.locked = locked;
-      this << ldop;
-      this << TransOp(opcode, REG_temp0, REG_temp0, rareg, REG_zero, 0, 0, 0, SETFLAG_CF);
+      put(ldop);
+      put(TransOp(opcode, REG_temp0, REG_temp0, rareg, REG_zero, 0, 0, 0, SETFLAG_CF));
       if unlikely (no_partial_flag_updates_per_insn)
-        this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+        put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
 
       if (opcode != OP_bt) {
         TransOp stop(OP_st, REG_mem, REG_temp2, REG_imm, REG_temp0, 0, 0);
         stop.locked = locked;
-        this << stop;
+        put(stop);
       }
 
       if (memory_fence_if_locked(1))
@@ -1694,10 +1694,10 @@ bool TraceDecoder::decode_complex() {
       int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
 
       // bt has no output - just flags:
-      this << TransOp(opcode, (opcode == OP_bt) ? REG_temp0 : rdreg, rdreg, REG_imm, REG_zero, 3, ra.imm.imm, 0,
-                      SETFLAG_CF);
+      put(TransOp(opcode, (opcode == OP_bt) ? REG_temp0 : rdreg, rdreg, REG_imm, REG_zero, 3, ra.imm.imm, 0,
+                  SETFLAG_CF));
       if unlikely (no_partial_flag_updates_per_insn)
-        this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+        put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
       break;
     } else {
       if (opcode == OP_bt)
@@ -1712,15 +1712,15 @@ bool TraceDecoder::decode_complex() {
 
       TransOp ldop(OP_ld, REG_temp0, REG_temp1, REG_imm, REG_zero, 0, ra.imm.imm >> 3);
       ldop.locked = locked;
-      this << ldop;
-      this << TransOp(opcode, REG_temp0, REG_temp0, REG_imm, REG_zero, 0, lowbits(ra.imm.imm, 3), 0, SETFLAG_CF);
+      put(ldop);
+      put(TransOp(opcode, REG_temp0, REG_temp0, REG_imm, REG_zero, 0, lowbits(ra.imm.imm, 3), 0, SETFLAG_CF));
       if unlikely (no_partial_flag_updates_per_insn)
-        this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+        put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
 
       if (opcode != OP_bt) {
         TransOp stop(OP_st, REG_mem, REG_temp1, REG_imm, REG_temp0, 0, ra.imm.imm >> 3);
         stop.locked = locked;
-        this << stop;
+        put(stop);
       }
 
       if (memory_fence_if_locked(1))
@@ -1754,7 +1754,7 @@ bool TraceDecoder::decode_complex() {
 
     if (immform & (imm == 0)) {
       // No action and no flags update
-      this << TransOp(OP_nop, REG_temp0, REG_zero, REG_zero, REG_zero, 0);
+      put(TransOp(OP_nop, REG_temp0, REG_zero, REG_zero, REG_zero, 0));
       break;
     }
 
@@ -1775,14 +1775,14 @@ bool TraceDecoder::decode_complex() {
         //   ds = 64-c
         //
 
-        this << TransOp(OP_and, REG_temp0, REG_rcx, REG_imm, REG_zero, 3, bitmask(3 + rdsize));
-        this << TransOp(OP_mov, REG_temp2, REG_zero, REG_imm, REG_zero, 0,
-                        (1 << rdsize) * 8);                                    // load inverse count (e.g. 64 - c)
-        this << TransOp(OP_sub, REG_temp2, REG_temp2, REG_temp0, REG_zero, 0); // load inverse count (e.g. 64 - c)
+        put(TransOp(OP_and, REG_temp0, REG_rcx, REG_imm, REG_zero, 3, bitmask(3 + rdsize)));
+        put(TransOp(OP_mov, REG_temp2, REG_zero, REG_imm, REG_zero, 0,
+                    (1 << rdsize) * 8));                                    // load inverse count (e.g. 64 - c)
+        put(TransOp(OP_sub, REG_temp2, REG_temp2, REG_temp0, REG_zero, 0)); // load inverse count (e.g. 64 - c)
         // Form [ 64-c | c ]
-        this << TransOp(OP_maskb, REG_temp1, REG_temp0, REG_temp2, REG_imm, 3, 0, MaskControlInfo(58, 6, 58));
+        put(TransOp(OP_maskb, REG_temp1, REG_temp0, REG_temp2, REG_imm, 3, 0, MaskControlInfo(58, 6, 58)));
         // Form [ 64-c | c | 0 ]
-        this << TransOp(OP_shl, REG_temp1, REG_temp1, REG_imm, REG_zero, 3, 6);
+        put(TransOp(OP_shl, REG_temp1, REG_temp1, REG_imm, REG_zero, 3, 6));
       } else {
         //
         // Build mask: (58 = 64-6, 52 = 64-12)
@@ -1790,9 +1790,9 @@ bool TraceDecoder::decode_complex() {
         // maskq t1 = t0,t0,[ms=58, mc=6, ds=58]       // build 0|c|c
         // maskq t1 = t1,t0,[ms=52, mc=6, ds=52]       // build c|c|c
         //
-        this << TransOp(OP_and, REG_temp0, REG_rcx, REG_imm, REG_zero, 3, bitmask(3 + rdsize));
-        this << TransOp(OP_maskb, REG_temp1, REG_temp0, REG_temp0, REG_imm, 3, 0, MaskControlInfo(58, 6, 58));
-        this << TransOp(OP_maskb, REG_temp1, REG_temp1, REG_temp0, REG_imm, 3, 0, MaskControlInfo(52, 6, 52));
+        put(TransOp(OP_and, REG_temp0, REG_rcx, REG_imm, REG_zero, 3, bitmask(3 + rdsize)));
+        put(TransOp(OP_maskb, REG_temp1, REG_temp0, REG_temp0, REG_imm, 3, 0, MaskControlInfo(58, 6, 58)));
+        put(TransOp(OP_maskb, REG_temp1, REG_temp1, REG_temp0, REG_imm, 3, 0, MaskControlInfo(52, 6, 52)));
       }
     }
 
@@ -1800,7 +1800,7 @@ bool TraceDecoder::decode_complex() {
     // Collect the old flags here in case the shift count was zero:
     //
     if (!immform)
-      this << TransOp(OP_collcc, REG_temp2, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+      put(TransOp(OP_collcc, REG_temp2, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
 
     //
     // To simplify the microcode construction of the shrd/shld instructions,
@@ -1828,9 +1828,9 @@ bool TraceDecoder::decode_complex() {
     int shiftreg = (immform) ? REG_imm : REG_temp0;
     int maskreg = (immform) ? REG_imm : REG_temp1;
     int opcode = (left) ? OP_shl : OP_shr;
-    this << TransOp(opcode, rdreg, rdreg, shiftreg, REG_zero, rdsize, imm, 0, FLAGS_DEFAULT_ALU);
+    put(TransOp(opcode, rdreg, rdreg, shiftreg, REG_zero, rdsize, imm, 0, FLAGS_DEFAULT_ALU));
     W64 maskctl = (left) ? MaskControlInfo(0, imm, ((1 << rdsize) * 8) - imm) : MaskControlInfo(imm, imm, imm);
-    this << TransOp(OP_mask, rdreg, rdreg, rareg, maskreg, rdsize, 0, maskctl, FLAGS_DEFAULT_ALU);
+    put(TransOp(OP_mask, rdreg, rdreg, rareg, maskreg, rdsize, 0, maskctl, FLAGS_DEFAULT_ALU));
 
     if (rd.type == OPTYPE_MEM)
       result_store(rdreg, REG_temp5, rd);
@@ -1841,10 +1841,10 @@ bool TraceDecoder::decode_complex() {
     // sel.e t0 = rd,t2,t0      [zco] (t2 = original flags)
     //
     if (!immform) {
-      this << TransOp(OP_and, REG_temp0, REG_temp0, REG_temp0, REG_zero, 0, 0, 0, FLAGS_DEFAULT_ALU);
+      put(TransOp(OP_and, REG_temp0, REG_temp0, REG_temp0, REG_zero, 0, 0, 0, FLAGS_DEFAULT_ALU));
       TransOp selop(OP_sel, REG_temp0, rdreg, REG_temp2, REG_temp0, 3, 0, 0, FLAGS_DEFAULT_ALU);
       selop.cond = COND_e;
-      this << selop;
+      put(selop);
     }
     break;
   };
@@ -1902,18 +1902,18 @@ bool TraceDecoder::decode_complex() {
       rdreg = REG_temp2;
       operand_load(tmpreg, rd, OP_ld, 1);
     } else {
-      this << TransOp(OP_mov, tmpreg, REG_zero, rdreg, REG_zero, sizeshift);
+      put(TransOp(OP_mov, tmpreg, REG_zero, rdreg, REG_zero, sizeshift));
     }
 
-    this << TransOp(OP_sub, REG_temp1, REG_rax, tmpreg, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU);
+    put(TransOp(OP_sub, REG_temp1, REG_rax, tmpreg, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU));
 
     TransOp selmem(OP_sel, rdreg, tmpreg, rareg, REG_temp1, sizeshift);
     selmem.cond = COND_e;
-    this << selmem;
+    put(selmem);
 
     TransOp selreg(OP_sel, REG_rax, REG_rax, tmpreg, REG_temp1, sizeshift);
     selreg.cond = COND_ne;
-    this << selreg;
+    put(selreg);
 
     if likely (rd.type == OPTYPE_MEM)
       result_store(rdreg, REG_temp0, rd);
@@ -1967,30 +1967,30 @@ bool TraceDecoder::decode_complex() {
 
     TransOp sublo(OP_sub, REG_temp2, REG_temp0, REG_rax, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU);
     sublo.nouserflags = 1;
-    this << sublo;
+    put(sublo);
     TransOp subhi(OP_sub, REG_temp3, REG_temp1, REG_rdx, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU);
     subhi.nouserflags = 1;
-    this << subhi;
-    this << TransOp(OP_andcc, REG_temp7, REG_temp2, REG_temp3, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU);
+    put(subhi);
+    put(TransOp(OP_andcc, REG_temp7, REG_temp2, REG_temp3, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU));
     {
       TransOp sel(OP_sel, REG_temp2, REG_temp0, REG_rbx, REG_temp7, sizeshift);
       sel.cond = COND_e;
-      this << sel;
+      put(sel);
     }
     {
       TransOp sel(OP_sel, REG_temp3, REG_temp1, REG_rcx, REG_temp7, sizeshift);
       sel.cond = COND_e;
-      this << sel;
+      put(sel);
     }
     {
       TransOp sel(OP_sel, REG_rax, REG_temp0, REG_rax, REG_temp7, sizeshift);
       sel.cond = COND_e;
-      this << sel;
+      put(sel);
     }
     {
       TransOp sel(OP_sel, REG_rdx, REG_temp1, REG_rdx, REG_temp7, sizeshift);
       sel.cond = COND_e;
-      this << sel;
+      put(sel);
     }
     result_store(REG_temp2, REG_temp4, rd);
     rd.mem.offset += sizeincr;
@@ -2050,11 +2050,11 @@ bool TraceDecoder::decode_complex() {
       rdreg = REG_temp1;
       operand_load(tmpreg, rd, OP_ld, 1);
     } else {
-      this << TransOp(OP_mov, tmpreg, REG_zero, rdreg, REG_zero, sizeshift);
+      put(TransOp(OP_mov, tmpreg, REG_zero, rdreg, REG_zero, sizeshift));
     }
 
-    this << TransOp(OP_add, rdreg, tmpreg, rareg, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU);
-    this << TransOp(OP_mov, rareg, rareg, tmpreg, REG_zero, sizeshift);
+    put(TransOp(OP_add, rdreg, tmpreg, rareg, REG_zero, sizeshift, 0, 0, FLAGS_DEFAULT_ALU));
+    put(TransOp(OP_mov, rareg, rareg, tmpreg, REG_zero, sizeshift));
 
     if likely (rd.type == OPTYPE_MEM) {
       result_store(rdreg, REG_temp2, rd);
@@ -2122,7 +2122,7 @@ bool TraceDecoder::decode_complex() {
 
       TransOp ldp(OP_ld, REG_temp1, REG_ctx, REG_imm, REG_zero, 1, offsetof_(Context, mxcsr));
       ldp.internal = 1;
-      this << ldp;
+      put(ldp);
       result_store(REG_temp1, REG_temp0, rd);
       break;
     }
@@ -2144,7 +2144,7 @@ bool TraceDecoder::decode_complex() {
           mf.extshift = MF_TYPE_SFENCE;
           break;
         }
-        this << mf;
+        put(mf);
         split_after();
       } else {
         split_before();
@@ -2159,7 +2159,7 @@ bool TraceDecoder::decode_complex() {
   }
 
   case 0x177: { // EMMS: clear all tag bits (set to "empty" state)
-    this << TransOp(OP_mov, REG_fptags, REG_zero, REG_zero, REG_zero, 3);
+    put(TransOp(OP_mov, REG_fptags, REG_zero, REG_zero, REG_zero, 3));
     break;
   }
 
@@ -2191,9 +2191,9 @@ bool TraceDecoder::decode_complex() {
     EndOfDecode();
     TransOp ldp1(OP_ld, REG_rdx, REG_zero, REG_imm, REG_zero, 3, (Waddr)&sim_cycle);
     ldp1.internal = 1;
-    this << ldp1;
-    this << TransOp(OP_mov, REG_rax, REG_zero, REG_rdx, REG_zero, 2);
-    this << TransOp(OP_shr, REG_rdx, REG_rdx, REG_imm, REG_zero, 3, 32);
+    put(ldp1);
+    put(TransOp(OP_mov, REG_rax, REG_zero, REG_rdx, REG_zero, 2));
+    put(TransOp(OP_shr, REG_rdx, REG_rdx, REG_imm, REG_zero, 3, 32));
     break;
   }
 

@@ -945,11 +945,11 @@ void TraceDecoder::immediate(int rdreg, int sizeshift, W64s imm, bool issigned) 
   if (totalbits < 64)
     imm = (issigned) ? signext64(imm, totalbits) : bits(imm, 0, totalbits);
   // Only byte and word sized immediates need to be merged with the previous value:
-  this << TransOp(OP_mov, rdreg, REG_zero, REG_imm, REG_zero, 3, imm);
+  put(TransOp(OP_mov, rdreg, REG_zero, REG_imm, REG_zero, 3, imm));
 }
 
 void TraceDecoder::abs_code_addr_immediate(int rdreg, int sizeshift, W64 imm) {
-  this << TransOp(OP_add, rdreg, REG_trace, REG_imm, REG_zero, sizeshift, signext64(imm, 48));
+  put(TransOp(OP_add, rdreg, REG_trace, REG_imm, REG_zero, sizeshift, signext64(imm, 48)));
 }
 
 int TraceDecoder::bias_by_segreg(int basereg) {
@@ -968,8 +968,8 @@ int TraceDecoder::bias_by_segreg(int basereg) {
 
     TransOp ldp(OP_ld, REG_temp6, REG_ctx, REG_imm, REG_zero, 3, varoffs);
     ldp.internal = 1;
-    this << ldp;
-    this << TransOp(OP_add, REG_temp6, REG_temp6, basereg, REG_zero, 3);
+    put(ldp);
+    put(TransOp(OP_add, REG_temp6, REG_temp6, basereg, REG_zero, 3));
     return REG_temp6;
   }
 
@@ -1042,7 +1042,7 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
       ldst.cachelevel = cachelevel;
       ldst.locked = locked;
       ldst.extshift = 0;
-      this << ldst;
+      put(ldst);
     } else {
       assert(opcode == OP_add);
       abs_code_addr_immediate(destreg, 3, Waddr(rip) + offset);
@@ -1052,7 +1052,7 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
     if (force_seg_bias)
       basereg = bias_by_segreg(basereg);
     if (imm_is_not_encodable) {
-      this << TransOp(OP_add, REG_temp8, basereg, REG_imm, REG_zero, 3, offset);
+      put(TransOp(OP_add, REG_temp8, basereg, REG_imm, REG_zero, 3, offset));
       basereg = REG_temp8;
       offset = 0;
     }
@@ -1064,7 +1064,7 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
       ldst.locked = locked;
       ldst.extshift = 0; // rmw;
     }
-    this << ldst;
+    put(ldst);
   } else if (offset == 0) {
     // [ra + rb*scale] or [rb*scale]
     if (force_seg_bias)
@@ -1075,9 +1075,9 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
     if (memref.mem.scale) {
       TransOp addop(OP_adda, tempreg, basereg, REG_zero, indexreg, (memop) ? 3 : memref.mem.size);
       addop.extshift = memref.mem.scale;
-      this << addop;
+      put(addop);
     } else {
-      this << TransOp(OP_add, tempreg, basereg, indexreg, REG_zero, (memop) ? 3 : memref.mem.size);
+      put(TransOp(OP_add, tempreg, basereg, indexreg, REG_zero, (memop) ? 3 : memref.mem.size));
     }
 
     TransOp ldst(opcode, destreg, tempreg, REG_imm, srcreg, memref.mem.size, 0);
@@ -1088,21 +1088,21 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
       ldst.locked = locked;
       ldst.extshift = 0; // rmw;
     }
-    this << ldst;
+    put(ldst);
   } else {
     // [ra + imm32 + rb*scale]
     if (force_seg_bias)
       basereg = bias_by_segreg(basereg);
 
     if (imm_is_not_encodable) {
-      this << TransOp(OP_add, REG_temp8, basereg, REG_imm, REG_zero, 3, offset);
+      put(TransOp(OP_add, REG_temp8, basereg, REG_imm, REG_zero, 3, offset));
       basereg = REG_temp8;
       offset = 0;
     }
 
     TransOp addop(OP_adda, REG_temp8, basereg, REG_zero, indexreg, 3);
     addop.extshift = memref.mem.scale;
-    this << addop;
+    put(addop);
     TransOp ldst(opcode, destreg, REG_temp8, REG_imm, srcreg, memref.mem.size, offset);
     if (memop) {
       ldst.datatype = datatype;
@@ -1110,7 +1110,7 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
       ldst.locked = locked;
       ldst.extshift = 0; // rmw;
     }
-    this << ldst;
+    put(ldst);
   }
 }
 
@@ -1148,13 +1148,13 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
 
     int rareg = destreg;
     if (rdhigh) {
-      this << TransOp(OP_maskb, REG_temp2, REG_zero, rareg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      put(TransOp(OP_maskb, REG_temp2, REG_zero, rareg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)));
       rareg = REG_temp2;
     }
 
     int rbreg = srcreg;
     if (rahigh) {
-      this << TransOp(OP_maskb, REG_temp3, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      put(TransOp(OP_maskb, REG_temp3, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)));
       rbreg = REG_temp3;
     }
 
@@ -1168,15 +1168,15 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
     }
 
     if (flagsonly) {
-      this << TransOp(opcode, REG_temp0, rareg, rbreg, rcreg, sizeshift, (isimm) ? ra.imm.imm : 0, 0, setflags);
+      put(TransOp(opcode, REG_temp0, rareg, rbreg, rcreg, sizeshift, (isimm) ? ra.imm.imm : 0, 0, setflags));
     } else {
       if (isnegop) {
         rbreg = rareg;
         rareg = REG_zero;
       }
       if (ra_rb_imm_form) {
-        this << TransOp(opcode, destreg, srcreg, REG_imm, (sizeshift >= 2) ? REG_zero : destreg, sizeshift,
-                        ra_rb_imm_form_rbimm, 0, setflags);
+        put(TransOp(opcode, destreg, srcreg, REG_imm, (sizeshift >= 2) ? REG_zero : destreg, sizeshift,
+                    ra_rb_imm_form_rbimm, 0, setflags));
       } else {
         if unlikely (isnegop && (sizeshift <= 1)) {
           // In decode-fast, neg r1 optimized to be => r1 = 0 - rd
@@ -1184,13 +1184,13 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
           // For 8 and 16 bit operands, use:
           // t0 = 0 - rd
           // mov rd=rd,t0
-          this << TransOp(OP_sub, REG_temp0, REG_zero, destreg, REG_zero, sizeshift, 0, 0, setflags);
-          this << TransOp(OP_mov, destreg, destreg, REG_temp0, REG_zero, sizeshift);
+          put(TransOp(OP_sub, REG_temp0, REG_zero, destreg, REG_zero, sizeshift, 0, 0, setflags));
+          put(TransOp(OP_mov, destreg, destreg, REG_temp0, REG_zero, sizeshift));
         } else {
-          this << TransOp(opcode, (rdhigh) ? REG_temp2 : destreg, rareg, rbreg, rcreg, sizeshift,
-                          (isimm) ? ra.imm.imm : 0, 0, setflags);
+          put(TransOp(opcode, (rdhigh) ? REG_temp2 : destreg, rareg, rbreg, rcreg, sizeshift, (isimm) ? ra.imm.imm : 0,
+                      0, setflags));
           if (rdhigh) {
-            this << TransOp(OP_maskb, destreg, destreg, REG_temp2, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
+            put(TransOp(OP_maskb, destreg, destreg, REG_temp2, REG_imm, 3, 0, MaskControlInfo(56, 8, 56)));
           }
         }
       }
@@ -1212,21 +1212,21 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
 
     int rareg = destreg;
     if (rdhigh) {
-      this << TransOp(OP_maskb, REG_temp2, REG_zero, destreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      put(TransOp(OP_maskb, REG_temp2, REG_zero, destreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)));
       rareg = REG_temp2;
     }
 
     int sizeshift = reginfo[rd.reg.reg].sizeshift;
     if (flagsonly) {
-      this << TransOp(opcode, REG_temp0, rareg, REG_temp0, rcreg, sizeshift, 0, 0, setflags);
+      put(TransOp(opcode, REG_temp0, rareg, REG_temp0, rcreg, sizeshift, 0, 0, setflags));
     } else {
       if (ra_rb_imm_form) {
-        this << TransOp(opcode, destreg, REG_temp0, REG_imm, (sizeshift >= 2) ? REG_zero : destreg, sizeshift,
-                        ra_rb_imm_form_rbimm, 0, setflags);
+        put(TransOp(opcode, destreg, REG_temp0, REG_imm, (sizeshift >= 2) ? REG_zero : destreg, sizeshift,
+                    ra_rb_imm_form_rbimm, 0, setflags));
       } else {
-        this << TransOp(opcode, (rdhigh) ? REG_temp2 : destreg, rareg, REG_temp0, rcreg, sizeshift, 0, 0, setflags);
+        put(TransOp(opcode, (rdhigh) ? REG_temp2 : destreg, rareg, REG_temp0, rcreg, sizeshift, 0, 0, setflags));
         if (rdhigh)
-          this << TransOp(OP_maskb, destreg, destreg, REG_temp2, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
+          put(TransOp(OP_maskb, destreg, destreg, REG_temp2, REG_imm, 3, 0, MaskControlInfo(56, 8, 56)));
       }
     }
   } else if ((rd.type == OPTYPE_MEM) && ((ra.type == OPTYPE_REG) || (ra.type == OPTYPE_IMM))) {
@@ -1247,16 +1247,16 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
     bool rahigh = (isimm) ? 0 : reginfo[ra.reg.reg].hibyte;
 
     if (rahigh) {
-      this << TransOp(OP_maskb, REG_temp2, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      put(TransOp(OP_maskb, REG_temp2, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)));
       srcreg = REG_temp2;
     }
 
     if (isimm) {
-      this << TransOp(opcode, REG_temp0, REG_temp0, REG_imm, rcreg, sizeshift, ra.imm.imm, 0, setflags);
+      put(TransOp(opcode, REG_temp0, REG_temp0, REG_imm, rcreg, sizeshift, ra.imm.imm, 0, setflags));
       if (!flagsonly)
         result_store(REG_temp0, REG_temp3, rd, OP_st, 0, 1);
     } else {
-      this << TransOp(opcode, REG_temp0, REG_temp0, srcreg, rcreg, sizeshift, 0, 0, setflags);
+      put(TransOp(opcode, REG_temp0, REG_temp0, srcreg, rcreg, sizeshift, 0, 0, setflags));
       if (!flagsonly)
         result_store(REG_temp0, REG_temp3, rd, OP_st, 0, 1);
     }
@@ -1270,13 +1270,13 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
 
     operand_load(REG_temp0, rd);
     int sizeshift = rd.mem.size;
-    this << TransOp(opcode, REG_temp0, (isnegop) ? REG_zero : REG_temp0, REG_temp0, rcreg, sizeshift, 0, 0, setflags);
+    put(TransOp(opcode, REG_temp0, (isnegop) ? REG_zero : REG_temp0, REG_temp0, rcreg, sizeshift, 0, 0, setflags));
     if (!flagsonly)
       result_store(REG_temp0, REG_temp3, rd);
   }
 
   if unlikely (no_partial_flag_updates_per_insn && (setflags != (SETFLAG_ZF | SETFLAG_CF | SETFLAG_OF))) {
-    this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+    put(TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
   }
 }
 
@@ -1303,12 +1303,12 @@ void TraceDecoder::move_reg_or_mem(const DecodedOperand& rd, const DecodedOperan
                         (rdhigh && rahigh) ? MaskControlInfo(56, 8, 0)
                                            :      // move between high bytes
                         MaskControlInfo(0, 8, 0); // move between low bytes
-      this << TransOp(OP_maskb, destreg, destreg, srcreg, REG_imm, 3, (isimm) ? ra.imm.imm : 0, maskctl);
+      put(TransOp(OP_maskb, destreg, destreg, srcreg, REG_imm, 3, (isimm) ? ra.imm.imm : 0, maskctl));
     } else {
       // must be at least 16 bits
       // On x86-64, only 8-bit and 16-bit ops need to be merged; 32-bit is zero extended to full 64 bits:
-      this << TransOp(OP_mov, destreg, (sizeshift < 2) ? destreg : REG_zero, srcreg, REG_zero, sizeshift,
-                      (isimm) ? ra.imm.imm : 0);
+      put(TransOp(OP_mov, destreg, (sizeshift < 2) ? destreg : REG_zero, srcreg, REG_zero, sizeshift,
+                  (isimm) ? ra.imm.imm : 0));
     }
   } else if ((rd.type == OPTYPE_REG) && (ra.type == OPTYPE_MEM)) {
     //
@@ -1324,9 +1324,9 @@ void TraceDecoder::move_reg_or_mem(const DecodedOperand& rd, const DecodedOperan
       // need to merge 8-bit or 16-bit data:
       operand_load(REG_temp0, ra);
       if (reginfo[rd.reg.reg].hibyte)
-        this << TransOp(OP_maskb, destreg, destreg, REG_temp0, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
+        put(TransOp(OP_maskb, destreg, destreg, REG_temp0, REG_imm, 3, 0, MaskControlInfo(56, 8, 56)));
       else
-        this << TransOp(OP_mov, destreg, destreg, REG_temp0, REG_zero, sizeshift);
+        put(TransOp(OP_mov, destreg, destreg, REG_temp0, REG_zero, sizeshift));
     }
   } else if ((rd.type == OPTYPE_MEM) && ((ra.type == OPTYPE_REG) || (ra.type == OPTYPE_IMM))) {
     //
@@ -1338,10 +1338,10 @@ void TraceDecoder::move_reg_or_mem(const DecodedOperand& rd, const DecodedOperan
     bool rahigh = (isimm) ? 0 : reginfo[ra.reg.reg].hibyte;
     if (isimm) {
       // We need to load the immediate separately in any case since stores do not accept immediates:
-      this << TransOp(OP_mov, REG_temp1, REG_zero, REG_imm, REG_zero, 3, ra.imm.imm);
+      put(TransOp(OP_mov, REG_temp1, REG_zero, REG_imm, REG_zero, 3, ra.imm.imm));
       result_store(REG_temp1, REG_temp0, rd);
     } else if (rahigh) {
-      this << TransOp(OP_maskb, REG_temp1, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      put(TransOp(OP_maskb, REG_temp1, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)));
       result_store(REG_temp1, REG_temp0, rd);
     } else {
       result_store(srcreg, REG_temp0, rd);
@@ -1366,7 +1366,7 @@ void TraceDecoder::signext_reg_or_mem(const DecodedOperand& rd, DecodedOperand& 
 
     // For movsx, it is not possible to have rd be 8 bits: it's always 16/32/64 bits.
     if (rahigh) {
-      this << TransOp(OP_maskb, REG_temp0, REG_zero, rareg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      put(TransOp(OP_maskb, REG_temp0, REG_zero, rareg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)));
       rareg = REG_temp0;
     }
 
@@ -1374,12 +1374,12 @@ void TraceDecoder::signext_reg_or_mem(const DecodedOperand& rd, DecodedOperand& 
     // On x86-64, only 8-bit and 16-bit ops need to be merged; 32-bit is zero extended to full 64 bits:
     if (zeroext && rdsize >= 2) {
       // Just use regular move
-      this << TransOp(OP_mov, rdreg, REG_zero, rareg, REG_zero, rasize);
+      put(TransOp(OP_mov, rdreg, REG_zero, rareg, REG_zero, rasize));
     } else {
       TransOp transop(OP_maskb, rdreg, (rdsize < 2) ? rdreg : REG_zero, rareg, REG_imm, rdsize, 0,
                       MaskControlInfo(0, (1 << rasize) * 8, 0));
       transop.cond = (zeroext) ? 1 : 2;
-      this << transop;
+      put(transop);
     }
   } else if ((rd.type == OPTYPE_REG) && (ra.type == OPTYPE_MEM)) {
     //
@@ -1393,11 +1393,11 @@ void TraceDecoder::signext_reg_or_mem(const DecodedOperand& rd, DecodedOperand& 
       operand_load((signext_to_32bit) ? REG_temp8 : rdreg, ra, (zeroext) ? OP_ld : OP_ldx);
       // sign extend and then zero high 32 bits (old way was ldxz uop):
       if (signext_to_32bit)
-        this << TransOp(OP_mov, rdreg, REG_zero, REG_temp8, REG_zero, 2);
+        put(TransOp(OP_mov, rdreg, REG_zero, REG_temp8, REG_zero, 2));
     } else {
       // need to merge 8-bit or 16-bit data:
       operand_load(REG_temp0, ra, (zeroext) ? OP_ld : OP_ldx);
-      this << TransOp(OP_mov, rdreg, rdreg, REG_temp0, REG_zero, rdsize);
+      put(TransOp(OP_mov, rdreg, rdreg, REG_temp0, REG_zero, rdsize));
     }
   }
 }
@@ -1407,13 +1407,13 @@ void TraceDecoder::microcode_assist(int assistid, Waddr selfrip, Waddr nextrip) 
   abs_code_addr_immediate(REG_selfrip, 3, (Waddr)selfrip);
   abs_code_addr_immediate(REG_nextrip, 3, (Waddr)nextrip);
   if (!last_flags_update_was_atomic)
-    this << TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+    put(TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
   TransOp transop(OP_brp, REG_rip, REG_zero, REG_zero, REG_zero, 3);
   transop.riptaken = transop.ripseq = (Waddr)assistid;
   bb.rip_taken = assistid;
   bb.rip_not_taken = assistid;
   bb.brtype = BRTYPE_BARRIER;
-  this << transop;
+  put(transop);
 }
 
 //
@@ -1889,7 +1889,7 @@ bool TraceDecoder::memory_fence_if_locked(bool end_of_x86_insn, int type) {
       //
       TransOp mf(OP_mf, REG_temp0, REG_zero, REG_zero, REG_zero, 0);
       mf.extshift = type;
-      this << mf;
+      put(mf);
       bb.mfence = 1;
       split_after();
       return true;
@@ -1917,7 +1917,7 @@ bool TraceDecoder::memory_fence_if_locked(bool end_of_x86_insn, int type) {
         //
         TransOp mf(OP_mf, REG_temp0, REG_zero, REG_zero, REG_zero, 0);
         mf.extshift = type;
-        this << mf;
+        put(mf);
         bb.mfence = 1;
         return false; // continue emitting other uops
       }
@@ -1928,7 +1928,7 @@ bool TraceDecoder::memory_fence_if_locked(bool end_of_x86_insn, int type) {
     //
     TransOp mf(OP_mf, REG_temp0, REG_zero, REG_zero, REG_zero, 0);
     mf.extshift = type;
-    this << mf;
+    put(mf);
   }
 
   // never reached:
@@ -2090,7 +2090,7 @@ bool TraceDecoder::translate() {
       if unlikely (!last_flags_update_was_atomic) {
         if (logable(5))
           logfile << "Basic block ", (void*)(Waddr)bb.rip, " had non-atomic flags update: adding collcc", endl;
-        this << TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+        put(TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU));
       }
       split_after();
       stats.decoder.bb_decode_type.all_insns_fast += (!some_insns_complex);

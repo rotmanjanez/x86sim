@@ -350,16 +350,6 @@ struct TraceDecoder {
   bool first_insn_in_bb() { return (Waddr(ripstart) == Waddr(bb.rip)); }
 };
 
-static inline TraceDecoder* operator<<(TraceDecoder* dec, const TransOp& transop) {
-  dec->put(transop);
-  return dec;
-}
-
-static inline TraceDecoder& operator<<(TraceDecoder& dec, const TransOp& transop) {
-  dec.put(transop);
-  return dec;
-}
-
 enum {
   DECODE_TYPE_FAST,
   DECODE_TYPE_COMPLEX,
