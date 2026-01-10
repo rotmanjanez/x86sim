@@ -153,21 +153,21 @@ bool TraceDecoder::decode_sse() {
 
     // Special case dependency chain breaker: xorXX A,A => xorXX zero,zero
     if unlikely ((uop == OP_xor) && (ra.type == OPTYPE_REG) && (rdreg == rbreg) && packed) {
-      this << TransOp(OP_xor, rdreg + 0, REG_zero, REG_zero, REG_zero, 3);
-      this << TransOp(OP_xor, rdreg + 1, REG_zero, REG_zero, REG_zero, 3);
+      put(TransOp(OP_xor, rdreg + 0, REG_zero, REG_zero, REG_zero, 3));
+      put(TransOp(OP_xor, rdreg + 1, REG_zero, REG_zero, REG_zero, 3));
       break;
     }
 
     TransOp lowop(uop, rdreg + 0, rareg + 0, rbreg + 0, REG_zero, isclass(uop, OPCLASS_LOGIC) ? 3 : sizetype);
     lowop.cond = imm.imm.imm;
     lowop.datatype = datatype;
-    this << lowop;
+    put(lowop);
 
     if (packed) {
       TransOp highop(uop, rdreg + 1, rareg + 1, rbreg + 1, REG_zero, isclass(uop, OPCLASS_LOGIC) ? 3 : sizetype);
       highop.cond = imm.imm.imm;
       highop.datatype = datatype;
-      this << highop;
+      put(highop);
     }
     break;
   }
@@ -245,15 +245,15 @@ bool TraceDecoder::decode_sse() {
 
     // Special case dependency chain breaker: xorXX A,A => xorXX zero,zero
     if unlikely ((uop == OP_xor) && (ra.type == OPTYPE_REG) && (rdreg == rareg)) {
-      this << TransOp(OP_xor, rdreg + 0, REG_zero, REG_zero, REG_zero, 3);
-      this << TransOp(OP_xor, rdreg + 1, REG_zero, REG_zero, REG_zero, 3);
+      put(TransOp(OP_xor, rdreg + 0, REG_zero, REG_zero, REG_zero, 3));
+      put(TransOp(OP_xor, rdreg + 1, REG_zero, REG_zero, REG_zero, 3));
       break;
     }
 
     bool isshift = (uop == OP_vshr) | (uop == OP_vsar) | (uop == OP_vshl);
 
-    this << TransOp(uop, rdreg + 0, rdreg + 0, rareg + 0, REG_zero, sizeshift);
-    this << TransOp(uop, rdreg + 1, rdreg + 1, rareg + (!isshift), REG_zero, sizeshift);
+    put(TransOp(uop, rdreg + 0, rdreg + 0, rareg + 0, REG_zero, sizeshift));
+    put(TransOp(uop, rdreg + 1, rdreg + 1, rareg + (!isshift), REG_zero, sizeshift));
     break;
   }
 
@@ -284,9 +284,9 @@ bool TraceDecoder::decode_sse() {
 
     int highbit = ((1 << sizeshift) * 8) - 1;
 
-    this << TransOp(OP_vbt, REG_temp0, rareg + 0, REG_imm, REG_zero, sizeshift, highbit);
-    this << TransOp(OP_vbt, REG_temp1, rareg + 1, REG_imm, REG_zero, sizeshift, highbit);
-    this << TransOp(OP_maskb, rdreg, REG_temp0, REG_temp1, REG_imm, 3, 0, maskctl);
+    put(TransOp(OP_vbt, REG_temp0, rareg + 0, REG_imm, REG_zero, sizeshift, highbit));
+    put(TransOp(OP_vbt, REG_temp1, rareg + 1, REG_imm, REG_zero, sizeshift, highbit));
+    put(TransOp(OP_maskb, rdreg, REG_temp0, REG_temp1, REG_imm, 3, 0, maskctl));
 
     break;
   }
@@ -314,10 +314,10 @@ bool TraceDecoder::decode_sse() {
 
     TransOp lo(OP_vcmp, rdreg + 0, rdreg + 0, rareg + 0, REG_zero, sizeshift);
     lo.cond = cond;
-    this << lo;
+    put(lo);
     TransOp hi(OP_vcmp, rdreg + 1, rdreg + 1, rareg + 1, REG_zero, sizeshift);
     hi.cond = cond;
-    this << hi;
+    put(hi);
     break;
   }
 
@@ -352,18 +352,18 @@ bool TraceDecoder::decode_sse() {
       bool left = (opcode != OP_shr);
 
       if unlikely (!imm) {
-        this << TransOp(OP_nop, REG_temp0, REG_zero, REG_zero, REG_zero, 3);
+        put(TransOp(OP_nop, REG_temp0, REG_zero, REG_zero, REG_zero, 3));
       } else if likely (imm < 8) {
         if (left) {
-          this << TransOp(OP_rotl, REG_temp0, rdreg + 0, REG_imm, REG_zero, 3, imm * 8);
-          this << TransOp(OP_maskb, rdreg + 1, REG_temp0, rdreg + 1, REG_imm, 3, 0,
-                          MaskControlInfo((8 - imm) * 8, (8 - imm) * 8, (8 - imm) * 8));
-          this << TransOp(OP_shl, rdreg + 0, rdreg + 0, REG_imm, REG_zero, 3, (imm * 8));
+          put(TransOp(OP_rotl, REG_temp0, rdreg + 0, REG_imm, REG_zero, 3, imm * 8));
+          put(TransOp(OP_maskb, rdreg + 1, REG_temp0, rdreg + 1, REG_imm, 3, 0,
+                      MaskControlInfo((8 - imm) * 8, (8 - imm) * 8, (8 - imm) * 8)));
+          put(TransOp(OP_shl, rdreg + 0, rdreg + 0, REG_imm, REG_zero, 3, (imm * 8)));
         } else {
-          this << TransOp(OP_rotr, REG_temp0, rdreg + 1, REG_imm, REG_zero, 3, imm * 8);
-          this << TransOp(OP_maskb, rdreg + 0, REG_temp0, rdreg + 0, REG_imm, 3, 0,
-                          MaskControlInfo(0, (8 - imm) * 8, imm * 8));
-          this << TransOp(OP_shr, rdreg + 1, rdreg + 1, REG_imm, REG_zero, 3, (imm * 8));
+          put(TransOp(OP_rotr, REG_temp0, rdreg + 1, REG_imm, REG_zero, 3, imm * 8));
+          put(TransOp(OP_maskb, rdreg + 0, REG_temp0, rdreg + 0, REG_imm, 3, 0,
+                      MaskControlInfo(0, (8 - imm) * 8, imm * 8)));
+          put(TransOp(OP_shr, rdreg + 1, rdreg + 1, REG_imm, REG_zero, 3, (imm * 8)));
         }
       } else if likely (imm < 16) {
         // imm >= 8
@@ -378,12 +378,12 @@ bool TraceDecoder::decode_sse() {
         // hi = <<      shl       hi = lo,(imm & 0x7)*8
         // lo = 0       mov       lo = 0,0
         //
-        this << TransOp(opcode, rdreg + left, rdreg + right, REG_imm, REG_zero, 3, (imm & 7) * 8);
-        this << TransOp(OP_mov, rdreg + right, REG_zero, REG_zero, REG_zero, 3);
+        put(TransOp(opcode, rdreg + left, rdreg + right, REG_imm, REG_zero, 3, (imm & 7) * 8));
+        put(TransOp(OP_mov, rdreg + right, REG_zero, REG_zero, REG_zero, 3));
       } else {
         // all zeros
-        this << TransOp(OP_mov, rdreg + 0, REG_zero, REG_zero, REG_zero, 3);
-        this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3);
+        put(TransOp(OP_mov, rdreg + 0, REG_zero, REG_zero, REG_zero, 3));
+        put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3));
       }
     } else {
       // psxxw psxxd psxxq
@@ -402,17 +402,17 @@ bool TraceDecoder::decode_sse() {
         if unlikely (opcode == OP_vsar) {
           TransOp lo(OP_vcmp, rdreg + 0, rdreg + 0, REG_zero, REG_zero, sizeshift);
           lo.cond = COND_s;
-          this << lo;
+          put(lo);
           TransOp hi(OP_vcmp, rdreg + 1, rdreg + 1, REG_zero, REG_zero, sizeshift);
           hi.cond = COND_s;
-          this << hi;
+          put(hi);
         } else {
-          this << TransOp(OP_mov, rdreg + 0, REG_zero, REG_zero, REG_zero, 3);
-          this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3);
+          put(TransOp(OP_mov, rdreg + 0, REG_zero, REG_zero, REG_zero, 3));
+          put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3));
         }
       } else {
-        this << TransOp(opcode, rdreg + 0, rdreg + 0, REG_imm, REG_zero, sizeshift, imm);
-        this << TransOp(opcode, rdreg + 1, rdreg + 1, REG_imm, REG_zero, sizeshift, imm);
+        put(TransOp(opcode, rdreg + 0, rdreg + 0, REG_imm, REG_zero, sizeshift, imm));
+        put(TransOp(opcode, rdreg + 1, rdreg + 1, REG_imm, REG_zero, sizeshift, imm));
       }
     }
     break;
@@ -536,14 +536,14 @@ bool TraceDecoder::decode_sse() {
       // For optimal efficiency, the processor should eliminate the mov uops
       // using rename table tricks.
       //
-      this << TransOp(OP_permb, REG_temp2, rdreg + hi, rareg + hi, REG_imm, 3, 0, permute_control_info[sel][1]);
-      this << TransOp(OP_permb, REG_temp3, rdreg + hi, rareg + hi, REG_imm, 3, 0, permute_control_info[sel][0]);
-      this << TransOp(OP_mov, rdreg + 0, REG_zero, REG_temp2, REG_zero, 3);
-      this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_temp3, REG_zero, 3);
+      put(TransOp(OP_permb, REG_temp2, rdreg + hi, rareg + hi, REG_imm, 3, 0, permute_control_info[sel][1]));
+      put(TransOp(OP_permb, REG_temp3, rdreg + hi, rareg + hi, REG_imm, 3, 0, permute_control_info[sel][0]));
+      put(TransOp(OP_mov, rdreg + 0, REG_zero, REG_temp2, REG_zero, 3));
+      put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_temp3, REG_zero, 3));
     } else {
       // pack.xx uop
-      this << TransOp(uop, rdreg + 0, rdreg + 0, rdreg + 1, REG_zero, sizeshift);
-      this << TransOp(uop, rdreg + 1, rareg + 0, rareg + 1, REG_zero, sizeshift);
+      put(TransOp(uop, rdreg + 0, rdreg + 0, rdreg + 1, REG_zero, sizeshift));
+      put(TransOp(uop, rdreg + 1, rareg + 0, rareg + 1, REG_zero, sizeshift));
     }
     break;
   }
@@ -569,11 +569,11 @@ bool TraceDecoder::decode_sse() {
     int uop = (op == 0x57d) ? OP_fsub : OP_fadd;
     TransOp lowop(uop, rdreg + 0, rdreg + 0, rdreg + 1, REG_zero, 3);
     lowop.datatype = DATATYPE_VEC_DOUBLE;
-    this << lowop;
+    put(lowop);
 
     TransOp highop(uop, rdreg + 1, rareg + 0, rareg + 1, REG_zero, 3);
     highop.datatype = DATATYPE_VEC_DOUBLE;
-    this << highop;
+    put(highop);
 
     break;
   }
@@ -597,8 +597,8 @@ bool TraceDecoder::decode_sse() {
       rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
     }
 
-    this << TransOp(OP_fsub, rdreg + 0, rdreg + 0, rareg + 0, REG_zero, 3);
-    this << TransOp(OP_fadd, rdreg + 1, rdreg + 1, rareg + 1, REG_zero, 3);
+    put(TransOp(OP_fsub, rdreg + 0, rdreg + 0, rareg + 0, REG_zero, 3));
+    put(TransOp(OP_fadd, rdreg + 1, rdreg + 1, rareg + 1, REG_zero, 3));
     break;
   }
 
@@ -619,7 +619,7 @@ bool TraceDecoder::decode_sse() {
 
     TransOp uop((rex.mode64) ? OP_fcvt_q2s_ins : OP_fcvt_i2s_ins, rdreg, rdreg, rareg, REG_zero, 3);
     uop.datatype = DATATYPE_FLOAT;
-    this << uop;
+    put(uop);
     break;
   }
 
@@ -640,7 +640,7 @@ bool TraceDecoder::decode_sse() {
 
     TransOp uop((rex.mode64) ? OP_fcvt_q2d : OP_fcvt_i2d_lo, rdreg, REG_zero, rareg, REG_zero, 3);
     uop.datatype = DATATYPE_DOUBLE;
-    this << uop;
+    put(uop);
     break;
   }
 
@@ -661,17 +661,17 @@ bool TraceDecoder::decode_sse() {
 
       if (unlikely(rareg == rdreg)) {
         TransOp mov(OP_mov, REG_temp0, REG_zero, rareg, REG_zero, 3);
-        this << mov;
+        put(mov);
         rareg = REG_temp0;
       }
     }
 
     TransOp uoplo(OP_fcvt_i2d_lo, rdreg + 0, REG_zero, rareg, REG_zero, 3);
     uoplo.datatype = DATATYPE_VEC_DOUBLE;
-    this << uoplo;
+    put(uoplo);
     TransOp uophi(OP_fcvt_i2d_hi, rdreg + 1, REG_zero, rareg, REG_zero, 3);
     uophi.datatype = DATATYPE_VEC_DOUBLE;
-    this << uophi;
+    put(uophi);
     break;
   }
 
@@ -693,10 +693,10 @@ bool TraceDecoder::decode_sse() {
 
     TransOp uoplo(OP_fcvt_i2s_p, rdreg + 0, REG_zero, rareg + 0, REG_zero, 3);
     uoplo.datatype = DATATYPE_VEC_FLOAT;
-    this << uoplo;
+    put(uoplo);
     TransOp uophi(OP_fcvt_i2s_p, rdreg + 1, REG_zero, rareg + 1, REG_zero, 3);
     uophi.datatype = DATATYPE_VEC_FLOAT;
-    this << uophi;
+    put(uophi);
     break;
   }
 
@@ -717,8 +717,8 @@ bool TraceDecoder::decode_sse() {
       rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
     }
 
-    this << TransOp(OP_fcvt_d2i_p, rdreg + 0, rareg + 1, rareg + 0, REG_zero, ((op >> 8) == 5));
-    this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3);
+    put(TransOp(OP_fcvt_d2i_p, rdreg + 0, rareg + 1, rareg + 0, REG_zero, ((op >> 8) == 5)));
+    put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3));
     break;
   }
 
@@ -742,8 +742,8 @@ bool TraceDecoder::decode_sse() {
 
     TransOp uop(OP_fcvt_d2s_p, rdreg + 0, rareg + 1, rareg + 0, REG_zero, 3);
     uop.datatype = DATATYPE_VEC_FLOAT;
-    this << uop;
-    this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3);
+    put(uop);
+    put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3));
     break;
   }
 
@@ -765,8 +765,8 @@ bool TraceDecoder::decode_sse() {
 
     TransOp uop(OP_fcvt_i2s_p, rdreg + 0, REG_zero, rareg + 0, REG_zero, 3);
     uop.datatype = DATATYPE_VEC_FLOAT;
-    this << uop;
-    this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3);
+    put(uop);
+    put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3));
     break;
   }
 
@@ -787,8 +787,8 @@ bool TraceDecoder::decode_sse() {
       rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
     }
 
-    this << TransOp(OP_fcvt_s2i_p, rdreg + 0, rareg + 0, rareg + 0, REG_zero, ((op >> 8) == 2));
-    this << TransOp(OP_fcvt_s2i_p, rdreg + 1, rareg + 1, rareg + 1, REG_zero, ((op >> 8) == 2));
+    put(TransOp(OP_fcvt_s2i_p, rdreg + 0, rareg + 0, rareg + 0, REG_zero, ((op >> 8) == 2)));
+    put(TransOp(OP_fcvt_s2i_p, rdreg + 1, rareg + 1, rareg + 1, REG_zero, ((op >> 8) == 2)));
     break;
   }
 
@@ -809,8 +809,7 @@ bool TraceDecoder::decode_sse() {
       rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
     }
 
-    this << TransOp((rex.mode64) ? OP_fcvt_d2q : OP_fcvt_d2i, rdreg, REG_zero, rareg, REG_zero,
-                    (lowbits(op, 8) == 0x2c));
+    put(TransOp((rex.mode64) ? OP_fcvt_d2q : OP_fcvt_d2i, rdreg, REG_zero, rareg, REG_zero, (lowbits(op, 8) == 0x2c)));
     break;
   }
 
@@ -830,8 +829,7 @@ bool TraceDecoder::decode_sse() {
       rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
     }
 
-    this << TransOp((rex.mode64) ? OP_fcvt_s2q : OP_fcvt_s2i, rdreg, REG_zero, rareg, REG_zero,
-                    (lowbits(op, 8) == 0x2c));
+    put(TransOp((rex.mode64) ? OP_fcvt_s2q : OP_fcvt_s2i, rdreg, REG_zero, rareg, REG_zero, (lowbits(op, 8) == 0x2c)));
     break;
   }
 
@@ -852,7 +850,7 @@ bool TraceDecoder::decode_sse() {
 
     TransOp uop(OP_fcvt_s2d_lo, rdreg, REG_zero, rareg, REG_zero, 3);
     uop.datatype = DATATYPE_DOUBLE;
-    this << uop;
+    put(uop);
     break;
   }
 
@@ -873,17 +871,17 @@ bool TraceDecoder::decode_sse() {
 
       if (unlikely(rareg == rdreg)) {
         TransOp mov(OP_mov, REG_temp0, REG_zero, rareg, REG_zero, 3);
-        this << mov;
+        put(mov);
         rareg = REG_temp0;
       }
     }
 
     TransOp uoplo(OP_fcvt_s2d_lo, rdreg + 0, REG_zero, rareg, REG_zero, 3);
     uoplo.datatype = DATATYPE_VEC_DOUBLE;
-    this << uoplo;
+    put(uoplo);
     TransOp uophi(OP_fcvt_s2d_hi, rdreg + 1, REG_zero, rareg, REG_zero, 3);
     uophi.datatype = DATATYPE_VEC_DOUBLE;
-    this << uophi;
+    put(uophi);
     break;
   }
 
@@ -903,7 +901,7 @@ bool TraceDecoder::decode_sse() {
 
     TransOp uop(OP_fcvt_d2s_ins, rdreg, rdreg, rareg, REG_zero, 3);
     uop.datatype = DATATYPE_FLOAT;
-    this << uop;
+    put(uop);
     break;
   }
 
@@ -930,10 +928,10 @@ bool TraceDecoder::decode_sse() {
       int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
       TransOp uoplo(OP_mov, rdreg + 0, REG_zero, rareg + 0, REG_zero, 3);
       uoplo.datatype = datatype;
-      this << uoplo;
+      put(uoplo);
       TransOp uophi(OP_mov, rdreg + 1, REG_zero, rareg + 1, REG_zero, 3);
       uophi.datatype = datatype;
-      this << uophi;
+      put(uophi);
     }
     break;
   }
@@ -964,10 +962,10 @@ bool TraceDecoder::decode_sse() {
       int rdreg = arch_pseudo_reg_to_arch_reg[rd.reg.reg];
       TransOp uoplo(OP_mov, rdreg + 0, REG_zero, rareg + 0, REG_zero, 3);
       uoplo.datatype = datatype;
-      this << uoplo;
+      put(uoplo);
       TransOp uophi(OP_mov, rdreg + 1, REG_zero, rareg + 1, REG_zero, 3);
       uophi.datatype = datatype;
-      this << uophi;
+      put(uophi);
     }
     break;
   };
@@ -986,18 +984,18 @@ bool TraceDecoder::decode_sse() {
       operand_load(rdreg + 0, ra, OP_ld, datatype);
       TransOp uop(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3);
       uop.datatype = datatype;
-      this << uop; // zero high 64 bits
+      put(uop); // zero high 64 bits
     } else {
       int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
       // Strange semantics: iff the source operand is a register, insert into low 32 bits only; leave high 32 bits and bits 64-127 alone
       if (isdouble) {
         TransOp uop(OP_mov, rdreg, REG_zero, rareg, REG_zero, 3);
         uop.datatype = datatype;
-        this << uop;
+        put(uop);
       } else {
         TransOp uop(OP_maskb, rdreg, rdreg, rareg, REG_imm, 3, 0, MaskControlInfo(0, 32, 0));
         uop.datatype = datatype;
-        this << uop;
+        put(uop);
       }
     }
     break;
@@ -1013,11 +1011,11 @@ bool TraceDecoder::decode_sse() {
     if (ra.type == OPTYPE_MEM) {
       // Load
       operand_load(rdreg + 0, ra, OP_ld, DATATYPE_VEC_DOUBLE);
-      this << TransOp(OP_mov, rdreg + 1, REG_zero, rdreg + 0, REG_zero, 3);
+      put(TransOp(OP_mov, rdreg + 1, REG_zero, rdreg + 0, REG_zero, 3));
     } else {
       int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
-      this << TransOp(OP_mov, rdreg + 0, REG_zero, rareg, REG_zero, 3);
-      this << TransOp(OP_mov, rdreg + 1, REG_zero, rareg, REG_zero, 3);
+      put(TransOp(OP_mov, rdreg + 0, REG_zero, rareg, REG_zero, 3));
+      put(TransOp(OP_mov, rdreg + 1, REG_zero, rareg, REG_zero, 3));
     }
 
     break;
@@ -1041,11 +1039,11 @@ bool TraceDecoder::decode_sse() {
       if (isdouble) {
         TransOp uop(OP_mov, rdreg, REG_zero, rareg, REG_zero, 3);
         uop.datatype = datatype;
-        this << uop;
+        put(uop);
       } else {
         TransOp uop(OP_maskb, rdreg, rdreg, rareg, REG_imm, 3, 0, MaskControlInfo(0, 32, 0));
         uop.datatype = datatype;
-        this << uop;
+        put(uop);
       }
     }
     break;
@@ -1063,7 +1061,7 @@ bool TraceDecoder::decode_sse() {
 
     int which = bit(imm.imm.imm, 2);
     int shift = lowbits(imm.imm.imm, 3) * 16;
-    this << TransOp(OP_maskb, rdreg, REG_zero, rareg + which, REG_imm, 3, 0, MaskControlInfo(0, 16, lowbits(shift, 6)));
+    put(TransOp(OP_maskb, rdreg, REG_zero, rareg + which, REG_imm, 3, 0, MaskControlInfo(0, 16, lowbits(shift, 6))));
     break;
   }
 
@@ -1080,8 +1078,8 @@ bool TraceDecoder::decode_sse() {
     int which = bit(imm.imm.imm, 2);
     int shift = lowbits(imm.imm.imm, 3) * 16;
 
-    this << TransOp(OP_maskb, rdreg + which, rdreg + which, rareg, REG_imm, 3, 0,
-                    MaskControlInfo(64 - shift, 16, 64 - lowbits(shift, 6)));
+    put(TransOp(OP_maskb, rdreg + which, rdreg + which, rareg, REG_imm, 3, 0,
+                MaskControlInfo(64 - shift, 16, 64 - lowbits(shift, 6))));
     break;
   }
 
@@ -1113,14 +1111,14 @@ bool TraceDecoder::decode_sse() {
     int base3 = bits(imm.imm.imm, 3 * 2, 2) * 4;
 
     // We may need to write to temporaries since this is a full 1:1 permute.
-    this << TransOp(
+    put(TransOp(
         OP_permb, REG_temp2, ((mix) ? rdreg + 0 : rareg + 0), ((mix) ? rdreg + 1 : rareg + 1), REG_imm, 3, 0,
-        PermbControlInfo(base1 + 3, base1 + 2, base1 + 1, base1 + 0, base0 + 3, base0 + 2, base0 + 1, base0 + 0));
-    this << TransOp(
+        PermbControlInfo(base1 + 3, base1 + 2, base1 + 1, base1 + 0, base0 + 3, base0 + 2, base0 + 1, base0 + 0)));
+    put(TransOp(
         OP_permb, REG_temp3, ((mix) ? rareg + 0 : rareg + 0), ((mix) ? rareg + 1 : rareg + 1), REG_imm, 3, 0,
-        PermbControlInfo(base3 + 3, base3 + 2, base3 + 1, base3 + 0, base2 + 3, base2 + 2, base2 + 1, base2 + 0));
-    this << TransOp(OP_mov, rdreg + 0, REG_zero, REG_temp2, REG_zero, 3);
-    this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_temp3, REG_zero, 3);
+        PermbControlInfo(base3 + 3, base3 + 2, base3 + 1, base3 + 0, base2 + 3, base2 + 2, base2 + 1, base2 + 0)));
+    put(TransOp(OP_mov, rdreg + 0, REG_zero, REG_temp2, REG_zero, 3));
+    put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_temp3, REG_zero, 3));
 
     break;
   }
@@ -1155,8 +1153,8 @@ bool TraceDecoder::decode_sse() {
     W32 ctl =
         MakePermuteControlInfo(base3 + 1, base3 + 0, base2 + 1, base2 + 0, base1 + 1, base1 + 0, base0 + 1, base0 + 0);
 
-    this << TransOp(OP_permb, rdreg + hi, rareg + hi, REG_zero, REG_imm, 3, 0, ctl);
-    this << TransOp(OP_mov, rdreg + (!hi), REG_zero, rareg + (!hi), REG_zero, 3);
+    put(TransOp(OP_permb, rdreg + hi, rareg + hi, REG_zero, REG_imm, 3, 0, ctl));
+    put(TransOp(OP_mov, rdreg + (!hi), REG_zero, rareg + (!hi), REG_zero, 3));
 
     break;
   }
@@ -1181,9 +1179,9 @@ bool TraceDecoder::decode_sse() {
     }
 
     // When rareg == rdreg, a swap of low and high may need an additional move.
-    this << TransOp(OP_mov, REG_temp2, REG_zero, rdreg + bit(imm.imm.imm, 0), REG_imm, 3);
-    this << TransOp(OP_mov, rdreg + 1, REG_zero, rareg + bit(imm.imm.imm, 1), REG_imm, 3);
-    this << TransOp(OP_mov, rdreg + 0, REG_zero, REG_temp2, REG_zero, 3);
+    put(TransOp(OP_mov, REG_temp2, REG_zero, rdreg + bit(imm.imm.imm, 0), REG_imm, 3));
+    put(TransOp(OP_mov, rdreg + 1, REG_zero, rareg + bit(imm.imm.imm, 1), REG_imm, 3));
+    put(TransOp(OP_mov, rdreg + 0, REG_zero, REG_temp2, REG_zero, 3));
     break;
   }
 
@@ -1226,7 +1224,7 @@ bool TraceDecoder::decode_sse() {
     // comisX and ucomisX set {zf pf cf} according to the comparison,
     // and always set {of sf af} to zero.
     //
-    this << TransOp(OP_fcmpcc, REG_temp0, rdreg, rareg, REG_zero, sizecode, 0, 0, FLAGS_DEFAULT_ALU);
+    put(TransOp(OP_fcmpcc, REG_temp0, rdreg, rareg, REG_zero, sizecode, 0, 0, FLAGS_DEFAULT_ALU));
     break;
   };
 
@@ -1249,13 +1247,13 @@ bool TraceDecoder::decode_sse() {
       case 0x312: { // movhlps
         TransOp uop(OP_mov, rdreg, REG_zero, rareg + 1, REG_zero, 3);
         uop.datatype = datatype;
-        this << uop;
+        put(uop);
         break;
       }
       case 0x316: { // movlhps
         TransOp uop(OP_mov, rdreg + 1, REG_zero, rareg, REG_zero, 3);
         uop.datatype = datatype;
-        this << uop;
+        put(uop);
         break;
       }
       }
@@ -1294,7 +1292,7 @@ bool TraceDecoder::decode_sse() {
       case 0x515: { // unpckhpd
         TransOp uop(OP_mov, rdreg + 0, REG_zero, rdreg + 1, REG_zero, 3);
         uop.datatype = datatype;
-        this << uop;
+        put(uop);
         ra.mem.offset += 8;
         operand_load(rdreg + 1, ra, OP_ld, datatype);
         break;
@@ -1306,16 +1304,16 @@ bool TraceDecoder::decode_sse() {
       case 0x514: { // unpcklpd
         TransOp uoplo(OP_mov, rdreg + 1, REG_zero, rareg + 0, REG_zero, 3);
         uoplo.datatype = datatype;
-        this << uoplo;
+        put(uoplo);
         break;
       }
       case 0x515: { // unpckhpd
         TransOp uoplo(OP_mov, rdreg + 0, REG_zero, rdreg + 1, REG_zero, 3);
         uoplo.datatype = datatype;
-        this << uoplo;
+        put(uoplo);
         TransOp uophi(OP_mov, rdreg + 1, REG_zero, rareg + 1, REG_zero, 3);
         uophi.datatype = datatype;
-        this << uophi;
+        put(uophi);
         break;
       }
       }
@@ -1345,22 +1343,22 @@ bool TraceDecoder::decode_sse() {
       TransOp uophi(OP_permb, rdreg + 1, rareg + 0, rdreg + 0, REG_imm, 3, 0,
                     PermbControlInfo(7, 6, 5, 4, 15, 14, 13, 12)); // rd+1 (d3, d2) = a1 d1
       uophi.datatype = DATATYPE_VEC_FLOAT;
-      this << uophi;
+      put(uophi);
       TransOp uoplo(OP_permb, rdreg + 0, rareg + 0, rdreg + 0, REG_imm, 3, 0,
                     PermbControlInfo(3, 2, 1, 0, 11, 10, 9, 8)); // rd+0 = (d1, d0) a0 d0
       uoplo.datatype = DATATYPE_VEC_FLOAT;
-      this << uoplo;
+      put(uoplo);
       break;
     }
     case 0x315: { // unpckhps:
       TransOp uoplo(OP_permb, rdreg + 0, rareg + 1, rdreg + 1, REG_imm, 3, 0,
                     PermbControlInfo(3, 2, 1, 0, 11, 10, 9, 8)); // rd+0 (d1, d0) = a2 d2
       uoplo.datatype = DATATYPE_VEC_FLOAT;
-      this << uoplo;
+      put(uoplo);
       TransOp uophi(OP_permb, rdreg + 1, rareg + 1, rdreg + 1, REG_imm, 3, 0,
                     PermbControlInfo(7, 6, 5, 4, 15, 14, 13, 12)); // rd+1 (d3, d2) = a3 d3
       uophi.datatype = DATATYPE_VEC_FLOAT;
-      this << uophi;
+      put(uophi);
       break;
     }
     default:
@@ -1379,12 +1377,12 @@ bool TraceDecoder::decode_sse() {
     if (ra.type == OPTYPE_MEM) {
       // Load
       operand_load(rdreg + 0, ra, OP_ld, datatype);
-      this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3); // zero high 64 bits
+      put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3)); // zero high 64 bits
     } else {
       int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
       int rashift = reginfo[ra.reg.reg].sizeshift;
-      this << TransOp(OP_mov, rdreg + 0, REG_zero, rareg, REG_zero, rashift);
-      this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3); // zero high 64 bits
+      put(TransOp(OP_mov, rdreg + 0, REG_zero, rareg, REG_zero, rashift));
+      put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3)); // zero high 64 bits
     }
     break;
   }
@@ -1400,7 +1398,7 @@ bool TraceDecoder::decode_sse() {
     } else {
       int rdreg = arch_pseudo_reg_to_arch_reg[rd.reg.reg];
       int rdshift = reginfo[rd.reg.reg].sizeshift;
-      this << TransOp(OP_mov, rdreg, (rdshift < 3) ? rdreg : REG_zero, rareg, REG_zero, rdshift);
+      put(TransOp(OP_mov, rdreg, (rdshift < 3) ? rdreg : REG_zero, rareg, REG_zero, rdshift));
     }
     break;
   }
@@ -1414,12 +1412,12 @@ bool TraceDecoder::decode_sse() {
     if (ra.type == OPTYPE_MEM) {
       // Load
       operand_load(rdreg + 0, ra, OP_ld, datatype);
-      this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3); // zero high 64 bits
+      put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3)); // zero high 64 bits
     } else {
       // Move from xmm to xmm
       int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
-      this << TransOp(OP_mov, rdreg + 0, REG_zero, rareg, REG_zero, 3);
-      this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3); // zero high 64 bits
+      put(TransOp(OP_mov, rdreg + 0, REG_zero, rareg, REG_zero, 3));
+      put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3)); // zero high 64 bits
     }
     break;
   }
@@ -1435,8 +1433,8 @@ bool TraceDecoder::decode_sse() {
       result_store(rareg, REG_temp0, rd, OP_st, datatype);
     } else {
       int rdreg = arch_pseudo_reg_to_arch_reg[rd.reg.reg];
-      this << TransOp(OP_mov, rdreg, REG_zero, rareg, REG_zero, 3);
-      this << TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3); // zero high 64 bits
+      put(TransOp(OP_mov, rdreg, REG_zero, rareg, REG_zero, 3));
+      put(TransOp(OP_mov, rdreg + 1, REG_zero, REG_zero, REG_zero, 3)); // zero high 64 bits
     }
     break;
   }
