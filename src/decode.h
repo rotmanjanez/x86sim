@@ -216,13 +216,7 @@ struct DecodedOperand {
   bool varreg(TraceDecoder& state, int bytemode, bool def64);
   bool varreg_def32(TraceDecoder& state, int bytemode);
   bool varreg_def64(TraceDecoder& state, int bytemode);
-
-  ostream& print(ostream& os) const;
 };
-
-static inline ostream& operator<<(ostream& os, const DecodedOperand& decop) {
-  return decop.print(os);
-}
 
 enum {
   DECODE_OUTCOME_OK = 0,
@@ -654,13 +648,11 @@ struct BasicBlockCache : public SelfHashtable<RIPVirtPhys, BasicBlock, BB_CACHE_
   int get_page_bb_count(Waddr mfn);
   int reclaim(size_t reqbytes = 0, int urgency = 0);
   void flush();
-
-  ostream& print(ostream& os);
 };
 
 extern BasicBlockCache bbcache;
 
-extern odstream bbcache_dump_file;
+extern int bbcache_dump_fd;
 
 //
 // This part is used when parsing stats.h to build the
@@ -671,5 +663,20 @@ static const char* decode_type_names[DECODE_TYPE_COUNT] = {"fast", "complex", "x
 
 static const char* invalidate_reason_names[INVALIDATE_REASON_COUNT] = {"smc",     "dma",   "spurious",
                                                                        "reclaim", "dirty", "empty"};
+
+//
+// std::formatter specializations
+//
+template<>
+struct std::formatter<DecodedOperand> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const DecodedOperand& op, std::format_context& ctx) const;
+};
+
+template<>
+struct std::formatter<BasicBlockCache> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(BasicBlockCache& bbc, std::format_context& ctx) const;
+};
 
 #endif // _DECODE_H_

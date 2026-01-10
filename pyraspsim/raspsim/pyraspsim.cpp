@@ -5,9 +5,9 @@
 #include <sys/mman.h>
 
 #include <algorithm>
+#include <format>
 #include <mutex>
 #include <registers.def>
-#include <sstream>
 #include <string>
 
 namespace py = pybind11;
@@ -22,27 +22,6 @@ enum class Prot {
   RX = PROT_READ | PROT_EXEC,
   RWX = PROT_READ | PROT_WRITE | PROT_EXEC
 };
-
-std::ostream& operator<<(std::ostream& os, Prot p) {
-  switch (p) {
-  case Prot::READ:
-    return os << "READ";
-  case Prot::WRITE:
-    return os << "WRITE";
-  case Prot::EXEC:
-    return os << "EXEC";
-  case Prot::NONE:
-    return os << "NONE";
-  case Prot::RW:
-    return os << "RW";
-  case Prot::RX:
-    return os << "RX";
-  case Prot::RWX:
-    return os << "RWX";
-  }
-
-  return os;
-}
 
 bool hasProt(Prot p, Prot q) {
   return (static_cast<int>(p) & static_cast<int>(q)) == static_cast<int>(q);
@@ -113,9 +92,7 @@ public:
       W64 chunksize = std::min({(W64)size, (W64)ps, ps - (effvirtaddr & (ps - 1))});
       void* addr = sim->page_virt_to_mapped(effvirtaddr);
       if (!addr) {
-        std::stringstream ss;
-        ss << "Trying to read from unmapped memory at " << std::hex << effvirtaddr << std::dec;
-        throw py::value_error(strdup(ss.str().c_str()));
+        throw py::value_error(strdup(std::format("Trying to read from unmapped memory at {:x}", effvirtaddr).c_str()));
       }
       b += std::string((char*)addr, chunksize);
       nprocessed += chunksize;

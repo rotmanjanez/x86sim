@@ -10,6 +10,8 @@
 #ifndef _OOOCORE_H_
 #define _OOOCORE_H_
 
+#include <format>
+
 // With these disabled, simulation is faster
 #define ENABLE_CHECKS
 #define ENABLE_LOGGING
@@ -64,7 +66,7 @@ enum {
 
 static const int LOAD_FU_COUNT = 2;
 
-const char* fu_names[FU_COUNT] = {
+inline const char* fu_names[FU_COUNT] = {
     "ldu0", "stu0", "ldu1", "stu1", "alu0", "fpu0", "alu1", "fpu1",
 };
 
@@ -473,7 +475,6 @@ struct IssueQueue {
   bool switch_to_end(int slot, const tag_t* operands, const tag_t* preready);
   bool remove(int slot);
 
-  ostream& print(ostream& os) const;
   void tally_broadcast_matches(tag_t sourceid, const std::bitset<size>& mask, int operand) const;
 
   //
@@ -509,11 +510,6 @@ struct IssueQueue {
 
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 };
-
-template<int size, int operandcount>
-static inline ostream& operator<<(ostream& os, const IssueQueue<size, operandcount>& issueq) {
-  return issueq.print(os);
-}
 
 //
 // Iterate through a linked list of objects where each object directly inherits
@@ -609,9 +605,6 @@ struct StateList : public selfqueuelink {
 
   void checkvalid();
 };
-
-template<typename T>
-static void print_list_of_state_lists(ostream& os, const ListOfStateLists& lol, const char* title);
 
 //
 // Fetch Buffers
@@ -726,9 +719,7 @@ struct ReorderBufferEntry : public selfqueuelink {
   void fencewakeup();
   LoadStoreQueueEntry* find_nearest_memory_fence();
   bool release_mem_lock(bool forced = false);
-  ostream& print(ostream& os) const;
-  stringbuf& get_operand_info(stringbuf& sb, int operand) const;
-  ostream& print_operand_info(ostream& os, int operand) const;
+  std::string get_operand_info(int operand) const;
 
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 
@@ -736,14 +727,10 @@ struct ReorderBufferEntry : public selfqueuelink {
   issueq_tag_t get_tag();
 };
 
-void decode_tag(issueq_tag_t tag, int& threadid, int& idx) {
+inline void decode_tag(issueq_tag_t tag, int& threadid, int& idx) {
   threadid = tag >> MAX_ROB_IDX_BIT;
   int mask = ((1 << (MAX_ROB_IDX_BIT + MAX_THREADS_BIT)) - 1) >> MAX_THREADS_BIT;
   idx = tag & mask;
-}
-
-static inline ostream& operator<<(ostream& os, const ReorderBufferEntry& rob) {
-  return rob.print(os);
 }
 
 //
@@ -780,8 +767,6 @@ struct LoadStoreQueueEntry : public SFR {
 
   void validate() { entry_valid = 1; }
 
-  ostream& print(ostream& os) const;
-
   LoadStoreQueueEntry& operator=(const SFR& sfr) {
     *((SFR*)this) = sfr;
     return *this;
@@ -789,10 +774,6 @@ struct LoadStoreQueueEntry : public SFR {
 
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 };
-
-static inline ostream& operator<<(ostream& os, const LoadStoreQueueEntry& lsq) {
-  return lsq.print(os);
-}
 
 struct PhysicalRegisterOperandInfo {
   W32 uuid;
@@ -803,8 +784,6 @@ struct PhysicalRegisterOperandInfo {
   byte archreg;
   byte pad1;
 };
-
-ostream& operator<<(ostream& os, const PhysicalRegisterOperandInfo& opinfo);
 
 //
 // Physical Register File
@@ -898,8 +877,6 @@ public:
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 };
 
-ostream& operator<<(ostream& os, const PhysicalRegister& physreg);
-
 struct PhysicalRegisterFile : public std::array<PhysicalRegister, MAX_PHYS_REG_FILE_SIZE> {
   byte coreid;
   byte rfid;
@@ -927,17 +904,12 @@ struct PhysicalRegisterFile : public std::array<PhysicalRegister, MAX_PHYS_REG_F
 
   PhysicalRegister* alloc(W8 threadid, int r = -1);
   void reset(W8 threadid);
-  ostream& print(ostream& os) const;
 
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 
 private:
   void reset();
 };
-
-static inline ostream& operator<<(ostream& os, const PhysicalRegisterFile& physregs) {
-  return physregs.print(os);
-}
 
 //
 // Register Rename Table
@@ -946,12 +918,7 @@ struct RegisterRenameTable : public std::array<PhysicalRegister*, TRANSREG_COUNT
 #ifdef ENABLE_TRANSIENT_VALUE_TRACKING
   std::bitset<TRANSREG_COUNT> renamed_in_this_basic_block;
 #endif
-  ostream& print(ostream& os) const;
 };
-
-static inline ostream& operator<<(ostream& os, const RegisterRenameTable& rrt) {
-  return rrt.print(os);
-}
 
 enum {
   ISSUE_COMPLETED = 1,      // issued correctly
@@ -1008,11 +975,6 @@ struct MemoryInterlockEntry {
     rob = 0;
     vcpuid = 0;
     threadid = 0;
-  }
-
-  ostream& print(ostream& os, W64 physaddr) const {
-    os << "phys ", (void*)physaddr, ": vcpu ", vcpuid, ", threadid ", threadid, ", uuid ", uuid, ", rob ", rob;
-    return os;
   }
 };
 
@@ -1302,21 +1264,17 @@ struct OutOfOrderCoreEvent {
       W16 operand_physregs[MAX_OPERANDS];
     } commit;
   };
-
-  ostream& print(ostream& os) const;
 };
 
 struct EventLog {
   OutOfOrderCoreEvent* start;
   OutOfOrderCoreEvent* end;
   OutOfOrderCoreEvent* tail;
-  ostream* logfile;
 
   EventLog() {
     start = null;
     end = null;
     tail = null;
-    logfile = null;
   }
 
   bool init(size_t bufsize);
@@ -1333,6 +1291,7 @@ struct EventLog {
   }
 
   void flush(bool only_to_tail = false);
+  void print(bool only_to_tail = false);
 
   OutOfOrderCoreEvent* add(int type) { return add()->fill(type); }
 
@@ -1348,8 +1307,6 @@ struct EventLog {
                                       Waddr addr = 0) {
     return add()->fill_load_store(type, rob, inherit_sfr, addr);
   }
-
-  ostream& print(ostream& os, bool only_to_tail = false);
 };
 
 struct LoadStoreAliasPredictor : public FullyAssociativeTags<W64, 8> {};
@@ -1488,11 +1445,8 @@ struct ThreadContext {
   void flush_mem_lock_release_list(int start = 0);
   int get_priority() const;
 
-  void dump_smt_state(ostream& os);
-  void print_smt_state(ostream& os);
-  void print_rob(ostream& os);
-  void print_lsq(ostream& os);
-  void print_rename_tables(ostream& os);
+  void dump_smt_state();
+  void print_smt_state();
 
   void reset();
   void init();
@@ -1525,7 +1479,7 @@ struct OutOfOrderCore {
   // Issue Queues (one per cluster)
   //
   int reserved_iq_entries;
-#define declare_issueq_templates template struct IssueQueue<ISSUE_QUEUE_SIZE>
+#define declare_issueq_templates template struct OutOfOrderModel::IssueQueue<ISSUE_QUEUE_SIZE>
 #ifdef MULTI_IQ
   IssueQueue<ISSUE_QUEUE_SIZE> issueq_int0;
   IssueQueue<ISSUE_QUEUE_SIZE> issueq_int1;
@@ -1690,8 +1644,8 @@ struct OutOfOrderCore {
   void flush_tlb(Context& ctx, int threadid, bool selective = false, Waddr virtaddr = 0);
 
   // Debugging
-  void dump_smt_state(ostream& os);
-  void print_smt_state(ostream& os);
+  void dump_smt_state();
+  void print_smt_state();
   void check_refcounts();
   void check_rob();
 };
@@ -1705,7 +1659,7 @@ struct OutOfOrderMachine : public PTLsimMachine {
   virtual bool init(PTLsimConfig& config);
   virtual int run(PTLsimConfig& config);
   virtual void reset();
-  virtual void dump_state(ostream& os);
+  virtual void dump_state();
   virtual void update_stats(PTLsimStats& stats);
   virtual void flush_tlb(Context& ctx);
   virtual void flush_tlb_virt(Context& ctx, Waddr virtaddr);
@@ -1713,14 +1667,13 @@ struct OutOfOrderMachine : public PTLsimMachine {
 };
 
 
-#ifdef DECLARE_STRUCTURES
 //
 // The following configuration has two integer/store clusters with a single cycle
 // latency between them, but both clusters can access the load pseudo-cluster with
 // no extra cycle. The floating point cluster is two cycles from everything else.
 //
 #ifdef MULTI_IQ
-const Cluster clusters[MAX_CLUSTERS] = {
+inline const Cluster clusters[MAX_CLUSTERS] = {
     {"int0", 2, (FU_ALU0 | FU_STU0)},
     {"int1", 2, (FU_ALU1 | FU_STU1)},
     {"ld", 2, (FU_LDU0 | FU_LDU1)},
@@ -1744,14 +1697,12 @@ const byte intercluster_bandwidth_map[MAX_CLUSTERS][MAX_CLUSTERS] = {
 };
 
 #else  // single issueq
-const Cluster clusters[MAX_CLUSTERS] = {
+inline const Cluster clusters[MAX_CLUSTERS] = {
     {"all", 4, (FU_ALU0 | FU_ALU1 | FU_STU0 | FU_STU1 | FU_LDU0 | FU_LDU1 | FU_FPU0 | FU_FPU1)},
 };
 const byte intercluster_latency_map[MAX_CLUSTERS][MAX_CLUSTERS] = {{0}};
 const byte intercluster_bandwidth_map[MAX_CLUSTERS][MAX_CLUSTERS] = {{64}};
 #endif // multi_issueq
-
-#endif // DECLARE_STRUCTURES
 
 #endif // INSIDE_OOOCORE
 
@@ -2076,5 +2027,115 @@ struct OutOfOrderCoreStats { // rootnode:
     } cputime;
   } simulator;
 };
+
+#ifdef INSIDE_OOOCORE
+// std::formatter specializations for OutOfOrderModel types
+namespace std {
+template<>
+struct formatter<OutOfOrderModel::OutOfOrderCoreEvent> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::OutOfOrderCoreEvent& ev, format_context& ctx) const;
+};
+
+template<>
+struct formatter<OutOfOrderModel::PhysicalRegister> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::PhysicalRegister& physreg, format_context& ctx) const;
+};
+
+template<>
+struct formatter<OutOfOrderModel::PhysicalRegisterFile> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::PhysicalRegisterFile& prf, format_context& ctx) const;
+};
+
+template<>
+struct formatter<OutOfOrderModel::ReorderBufferEntry> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::ReorderBufferEntry& rob, format_context& ctx) const;
+};
+
+template<>
+struct formatter<OutOfOrderModel::LoadStoreQueueEntry> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::LoadStoreQueueEntry& lsq, format_context& ctx) const;
+};
+
+template<>
+struct formatter<OutOfOrderModel::ThreadContext> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::ThreadContext& thread, format_context& ctx) const;
+};
+
+template<>
+struct formatter<OutOfOrderModel::OutOfOrderCore> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::OutOfOrderCore& core, format_context& ctx) const;
+};
+
+template<>
+struct formatter<OutOfOrderModel::MemoryInterlockEntry> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::MemoryInterlockEntry& entry, format_context& ctx) const {
+    return std::format_to(ctx.out(), "vcpu {}, threadid {}, uuid {}, rob {}", entry.vcpuid, entry.threadid,
+                          entry.uuid, entry.rob);
+  }
+};
+
+template<>
+struct formatter<OutOfOrderModel::MemoryInterlockBuffer> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::MemoryInterlockBuffer& interlocks, format_context& ctx) const {
+    using base_t = LockableAssociativeArray<W64, OutOfOrderModel::MemoryInterlockEntry, 16, 4, 8>;
+    return formatter<base_t>{}.format(static_cast<const base_t&>(interlocks), ctx);
+  }
+};
+
+template<>
+struct formatter<OutOfOrderModel::PhysicalRegisterOperandInfo> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::PhysicalRegisterOperandInfo& opinfo, format_context& ctx) const {
+    return std::format_to(ctx.out(), "r{} (rob {} uuid {} {} rf{})", arch_reg_names[opinfo.archreg], opinfo.rob,
+                          opinfo.uuid, OutOfOrderModel::physreg_state_names[opinfo.state], opinfo.rfid);
+  }
+};
+
+template<int Size, int OperandCount>
+struct formatter<OutOfOrderModel::IssueQueue<Size, OperandCount>> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::IssueQueue<Size, OperandCount>& iq, format_context& ctx) const {
+    auto out = ctx.out();
+    out = std::format_to(out, "IssueQueue: count = {}:\n", iq.count);
+    for (int i = 0; i < Size; i++) {
+      out = std::format_to(out, "  uop {}: {} {} {} ", iq.uopids.slotid(i), ((iq.valid[i]) ? 'V' : '-'),
+                           ((iq.issued[i]) ? 'I' : '-'), ((iq.allready[i]) ? 'R' : '-'));
+      for (int j = 0; j < OperandCount; j++) {
+        if (j)
+          out = std::format_to(out, " ");
+        out = std::format_to(out, "{}", iq.tags[j].slotid(i));
+      }
+      out = std::format_to(out, "\n");
+    }
+    return out;
+  }
+};
+
+template<>
+struct formatter<OutOfOrderModel::RegisterRenameTable> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::RegisterRenameTable& rrt, format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < TRANSREG_COUNT; ++i) {
+      if ((i % 8) == 0)
+        out = std::format_to(out, " ");
+      out = std::format_to(out, " {:<6} r{:3d} | ", arch_reg_names[i], rrt[i]->index());
+      if ((i % 8) == 7)
+        out = std::format_to(out, "\n");
+    }
+    return out;
+  }
+};
+} // namespace std
+#endif // INSIDE_OOOCORE
 
 #endif // _OOOCORE_H_

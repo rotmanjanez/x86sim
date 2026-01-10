@@ -1,6 +1,8 @@
 #include "raspsim-hwsetup.h"
 #include "addrspace.h"
 #include "ptlsim.h"
+#include "logging.h"
+#include <format>
 
 struct PTLsimConfig;
 extern PTLsimConfig config;
@@ -63,13 +65,13 @@ PTLsimMachine* Raspsim::getMachine() {
   return PTLsimMachine::getmachine(config.core_name);
 }
 
-const char* Raspsim::getCoreName() {
+const std::string& Raspsim::getCoreName() {
   return config.core_name;
 }
 
 void Raspsim::setLogfile(const char* filename) {
   config.log_filename = filename;
-  backup_and_reopen_logfile();
+  logging::set_file_sink(filename);
 }
 
 Waddr Raspsim::getPageSize() {
@@ -145,8 +147,7 @@ void Raspsim::setRegisterValue(int reg, W64 value) {
 
 void Raspsim::stutdown() {
   shutdown_subsystems();
-  logfile.flush();
-  cerr.flush();
+  logging::flush();
 }
 
 void Raspsim::run() {
@@ -154,11 +155,9 @@ void Raspsim::run() {
 }
 
 char* Raspsim::formatException(byte exception, W32 errorcode, Waddr virtaddr) {
-  stringbuf buf{};
-
-  buf << "Exception ", exception, " (", x86_exception_names[exception], ") code=", errorcode, " addr=", (void*)virtaddr,
-      " @ rip ", (void*)(Waddr)ctx.commitarf[REG_rip], " (", total_user_insns_committed, " commits, ", sim_cycle,
-      " cycles)", endl;
+  std::string result = std::format("Exception {} ({}) code={} addr={} @ rip {} ({} commits, {} cycles)\n", exception,
+                                   x86_exception_names[exception], errorcode, (void*)(uintptr_t)virtaddr,
+                                   (void*)(uintptr_t)ctx.commitarf[REG_rip], total_user_insns_committed, sim_cycle);
 
   // PF
   if (exception == 14) {
@@ -170,18 +169,15 @@ char* Raspsim::formatException(byte exception, W32 errorcode, Waddr virtaddr) {
     W8 id = errorcode & 0x00000010;
     W8 pk = errorcode & 0x00000020;
 
-    buf << "PageFault error code: 0x", hexstring(errorcode, 32), ", Flags: ", (pk ? "PK " : ""), (id ? "I " : "D "),
-        (rsvd ? "RSVD " : ""), (us ? "U " : "S "), (wr ? "W " : "R "), (p ? "P" : ""), endl;
+    result +=
+        std::format("PageFault error code: 0x{:08x}, Flags: {}{}{}{}{}{}\n", errorcode, (pk ? "PK " : ""),
+                    (id ? "I " : "D "), (rsvd ? "RSVD " : ""), (us ? "U " : "S "), (wr ? "W " : "R "), (p ? "P" : ""));
   }
-  return strdup((char*)buf);
+  return strdup(result.c_str());
 }
 
 char* Raspsim::formatContext(const Context& ctx) {
-  stringbuf buf{};
-
-  buf << ctx;
-
-  return strdup((char*)buf);
+  return strdup(std::format("{}", ctx).c_str());
 }
 
 
@@ -217,7 +213,7 @@ bool check_for_async_sim_break() {
 int inject_events() {
   return 0;
 }
-void print_sysinfo(ostream& os) {}
+void print_sysinfo() {}
 
 // Only one VCPU in userspace PTLsim:
 Context& contextof(int vcpu) {
@@ -237,7 +233,8 @@ W64 storemask(Waddr addr, W64 data, byte bytemask) {
 
 int Context::copy_from_user(void* target, Waddr addr, int bytes, PageFaultErrorCode& pfec, Waddr& faultaddr,
                             bool forexec, Level1PTE& ptelo, Level1PTE& ptehi) {
-  logfile << "VMEM: Read from user ", (void*)addr, " (", bytes, ")", endl, flush;
+  logging::println("VMEM: Read from user {} ({})", (void*)addr, bytes);
+  logging::flush();
 
   bool readable;
   bool executable;
@@ -263,8 +260,8 @@ int Context::copy_from_user(void* target, Waddr addr, int bytes, PageFaultErrorC
 
   void* mapped_addr = asp.page_virt_to_mapped(addr);
   assert(mapped_addr);
-  logfile << "VMEM: Read ", mapped_addr, " = ", *(W8*)mapped_addr, "[", hexstring(*(W8*)mapped_addr, 64), "]", endl,
-      flush;
+  logging::println("VMEM: Read {} = {}[{:016x}]", mapped_addr, *(W8*)mapped_addr, *(W8*)mapped_addr);
+  logging::flush();
   memcpy(target, mapped_addr, n);
 
   // All the bytes were on the first page
@@ -288,7 +285,8 @@ int Context::copy_from_user(void* target, Waddr addr, int bytes, PageFaultErrorC
 }
 
 int Context::copy_to_user(Waddr target, void* source, int bytes, PageFaultErrorCode& pfec, Waddr& faultaddr) {
-  logfile << "VMEM: Write to user ", (void*)target, " (", bytes, ")", endl, flush;
+  logging::println("VMEM: Write to user {} ({})", (void*)target, bytes);
+  logging::flush();
 
   pfec = 0;
   bool writable = asp.fastcheck((byte*)target, asp.writemap);

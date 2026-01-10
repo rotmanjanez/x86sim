@@ -9,6 +9,13 @@
 #ifndef _PTLHWDEF_H
 #define _PTLHWDEF_H
 
+#ifdef PAGE_SIZE
+#undef PAGE_SIZE
+// We're on x86 or x86-64, so pages are always 4096 bytes:
+#endif
+#define PAGE_SIZE 4096
+
+
 //
 // NOTE: The first part of this file is included by assembly code,
 // so do not put any C/C++-specific things here until the label
@@ -127,8 +134,6 @@ struct RIPVirtPhysBase {
 
   // 36 bits + 12 page offset bits = 48 bit physical addresses
   static const Waddr INVALID = 0xfffffffff;
-
-  ostream& print(ostream& os) const;
 };
 
 struct RIPVirtPhys : public RIPVirtPhysBase {
@@ -146,13 +151,6 @@ struct RIPVirtPhys : public RIPVirtPhysBase {
   bool operator==(const RIPVirtPhys& b) const { return (rip == b.rip); }
 };
 
-static inline ostream& operator<<(ostream& os, const RIPVirtPhysBase& rvp) {
-  return rvp.print(os);
-}
-static inline ostream& operator<<(ostream& os, const RIPVirtPhys& rvp) {
-  return rvp.print(os);
-}
-
 //
 // Store Forwarding Register definition
 //
@@ -167,14 +165,6 @@ struct SFR {
   W64 addrvalid : 1, invalid : 1, datavalid : 1, physaddr : 45, bytemask : 8, tag : 8;
   W64 smc_mfn; /* hack to pass along the address for smc_setdirty */
 };
-
-stringbuf& operator<<(stringbuf& sb, const SFR& sfr);
-
-inline ostream& operator<<(ostream& os, const SFR& sfr) {
-  stringbuf sb;
-  sb << sfr;
-  return os << sb;
-}
 
 struct IssueState {
   union {
@@ -197,8 +187,6 @@ struct IssueState {
   };
 };
 
-ostream& operator<<(ostream& os, const IssueState& ctx);
-
 struct IssueInput {
   W64 ra;
   W64 rb;
@@ -208,9 +196,15 @@ struct IssueInput {
   W16 rcflags;
 };
 
-typedef W64 UserContext[ARCHREG_COUNT];
+struct UserContext : public std::array<W64, ARCHREG_COUNT> {
+  using std::array<W64, ARCHREG_COUNT>::array;
+};
 
-ostream& operator<<(ostream& os, const UserContext& ctx);
+template<>
+struct std::formatter<UserContext> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const UserContext& arf, std::format_context& ctx) const;
+};
 
 typedef byte X87Reg[10];
 
@@ -228,6 +222,15 @@ struct X87ControlWord {
   X87ControlWord() {}
   X87ControlWord(const W16& w) { *((W16*)this) = w; }
   operator W16() const { return *((W16*)this); }
+};
+
+template<>
+struct std::formatter<X87ControlWord> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const X87ControlWord& cw, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "0x{:04x}", static_cast<W16>(cw));
+  }
 };
 
 struct X87State {
@@ -368,7 +371,6 @@ struct SegmentDescriptor {
 // Encoding of segment numbers:
 enum { SEGID_ES = 0, SEGID_CS = 1, SEGID_SS = 2, SEGID_DS = 3, SEGID_FS = 4, SEGID_GS = 5, SEGID_COUNT = 6 };
 
-ostream& operator<<(ostream& os, const SegmentDescriptor& seg);
 
 struct SegmentDescriptorCache {
   W32 selector;
@@ -403,12 +405,6 @@ struct SegmentDescriptorCache {
   }
 };
 
-stringbuf& operator<<(stringbuf& os, const SegmentDescriptorCache& seg);
-inline ostream& operator<<(ostream& os, const SegmentDescriptorCache& seg) {
-  stringbuf sb;
-  sb << seg;
-  return os << sb;
-}
 
 //
 // These are x86 exceptions, not PTLsim internal exceptions
@@ -443,8 +439,6 @@ struct PageFaultErrorCode {
   byte p : 1, rw : 1, us : 1, rsv : 1, nx : 1, pad : 3;
   RawDataAccessors(PageFaultErrorCode, byte);
 };
-
-ostream& operator<<(ostream& os, const PageFaultErrorCode& pfec);
 
 
 //
@@ -566,13 +560,6 @@ struct Context : public ContextBase {
   void update_shadow_segment_descriptors();
 };
 
-stringbuf& operator<<(stringbuf& os, const Context& ctx);
-
-static inline ostream& operator<<(ostream& os, const Context& ctx) {
-  stringbuf sb;
-  sb << ctx;
-  return os << sb;
-}
 
 // Other flags not defined above
 enum {
@@ -1026,9 +1013,6 @@ struct TransOp : public TransOpBase {
 
 enum { LDST_ALIGN_NORMAL, LDST_ALIGN_LO, LDST_ALIGN_HI };
 
-ostream& operator<<(ostream& os, const TransOpBase& op);
-stringbuf& operator<<(stringbuf& os, const TransOpBase& op);
-
 struct BasicBlock;
 
 typedef void (*uopimpl_func_t)(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags);
@@ -1161,16 +1145,12 @@ struct BasicBlock : public BasicBlockBase {
   void use(W64 counter) { lastused = counter; };
 };
 
-ostream& operator<<(ostream& os, const BasicBlock& bb);
-
 //
 // Printing and information
 //
-stringbuf& nameof(stringbuf& sbname, const TransOpBase& uop);
-
+std::string nameof(const TransOpBase& uop);
 char* regname(int r);
-
-stringbuf& print_value_and_flags(stringbuf& sb, W64 value, W16 flags);
+std::string format_value_and_flags(W64 value, W16 flags);
 
 struct flagstring {
   W64 bits;
@@ -1182,23 +1162,6 @@ struct flagstring {
   flagstring(const W64 bits) { this->bits = bits; }
 };
 
-static inline ostream& operator<<(ostream& os, const flagstring& bs) {
-  for (int i = 31; i >= 0; i--) {
-    if (bit(bs.bits, i))
-      os << x86_flag_names[i];
-  }
-
-  return os;
-}
-
-static inline stringbuf& operator<<(stringbuf& sb, const flagstring& bs) {
-  for (int i = 31; i >= 0; i--) {
-    if (bit(bs.bits, i))
-      sb << x86_flag_names[i];
-  }
-
-  return sb;
-}
 
 typedef void (*assist_func_t)(Context& ctx);
 
@@ -1214,5 +1177,299 @@ int assist_index(assist_func_t func);
 #ifdef DSTBUILD
 static const char* sizeshift_names[4] = {"1 (byte)", "2 (word)", "4 (dword)", "8 (qword)"};
 #endif
+
+//
+// std::formatter specializations for C++23 std::print/std::format support
+//
+template<>
+struct std::formatter<flagstring> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const flagstring& bs, std::format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 31; i >= 0; i--) {
+      if (bit(bs.bits, i)) {
+        out = std::format_to(out, "{}", x86_flag_names[i]);
+      }
+    }
+    return out;
+  }
+};
+
+template<>
+struct std::formatter<SFR> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const SFR& sfr, std::format_context& ctx) const {
+    auto out = ctx.out();
+    if (sfr.invalid) {
+      out = std::format_to(out, "< Invalid: fault {:02x} > ", sfr.data);
+    } else {
+      out = std::format_to(out, "{} ",
+                           bytemaskstring(reinterpret_cast<const unsigned char*>(&sfr.data), sfr.bytemask, 8));
+    }
+    out = std::format_to(out, "@ {:016x} for memid tag {:>3}", sfr.physaddr << 3, sfr.tag);
+    return out;
+  }
+};
+
+template<>
+struct std::formatter<SegmentDescriptorCache> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const SegmentDescriptorCache& seg, std::format_context& ctx) const {
+    auto out = ctx.out();
+    out = std::format_to(out, "{:04x}: ", seg.selector);
+    out = std::format_to(out, "base {:016x}, limit {:016x}, ring {}:", seg.base, seg.limit, seg.dpl);
+    out = std::format_to(out, "{}", seg.supervisor ? " sys" : " usr");
+    out = std::format_to(out, "{}", seg.use64 ? " 64bit" : "      ");
+    out = std::format_to(out, "{}", seg.use32 ? " 32bit" : "      ");
+    if (!seg.present)
+      out = std::format_to(out, " (not present)");
+    return out;
+  }
+};
+
+template<>
+struct std::formatter<PageFaultErrorCode> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const PageFaultErrorCode& pfec, std::format_context& ctx) const {
+    auto out = ctx.out();
+    out = std::format_to(out, "[");
+    out = std::format_to(out, "{}", pfec.p ? " present" : " not-present");
+    out = std::format_to(out, "{}", pfec.rw ? " write" : " read");
+    out = std::format_to(out, "{}", pfec.us ? " user" : " kernel");
+    if (pfec.rsv)
+      out = std::format_to(out, " reserved-bits-set");
+    if (pfec.nx)
+      out = std::format_to(out, " execute");
+    out = std::format_to(out, " ]");
+    return out;
+  }
+};
+
+template<>
+struct std::formatter<SegmentDescriptor> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const SegmentDescriptor& seg, std::format_context& ctx) const {
+    auto out = ctx.out();
+    out = std::format_to(out, "base {:08x}, limit {:08x}, ring {}", seg.getbase(), seg.getlimit(), seg.dpl);
+    out = std::format_to(out, "{}", seg.s ? " sys" : " usr");
+    out = std::format_to(out, "{}", seg.l ? " 64bit" : "      ");
+    out = std::format_to(out, "{}", seg.d ? " 32bit" : " 16bit");
+    out = std::format_to(out, "{}", seg.g ? " g=4KB" : "      ");
+    if (!seg.p)
+      out = std::format_to(out, "not present");
+    return out;
+  }
+};
+
+template<>
+struct std::formatter<Context> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const Context& ctx, std::format_context& fctx) const {
+    auto out = fctx.out();
+    static const int arfwidth = 4;
+
+    out = std::format_to(out, "VCPU State:\n");
+    out = std::format_to(out, "  Architectural Registers:\n");
+    for (int i = 0; i < ARCHREG_COUNT; i++) {
+      out = std::format_to(out, "  {:<6} 0x{:016x}", arch_reg_names[i], ctx.commitarf[i]);
+      if ((i % arfwidth) == (arfwidth - 1))
+        out = std::format_to(out, "\n");
+    }
+
+    out = std::format_to(out, "  Segment Registers:\n");
+    out = std::format_to(out, "    cs {}\n", ctx.seg[SEGID_CS]);
+    out = std::format_to(out, "    ss {}\n", ctx.seg[SEGID_SS]);
+    out = std::format_to(out, "    ds {}\n", ctx.seg[SEGID_DS]);
+    out = std::format_to(out, "    es {}\n", ctx.seg[SEGID_ES]);
+    out = std::format_to(out, "    fs {}\n", ctx.seg[SEGID_FS]);
+    out = std::format_to(out, "    gs {}\n", ctx.seg[SEGID_GS]);
+
+    out = std::format_to(out, "  FPU:\n");
+    out = std::format_to(out, "    FP Control Word: {}\n", ctx.fpcw);
+    out = std::format_to(out, "    MXCSR:           {}\n", ctx.mxcsr);
+
+    for (int i = 7; i >= 0; i--) {
+      int stackid = (i - (ctx.commitarf[REG_fptos] >> 3)) & 0x7;
+      out = std::format_to(out, "    fp{}  st({})  {}  0x{:016x} => {}\n", i, stackid,
+                           (bit(ctx.commitarf[REG_fptags], i * 8) ? "Valid" : "Empty"), ctx.fpstack[i],
+                           *((double*)&ctx.fpstack[i]));
+    }
+
+    out = std::format_to(out, "  Internal State:\n");
+    out = std::format_to(out, "    Last internal exception: {}\n", ctx.exception);
+
+    return out;
+  }
+};
+
+template<>
+struct std::formatter<TransOpBase> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const TransOpBase& op, std::format_context& fctx) const {
+    auto out = fctx.out();
+    static const char* size_names[4] = {"b", "w", "d", ""};
+    static const char* fptype_names[4] = {".s", ".vs", ".d", ".d"};
+
+    bool ld = isload(op.opcode);
+    bool st = isstore(op.opcode);
+    bool fp = (isclass(op.opcode, OPCLASS_FP_ALU));
+
+    // Build instruction name
+    std::string opname = nameof(op.opcode);
+    if (!(opinfo[op.opcode].flagops & opNOSIZE))
+      opname += (fp ? fptype_names[op.size] : size_names[op.size]);
+
+    if (isclass(op.opcode, OPCLASS_USECOND))
+      opname += std::format(".{}", cond_code_names[op.cond]);
+
+    if (ld | st) {
+      if (op.opcode == OP_mf) {
+        static const char* mf_names[4] = {"none", "st", "ld", "all"};
+        opname += std::format(".{}", mf_names[op.extshift]);
+      }
+      opname += ((op.cond == LDST_ALIGN_LO) ? ".lo" : (op.cond == LDST_ALIGN_HI) ? ".hi" : "");
+    } else if ((op.opcode == OP_mask) || (op.opcode == OP_maskb)) {
+      opname += ((op.cond == 0) ? "" : (op.cond == 1) ? ".z" : (op.cond == 2) ? ".x" : ".???");
+    }
+
+    if ((ld | st) && (op.cachelevel > 0))
+      opname += std::format(".L{}", (char)('1' + op.cachelevel));
+    if ((ld | st) && (op.locked))
+      opname += ((ld) ? ".acq" : ".rel");
+    if (op.internal)
+      opname += ".p";
+    if (op.eom)
+      opname += std::format(".{}", (op.any_flags_in_insn ? "+" : "-"));
+
+    // Output padded opname and destination register
+    out = std::format_to(out, "{:<12} {}", opname, arch_reg_names[op.rd]);
+    if ((op.rd < ARCHREG_COUNT) & (!op.final_arch_in_insn))
+      out = std::format_to(out, ".t");
+
+    out = std::format_to(out, " = ");
+    if (ld | st)
+      out = std::format_to(out, "[");
+    out = std::format_to(out, "{}", arch_reg_names[op.ra]);
+
+    if (op.rb == REG_imm) {
+      if (std::abs(op.rbimm) <= 32768)
+        out = std::format_to(out, ",{}", op.rbimm);
+      else
+        out = std::format_to(out, ",{}", (void*)op.rbimm);
+    } else {
+      out = std::format_to(out, ",{}", arch_reg_names[op.rb]);
+    }
+
+    if (ld | st)
+      out = std::format_to(out, "]");
+
+    if ((op.opcode == OP_mask) | (op.opcode == OP_maskb)) {
+      MaskControlInfo mci(op.rcimm);
+      int sh = (op.opcode == OP_maskb) ? 3 : 0;
+      out = std::format_to(out, ",[ms={} mc={} ds={}]", (mci.info.ms >> sh), (mci.info.mc >> sh), (mci.info.ds >> sh));
+    } else {
+      if (op.rc != REG_zero) {
+        if (op.rc == REG_imm)
+          out = std::format_to(out, ",{}", op.rcimm);
+        else
+          out = std::format_to(out, ",{}", arch_reg_names[op.rc]);
+      }
+    }
+
+    if ((op.opcode == OP_adda || op.opcode == OP_suba) && (op.extshift != 0))
+      out = std::format_to(out, "*{}", (1 << op.extshift));
+
+    if (op.setflags) {
+      out = std::format_to(out, " ");
+      if (op.nouserflags)
+        out = std::format_to(out, "int:");
+      out = std::format_to(out, "[");
+      for (int i = 0; i < SETFLAG_COUNT; i++) {
+        if (bit(op.setflags, i))
+          out = std::format_to(out, "{}", setflag_names[i]);
+      }
+      out = std::format_to(out, "]");
+      if (!op.final_flags_in_insn)
+        out = std::format_to(out, "/temp");
+    }
+
+    if (isbranch(op.opcode))
+      out = std::format_to(out, " [taken {}, seq {}]", (void*)(Waddr)op.riptaken, (void*)(Waddr)op.ripseq);
+
+    if (op.som)
+      out = std::format_to(out, " [som]");
+    if (op.eom)
+      out = std::format_to(out, " [eom]");
+    if (op.som | op.eom)
+      out = std::format_to(out, " [{} bytes]", op.bytes);
+
+    return out;
+  }
+};
+
+template<>
+struct std::formatter<TransOp> : std::formatter<TransOpBase> {
+  auto format(const TransOp& op, std::format_context& fctx) const {
+    return std::formatter<TransOpBase>::format(static_cast<const TransOpBase&>(op), fctx);
+  }
+};
+
+template<>
+struct std::formatter<RIPVirtPhysBase> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const RIPVirtPhysBase& rvp, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "{}", (void*)(Waddr)rvp.rip);
+  }
+};
+
+template<>
+struct std::formatter<RIPVirtPhys> : std::formatter<RIPVirtPhysBase> {
+  auto format(const RIPVirtPhys& rvp, std::format_context& ctx) const {
+    return std::formatter<RIPVirtPhysBase>::format(static_cast<const RIPVirtPhysBase&>(rvp), ctx);
+  }
+};
+
+template<>
+struct std::formatter<BasicBlock> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const BasicBlock& bb, std::format_context& ctx) const {
+    auto out = ctx.out();
+
+    out = std::format_to(out, "BasicBlock {} of type {}: {} bytes, {} transops ({}t {}m {}s", (void*)(Waddr)bb.rip,
+                         branch_type_names[bb.brtype], bb.bytes, bb.count, bb.tagcount, bb.memcount, bb.storecount);
+
+    if (bb.repblock)
+      out = std::format_to(out, " rep");
+
+    out = std::format_to(out, ", uses {}), {} refs, {} taken, {} not taken:\n", bitstring(bb.usedregs, 64, true),
+                         bb.refcount, (void*)(Waddr)bb.rip_taken, (void*)(Waddr)bb.rip_not_taken);
+
+    Waddr rip = bb.rip;
+    int bytes_in_insn = 0;
+    for (int i = 0; i < bb.count; ++i) {
+      const TransOp& transop = bb.transops[i];
+      // assuming std::formatter<TransOp,CharT> exists:
+      out = std::format_to(out, "  {}: {}\n", (void*)rip, transop);
+      if (transop.som)
+        bytes_in_insn = transop.bytes;
+      if (transop.eom)
+        rip += bytes_in_insn;
+    }
+
+    out = std::format_to(out, "Basic block terminates with taken rip {}, not taken rip {}\n",
+                         (void*)(Waddr)bb.rip_taken, (void*)(Waddr)bb.rip_not_taken);
+
+    return out;
+  }
+};
+
 #endif // __ASM_ONLY__
 #endif // _PTLHWDEF_H

@@ -386,7 +386,6 @@ static const char* physreg_state_names[MAX_PHYSREG_STATE] = {"none",    "free", 
                                                              "written", "arch", "pendingfree"};
 static const char* short_physreg_state_names[MAX_PHYSREG_STATE] = {"-", "free", "wait", "byps", "wrtn", "arch", "pend"};
 
-#ifdef INSIDE_OOOCORE
 
 struct OutOfOrderCore;
 OutOfOrderCore& coreof(int coreid);
@@ -469,7 +468,6 @@ struct IssueQueue {
   bool switch_to_end(int slot, const tag_t* operands, const tag_t* preready);
   bool remove(int slot);
 
-  ostream& print(ostream& os) const;
   void tally_broadcast_matches(tag_t sourceid, const std::bitset<size>& mask, int operand) const;
 
   //
@@ -505,11 +503,6 @@ struct IssueQueue {
 
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 };
-
-template<int size, int operandcount>
-static inline ostream& operator<<(ostream& os, const IssueQueue<size, operandcount>& issueq) {
-  return issueq.print(os);
-}
 
 //
 // Iterate through a linked list of objects where each object directly inherits
@@ -605,9 +598,6 @@ struct StateList : public selfqueuelink {
 
   void checkvalid();
 };
-
-template<typename T>
-static void print_list_of_state_lists(ostream& os, const ListOfStateLists& lol, const char* title);
 
 //
 // Fetch Buffers
@@ -722,9 +712,7 @@ struct ReorderBufferEntry : public selfqueuelink {
   void fencewakeup();
   LoadStoreQueueEntry* find_nearest_memory_fence();
   bool release_mem_lock(bool forced = false);
-  ostream& print(ostream& os) const;
-  stringbuf& get_operand_info(stringbuf& sb, int operand) const;
-  ostream& print_operand_info(ostream& os, int operand) const;
+  std::string get_operand_info(int operand) const;
 
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 
@@ -736,10 +724,6 @@ void decode_tag(issueq_tag_t tag, int& threadid, int& idx) {
   threadid = tag >> MAX_ROB_IDX_BIT;
   int mask = ((1 << (MAX_ROB_IDX_BIT + MAX_THREADS_BIT)) - 1) >> MAX_THREADS_BIT;
   idx = tag & mask;
-}
-
-static inline ostream& operator<<(ostream& os, const ReorderBufferEntry& rob) {
-  return rob.print(os);
 }
 
 //
@@ -776,8 +760,6 @@ struct LoadStoreQueueEntry : public SFR {
 
   void validate() { entry_valid = 1; }
 
-  ostream& print(ostream& os) const;
-
   LoadStoreQueueEntry& operator=(const SFR& sfr) {
     *((SFR*)this) = sfr;
     return *this;
@@ -785,10 +767,6 @@ struct LoadStoreQueueEntry : public SFR {
 
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 };
-
-static inline ostream& operator<<(ostream& os, const LoadStoreQueueEntry& lsq) {
-  return lsq.print(os);
-}
 
 struct PhysicalRegisterOperandInfo {
   W32 uuid;
@@ -799,8 +777,6 @@ struct PhysicalRegisterOperandInfo {
   byte archreg;
   byte pad1;
 };
-
-ostream& operator<<(ostream& os, const PhysicalRegisterOperandInfo& opinfo);
 
 //
 // Physical Register File
@@ -894,8 +870,6 @@ public:
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 };
 
-ostream& operator<<(ostream& os, const PhysicalRegister& physreg);
-
 struct PhysicalRegisterFile : public array<PhysicalRegister, MAX_PHYS_REG_FILE_SIZE> {
   byte coreid;
   byte rfid;
@@ -923,17 +897,12 @@ struct PhysicalRegisterFile : public array<PhysicalRegister, MAX_PHYS_REG_FILE_S
 
   PhysicalRegister* alloc(W8 threadid, int r = -1);
   void reset(W8 threadid);
-  ostream& print(ostream& os) const;
 
   OutOfOrderCore& getcore() const { return coreof(coreid); }
 
 private:
   void reset();
 };
-
-static inline ostream& operator<<(ostream& os, const PhysicalRegisterFile& physregs) {
-  return physregs.print(os);
-}
 
 //
 // Register Rename Table
@@ -942,12 +911,7 @@ struct RegisterRenameTable : public array<PhysicalRegister*, TRANSREG_COUNT> {
 #ifdef ENABLE_TRANSIENT_VALUE_TRACKING
   std::bitset<TRANSREG_COUNT> renamed_in_this_basic_block;
 #endif
-  ostream& print(ostream& os) const;
 };
-
-static inline ostream& operator<<(ostream& os, const RegisterRenameTable& rrt) {
-  return rrt.print(os);
-}
 
 enum {
   ISSUE_COMPLETED = 1,      // issued correctly
@@ -1004,11 +968,6 @@ struct MemoryInterlockEntry {
     rob = 0;
     vcpuid = 0;
     threadid = 0;
-  }
-
-  ostream& print(ostream& os, W64 physaddr) const {
-    os << "phys ", (void*)physaddr, ": vcpu ", vcpuid, ", threadid ", threadid, ", uuid ", uuid, ", rob ", rob;
-    return os;
   }
 };
 
@@ -1298,21 +1257,17 @@ struct OutOfOrderCoreEvent {
       W16 operand_physregs[MAX_OPERANDS];
     } commit;
   };
-
-  ostream& print(ostream& os) const;
 };
 
 struct EventLog {
   OutOfOrderCoreEvent* start;
   OutOfOrderCoreEvent* end;
   OutOfOrderCoreEvent* tail;
-  ostream* logfile;
 
   EventLog() {
     start = null;
     end = null;
     tail = null;
-    logfile = null;
   }
 
   bool init(size_t bufsize);
@@ -1329,6 +1284,7 @@ struct EventLog {
   }
 
   void flush(bool only_to_tail = false);
+  void print(bool only_to_tail = false);
 
   OutOfOrderCoreEvent* add(int type) { return add()->fill(type); }
 
@@ -1344,8 +1300,6 @@ struct EventLog {
                                       Waddr addr = 0) {
     return add()->fill_load_store(type, rob, inherit_sfr, addr);
   }
-
-  ostream& print(ostream& os, bool only_to_tail = false);
 };
 
 struct LoadStoreAliasPredictor : public FullyAssociativeTags<W64, 8> {};
@@ -1480,11 +1434,8 @@ struct ThreadContext {
   void flush_mem_lock_release_list(int start = 0);
   int get_priority() const;
 
-  void dump_smt_state(ostream& os);
-  void print_smt_state(ostream& os);
-  void print_rob(ostream& os);
-  void print_lsq(ostream& os);
-  void print_rename_tables(ostream& os);
+  void dump_smt_state();
+  void print_smt_state();
 
   void reset();
   void init();
@@ -1671,8 +1622,8 @@ struct OutOfOrderCore {
   void flush_tlb(Context& ctx, int threadid, bool selective = false, Waddr virtaddr = 0);
 
   // Debugging
-  void dump_smt_state(ostream& os);
-  void print_smt_state(ostream& os);
+  void dump_smt_state();
+  void print_smt_state();
   void check_refcounts();
   void check_rob();
 };
@@ -1685,7 +1636,7 @@ struct OutOfOrderMachine : public PTLsimMachine {
   OutOfOrderMachine(const char* name);
   virtual bool init(PTLsimConfig& config);
   virtual int run(PTLsimConfig& config);
-  virtual void dump_state(ostream& os);
+  virtual void dump_state();
   virtual void update_stats(PTLsimStats& stats);
   virtual void flush_tlb(Context& ctx);
   virtual void flush_tlb_virt(Context& ctx, Waddr virtaddr);
@@ -1706,7 +1657,6 @@ extern CycleTimer cttransfer;
 extern CycleTimer ctwriteback;
 extern CycleTimer ctcommit;
 
-#ifdef DECLARE_STRUCTURES
 //
 // The following configuration has two integer/store clusters with a single cycle
 // latency between them, but both clusters can access the load pseudo-cluster with
@@ -1736,9 +1686,6 @@ const byte intercluster_bandwidth_map[MAX_CLUSTERS][MAX_CLUSTERS] = {
     {1, 1, 1, 2}, // from FP
 };
 
-#endif // DECLARE_STRUCTURES
-
-#endif // INSIDE_OOOCORE
 
 //
 // This part is used when parsing stats.h to build the
@@ -2048,6 +1995,92 @@ struct OutOfOrderCoreStats { // rootnode:
       double commit;
     } cputime;
   } simulator;
+};
+
+// C++23 Formatter specializations for OutOfOrderModel types
+
+// IssueQueue formatter (template)
+namespace OutOfOrderModel {
+template<int size, int operandcount>
+struct std::formatter<IssueQueue<size, operandcount>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const IssueQueue<size, operandcount>& iq, std::format_context& ctx) const;
+};
+} // namespace OutOfOrderModel
+
+// ListOfStateLists formatter with title
+template<>
+struct std::formatter<std::pair<OutOfOrderModel::ListOfStateLists, const char*>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const std::pair<OutOfOrderModel::ListOfStateLists, const char*>& p, std::format_context& ctx) const;
+};
+
+// ReorderBufferEntry formatter
+template<>
+struct std::formatter<OutOfOrderModel::ReorderBufferEntry> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::ReorderBufferEntry& rob, std::format_context& ctx) const;
+};
+
+// LoadStoreQueueEntry formatter
+template<>
+struct std::formatter<OutOfOrderModel::LoadStoreQueueEntry> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::LoadStoreQueueEntry& lsq, std::format_context& ctx) const;
+};
+
+// PhysicalRegisterFile formatter
+template<>
+struct std::formatter<OutOfOrderModel::PhysicalRegisterFile> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::PhysicalRegisterFile& prf, std::format_context& ctx) const;
+};
+
+// RegisterRenameTable formatter
+template<>
+struct std::formatter<OutOfOrderModel::RegisterRenameTable> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const OutOfOrderModel::RegisterRenameTable& rrt, std::format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < TRANSREG_COUNT; ++i) {
+      if ((i % 8) == 0)
+        out = std::format_to(out, " ");
+      out = std::format_to(out, " {:<6} r{:3d} | ", arch_reg_names[i], rrt[i]->index());
+      if (((i % 8) == 7) || (i == TRANSREG_COUNT - 1))
+        out = std::format_to(out, "\n");
+    }
+    return out;
+  }
+};
+
+// MemoryInterlockEntry formatter with physaddr parameter
+template<>
+struct std::formatter<std::pair<OutOfOrderModel::MemoryInterlockEntry, W64>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const std::pair<OutOfOrderModel::MemoryInterlockEntry, W64>& p, std::format_context& ctx) const {
+    auto out = ctx.out();
+    const auto& entry = p.first;
+    W64 physaddr = p.second;
+    out = std::format_to(out, "phys {}: vcpu {}, threadid {}, uuid {}, rob {}", (void*)physaddr, entry.vcpuid,
+                         entry.threadid, entry.uuid, entry.rob);
+    return out;
+  }
+};
+
+// OutOfOrderCoreEvent formatter
+template<>
+struct std::formatter<OutOfOrderModel::OutOfOrderCoreEvent> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const OutOfOrderModel::OutOfOrderCoreEvent& event, std::format_context& ctx) const;
+};
+
+// EventLog formatter with optional only_to_tail parameter
+template<>
+struct std::formatter<std::pair<OutOfOrderModel::EventLog, bool>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const std::pair<OutOfOrderModel::EventLog, bool>& p, std::format_context& ctx) const;
 };
 
 #endif // _OOOCORE_H_

@@ -11,6 +11,8 @@
 #include "branchpred.h"
 #include "dcache.h"
 #include "stats.h"
+#include "ptlhwdef.h"
+#include "logging.h"
 
 // With these disabled, simulation is faster
 #define ENABLE_CHECKS
@@ -22,8 +24,6 @@
 #endif
 
 #ifndef ENABLE_LOGGING
-#undef logable
-#define logable(level) (0)
 #endif
 
 W64 suppress_total_user_insn_count_updates_in_seqcore;
@@ -259,33 +259,37 @@ struct TransactionalMemory {
     cmtrec.store_count = count;
     return count;
   }
-
-  ostream& print(ostream& os) const {
-    os << "TransactionalMemory containing ", count, " stores:", endl;
-    foreach (i, count) {
-      W64 data = data_list[i];
-      os << "  ", intstring(i, 4), ": 0x", hexstring(W64(addr_list[i]), 64),
-          " <= ", bytemaskstring((byte*)&data_list[i], bytemask_list[i], 8), endl;
-    }
-    os << "  Hash chains:", endl;
-    foreach (set, setcount) {
-      if (sets[set] < 0)
-        continue;
-      os << "  Set ", intstring(set, 2), ":";
-      W16s slot = sets[set];
-      while (slot >= 0) {
-        os << ' ', slot;
-        slot = next_list[slot];
-      }
-      os << endl;
-    }
-    return os;
-  }
 };
 
 template<int N, int setcount>
-ostream& operator<<(ostream& os, const TransactionalMemory<N, setcount>& tm) {
-  return tm.print(os);
+struct std::formatter<TransactionalMemory<N, setcount>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const TransactionalMemory<N, setcount>& tm, std::format_context& ctx) const;
+};
+
+template<int N, int setcount>
+auto std::formatter<TransactionalMemory<N, setcount>>::format(const TransactionalMemory<N, setcount>& tm,
+                                                              std::format_context& ctx) const {
+  auto out = ctx.out();
+  out = std::format_to(out, "TransactionalMemory containing {} stores:\n", tm.count);
+  foreach (i, tm.count) {
+    W64 data = tm.data_list[i];
+    out = std::format_to(out, "  {:>4}: 0x{:x} <= {}\n", i, W64(tm.addr_list[i]),
+                         bytemaskstring((const byte*)&data, tm.bytemask_list[i], 8));
+  }
+  out = std::format_to(out, "  Hash chains:\n");
+  foreach (set, tm.setcount) {
+    if (tm.sets[set] < 0)
+      continue;
+    out = std::format_to(out, "  Set {:>2}:", set);
+    W16s slot = tm.sets[set];
+    while (slot >= 0) {
+      out = std::format_to(out, " {}", slot);
+      slot = tm.next_list[slot];
+    }
+    out = std::format_to(out, "\n");
+  }
+  return out;
 }
 
 template<int N, int setcount>
@@ -295,11 +299,11 @@ W64 TransactionalMemory<N, setcount>::loadimpl(W64 physaddr) {
 
 template<int N, int setcount>
 W64 TransactionalMemory<N, setcount>::storeimpl(W64 physaddr, W64 data, byte bytemask) {
-  logfile << "Before storeimpl: physaddr ", (void*)physaddr, " => mfn ", (physaddr >> 12), ", data ",
-      bytemaskstring(data, 8, bytemask), endl;
+  logging::println(logging::DEBUG, "Before storeimpl: physaddr {} => mfn {}, data {}", (void*)physaddr,
+                   (physaddr >> 12), bytemaskstring((const byte*)&data, bytemask, 8));
   W64 rc = storemask(physaddr, data, bytemask);
-  logfile << "After storeimpl: physaddr ", (void*)physaddr, " => mfn ", (physaddr >> 12), ", data ",
-      bytemaskstring(data, 8, bytemask), " => rc ", (void*)rc, endl;
+  logging::println(logging::DEBUG, "After storeimpl: physaddr {} => mfn {}, data {} => rc {}", (void*)physaddr,
+                   (physaddr >> 12), bytemaskstring((const byte*)&data, bytemask, 8), (void*)rc);
   return rc;
 }
 
@@ -374,107 +378,105 @@ struct SequentialCoreEvent {
       W16 id;
     } assist;
   };
-
-  ostream& print(ostream& os) const;
 };
 
-PrintOperator(SequentialCoreEvent);
+template<>
+struct std::formatter<SequentialCoreEvent> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const SequentialCoreEvent& ev, std::format_context& ctx) const {
+    auto out = ctx.out();
 
-ostream& SequentialCoreEvent::print(ostream& os) const {
-  if (uuid > 0)
-    os << intstring(uuid, 20);
-  else
-    os << padstring("-", 20);
-  os << " c", coreid, " t", threadid, " ";
+    if (ev.uuid > 0)
+      out = std::format_to(out, "{:>20}", ev.uuid);
+    else
+      out = std::format_to(out, "{:>20}", "-");
+    out = std::format_to(out, " c{} t{} ", ev.coreid, ev.threadid);
 
-  bool st = isstore(uop.opcode);
-  bool ld = isload(uop.opcode);
-  bool br = isbranch(uop.opcode);
-  stringbuf sb;
-  sb << uop;
+    bool st = isstore(ev.uop.opcode);
+    bool ld = isload(ev.uop.opcode);
+    bool br = isbranch(ev.uop.opcode);
+    out = std::format_to(out, "[type {}]", ev.type);
 
-  //os << "[type ", type, "]", flush;
+    switch (ev.type) {
+    case EVENT_ISSUE:
+    case EVENT_BRANCH: {
+      std::string rdstr = format_value_and_flags(ev.issue.state.reg.rddata, ev.issue.state.reg.rdflags);
+      out = std::format_to(
+          out, "{} rip {}:{:<2}  {} {}",
+          ((ev.issue.state.reg.rdflags & FLAG_INV) ? ((br) ? "brxcpt" : "except") : ((br) ? "branch" : "issue ")),
+          (void*)ev.rip, ev.uopid, ev.uop, rdstr.c_str());
+      break;
+    }
+    case EVENT_LOAD:
+    case EVENT_STORE: {
+      out = std::format_to(out, "{} rip {}:{:<2}  {} {} (virt 0x{:012x})",
+                           ((ev.loadstore.sfr.invalid) ? ((st) ? "stxcpt" : "ldxcpt") : ((st) ? "store " : "load ")),
+                           (void*)ev.rip, ev.uopid, ev.uop, ev.loadstore.sfr, ev.loadstore.virtaddr);
+      if (ev.loadstore.origaddr != ev.loadstore.virtaddr)
+        out = std::format_to(out, " (orig 0x{:012x})", ev.loadstore.origaddr);
+      if (ev.loadstore.sfr.invalid)
+        out = std::format_to(out, " (PFEC {}, PTE {})", PageFaultErrorCode(ev.loadstore.pfec),
+                             Level1PTE(ev.loadstore.pteused));
+      break;
+    }
+    case EVENT_LOAD_ANNUL: {
+      out = std::format_to(out, "ldanul rip {}:{:<2}  {} {} (virt 0x{:012x})", (void*)ev.rip, ev.uopid, ev.uop,
+                           ev.loadstore.sfr, ev.loadstore.virtaddr);
+      if (ev.loadstore.origaddr != ev.loadstore.virtaddr)
+        out = std::format_to(out, " (orig 0x{:012x})", ev.loadstore.origaddr);
+      out = std::format_to(out, " was annulled (high unaligned load)");
+      break;
+    }
+    case EVENT_LOAD_STORE_UNALIGNED: {
+      out = std::format_to(out, "{} rip {}:{:<2}  {} virt 0x{:012x} (size {})", ((st) ? "stalgn" : "ldalgn"),
+                           (void*)ev.rip, ev.uopid, ev.uop, ev.loadstore.virtaddr, (1 << ev.uop.size));
+      break;
+    }
+    case EVENT_SKIPBLOCK: {
+      out = std::format_to(out, "skip   rip {}:{:<2}  {}: advance by {} bytes to {}", (void*)ev.rip, ev.uopid, ev.uop,
+                           ev.skipblock.bytes_in_current_insn, (void*)ev.skipblock.chk_recovery_rip);
+      break;
+    }
+    case EVENT_ALIGNMENT_FIXUP: {
+      out = std::format_to(out, "algnfx rip {}:{:<2} {} set unaligned bit for uop index {}", (void*)ev.rip, ev.uopid,
+                           ev.uop, ev.alignfixup.uopindex);
+      break;
+    }
+    case EVENT_TRANSLATE: {
+      out = std::format_to(out, "xlate  rip {} (rvp {}): BB of {} uops", (void*)ev.rip, ev.bb.rvp, ev.bb.bbcount);
+      break;
+    }
+    case EVENT_EXECUTE_BB: {
+      out = std::format_to(out, "execbb rip {} (rvp {}): BB of {} uops", (void*)ev.rip, ev.bb.rvp, ev.bb.bbcount);
+      break;
+    }
+    case EVENT_PTE_UPDATE: {
+      out = std::format_to(out, "pteupd 0x{:012x}: 0x{:02x}", ev.pteupdate.virtaddr, ev.pteupdate.pteupdate);
+      break;
+    }
+    default: {
+      out = std::format_to(out, "Unknown event type {}", ev.type);
+      break;
+    }
+    }
 
-  switch (type) {
-  case EVENT_ISSUE:
-  case EVENT_BRANCH: {
-    stringbuf rdstr;
-    print_value_and_flags(rdstr, issue.state.reg.rddata, issue.state.reg.rdflags);
-    os << ((issue.state.reg.rdflags & FLAG_INV) ? ((br) ? "brxcpt" : "except") : ((br) ? "branch" : "issue "));
-    os << " rip ", (void*)rip, ":", intstring(uopid, -2), "  ", padstring(sb, -60), " ", rdstr;
-    break;
-  }
-  case EVENT_LOAD:
-  case EVENT_STORE: {
-    os << ((loadstore.sfr.invalid) ? ((st) ? "stxcpt" : "ldxcpt") : ((st) ? "store " : "load  "));
-    os << " rip ", (void*)rip, ":", intstring(uopid, -2), "  ", padstring(sb, -60), " ", loadstore.sfr, " (virt 0x",
-        hexstring(loadstore.virtaddr, 48), ")";
-    if (loadstore.origaddr != loadstore.virtaddr)
-      os << " (orig 0x", hexstring(loadstore.origaddr, 48), ")";
-    if (loadstore.sfr.invalid)
-      os << " (PFEC ", PageFaultErrorCode(loadstore.pfec), ", PTE ", Level1PTE(loadstore.pteused), ")";
-    break;
-  }
-  case EVENT_LOAD_ANNUL: {
-    os << "ldanul", " rip ", (void*)rip, ":", intstring(uopid, -2), "  ", padstring(sb, -60), " ", loadstore.sfr,
-        " (virt 0x", hexstring(loadstore.virtaddr, 48), ")";
-    if (loadstore.origaddr != loadstore.virtaddr)
-      os << " (orig 0x", hexstring(loadstore.origaddr, 48), ")";
-    os << " was annulled (high unaligned load)";
-    break;
-  }
-  case EVENT_LOAD_STORE_UNALIGNED: {
-    os << ((st) ? "stalgn" : "ldalgn");
-    os << " rip ", (void*)rip, ":", intstring(uopid, -2), "  ", padstring(sb, -60), " virt 0x",
-        hexstring(loadstore.virtaddr, 48), " (size ", (1 << uop.size), ")";
-    break;
-  }
-  case EVENT_SKIPBLOCK: {
-    os << "skip   rip ", (void*)rip, ":", intstring(uopid, -2), "  ", padstring(sb, -60), ": advance by ",
-        skipblock.bytes_in_current_insn, " bytes to ", (void*)skipblock.chk_recovery_rip;
-    break;
-  }
-  case EVENT_ALIGNMENT_FIXUP: {
-    os << "algnfx", " rip ", rip, ":", intstring(uopid, -2), " ", padstring(sb, -60),
-        " set unaligned bit for uop index ", alignfixup.uopindex;
-    break;
-  }
-  case EVENT_TRANSLATE: {
-    os << "xlate  rip ", (void*)rip, " (rvp ", bb.rvp, "): BB of ", bb.bbcount, " uops";
-    break;
-  }
-  case EVENT_EXECUTE_BB: {
-    os << "execbb rip ", (void*)rip, " (rvp ", bb.rvp, "): BB of ", bb.bbcount, " uops";
-    break;
-  }
-  case EVENT_PTE_UPDATE: {
-    os << "pteupd 0x", hexstring(pteupdate.virtaddr, 48), ": ", PTEUpdate(pteupdate.pteupdate);
-    break;
-  }
-  default: {
-    os << "Unknown event type ", type, endl;
-    break;
-  }
-  }
+    if (ev.uop.eom)
+      out = std::format_to(out, " [EOM #{}]", ev.eomid);
+    out = std::format_to(out, "\n");
 
-  if (uop.eom)
-    os << " [EOM #", eomid, "]";
-  os << endl;
-
-  return os;
-}
+    return out;
+  }
+};
 
 struct SequentialCoreEventLog {
   SequentialCoreEvent* start;
   SequentialCoreEvent* end;
   SequentialCoreEvent* tail;
-  ostream* logfile;
 
   SequentialCoreEventLog() {
     start = null;
     end = null;
     tail = null;
-    logfile = null;
   }
 
   bool init(size_t bufsize);
@@ -509,11 +511,7 @@ struct SequentialCoreEventLog {
     return event;
   }
 
-  ostream& print(ostream& os, bool only_to_tail = false, W64 bbcount = std::numeric_limits<W64>::max());
-
-  ostream& print_n_basic_blocks(ostream& os, W64 bbcount) { return print(os, false, bbcount); }
-
-  ostream& print_one_basic_block(ostream& os) { return print_n_basic_blocks(os, 1); }
+  void print(bool only_to_tail = false);
 };
 
 bool SequentialCoreEventLog::init(size_t bufsize) {
@@ -542,44 +540,25 @@ void SequentialCoreEventLog::reset() {
 }
 
 void SequentialCoreEventLog::flush(bool only_to_tail) {
-  if unlikely (!logfile)
-    return;
-  if unlikely (!logfile->ok())
-    return;
-  print(*logfile, only_to_tail);
+  print(only_to_tail);
   tail = start;
 }
 
-ostream& SequentialCoreEventLog::print(ostream& os, bool only_to_tail, W64 bbcount) {
-  if (tail >= end)
+void SequentialCoreEventLog::print(bool only_to_tail) {
+  if (!start)
+    return;
+
+  if (tail > end)
     tail = start;
   if (tail < start)
     tail = end;
-  size_t bufsize = end - start;
 
   SequentialCoreEvent* p = (only_to_tail) ? start : tail;
-
-  int limit = (only_to_tail ? (tail - start) : bufsize);
-
-  if (bbcount < std::numeric_limits<W64>::max()) {
-    limit = 0;
-    p = tail - 1;
-    if (p < start)
-      p = end - 1;
-    foreach (i, bufsize) {
-      limit++;
-      if unlikely (p->type == EVENT_EXECUTE_BB)
-        bbcount--;
-      if (!bbcount)
-        break;
-      p--;
-      if (p < start)
-        p = end - 1;
-    }
-  }
+  size_t bufsize = end - start;
+  size_t limit = (only_to_tail) ? (tail - start) : bufsize;
 
   if (!config.flush_event_log_every_cycle)
-    os << "#-------- Start of event log --------", endl;
+    logging::println(logging::INFO, "#-------- Start of event log --------");
 
   W64 cycle = std::numeric_limits<W64>::max();
   foreach (i, limit) {
@@ -595,23 +574,21 @@ ostream& SequentialCoreEventLog::print(ostream& os, bool only_to_tail, W64 bbcou
 
     if (p->type == EVENT_EXECUTE_BB) {
       foreach (i, 24)
-        os << "--------";
-      os << endl;
+        logging::print(logging::INFO, "--------");
+      logging::println(logging::INFO, "");
     }
 
     if unlikely (p->cycle != cycle) {
       cycle = p->cycle;
-      os << "Cycle ", cycle, ":", endl;
+      logging::println(logging::INFO, "Cycle {}:", cycle);
     }
 
-    p->print(os);
+    logging::print(logging::INFO, "{}", *p);
     p++;
   }
 
   if (!config.flush_event_log_every_cycle)
-    os << "#-------- End of event log --------", endl;
-
-  return os;
+    logging::println(logging::INFO, "#-------- End of event log --------");
 }
 
 static SequentialCoreEventLog eventlog;
@@ -651,28 +628,25 @@ struct SequentialCore {
 
   TransactionalMemory<MAX_STORES_IN_COMMIT_RECORD, 16> transactmem;
 
-  ostream& print_state(ostream& os) {
-    os << "General state:", endl;
-    os << "  RIP:                ", (void*)(Waddr)arf[REG_rip], endl;
-    os << "  Flags:              ", hexstring(arf[REG_flags], 16), " ", flagstring(arf[REG_flags]), endl;
-    os << "  UUID:               ", current_uuid, endl;
-    os << "  Bytes in macro-op:  ", bytes_in_current_insn, endl;
-    os << "  Uop in macro-op:    ", current_uop_in_macro_op, endl;
-    os << "Basic block state:", endl;
-    os << "  BBcache block:      ", current_basic_block, endl;
-    os << "  uop count in block: ", (current_basic_block) ? current_basic_block->count : 0, endl;
-    os << "Register state:       ", endl;
+  void print_state() {
+    logging::println("General state:");
+    logging::println("  RIP:                {}", (void*)(Waddr)arf[REG_rip]);
+    logging::println("  Flags:              {:04x} {}", arf[REG_flags], flagstring(arf[REG_flags]));
+    logging::println("  UUID:               {}", current_uuid);
+    logging::println("  Bytes in macro-op:  {}", bytes_in_current_insn);
+    logging::println("  Uop in macro-op:    {}", current_uop_in_macro_op);
+    logging::println("Basic block state:");
+    logging::println("  BBcache block:      {}", (void*)current_basic_block);
+    logging::println("  uop count in block: {}", ((current_basic_block) ? current_basic_block->count : 0));
+    logging::println("Register state:");
 
     static const int width = 4;
     foreach (i, TRANSREG_COUNT) {
-      stringbuf flagsb;
-      flagsb << flagstring(arflags[i]);
-      os << "    ", padstring(arch_reg_names[i], -6), " 0x", hexstring(arf[i], 64), "|", padstring(flagsb, -6), "  ";
+      std::string flagsb = std::format("{}", flagstring(arflags[i]));
+      logging::print("    {:<6} 0x{:016x}|{:<6}  ", arch_reg_names[i], arf[i], flagsb);
       if ((i % width) == (width - 1))
-        os << endl;
+        logging::println("");
     }
-
-    return os;
   }
 
   void reset_fetch(W64 realrip) {
@@ -918,8 +892,8 @@ struct SequentialCore {
       if unlikely (cmtrec) {
         data = transactmem.load(state.physaddr << 3);
       } else {
-        logfile << "[cycle ", sim_cycle, "] load from physaddr ", (void*)physaddr, " for virtaddr ", (void*)origaddr,
-            endl;
+        logging::println("[cycle {}] load from physaddr {} for virtaddr {}", sim_cycle, (void*)physaddr,
+                         (void*)origaddr);
         data = loadphys(physaddr);
       }
     }
@@ -1023,33 +997,29 @@ struct SequentialCore {
     int assistid = ctx.commitarf[REG_rip];
     assist_func_t assist = (assist_func_t)(Waddr)assistid_to_func[assistid];
 
-    if (logable(5)) {
-      logfile << "[vcpu ", ctx.vcpuid, "] Barrier (#", assistid, " -> ", (void*)assist, " ", assist_name(assist),
-          " called from ", (RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx)), "; return to ",
-          (void*)(Waddr)ctx.commitarf[REG_nextrip], ") at ", sim_cycle, " cycles, ", total_user_insns_committed,
-          " commits", endl, flush;
-    }
+    logging::println(
+        logging::DEBUG, "[vcpu {}] Barrier (#{} -> {} {}) called from {}; return to {}) at {} cycles, {} commits",
+        ctx.vcpuid, assistid, (void*)assist, assist_name(assist), (RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx)),
+        (void*)(Waddr)ctx.commitarf[REG_nextrip], sim_cycle, total_user_insns_committed);
+    logging::flush();
 
-    if (logable(6))
-      logfile << "Calling assist function at ", (void*)assist, "...", endl, flush;
+    logging::println(logging::TRACE, "Calling assist function at {}...", (void*)assist);
+    logging::flush();
 
     update_assist_stats(assist);
-    if (logable(6)) {
-      logfile << "Before assist:", endl, ctx, endl;
-    }
+    logging::println(logging::TRACE, "Before assist:");
+    logging::println(logging::TRACE, "{}", ctx);
 
     assist(ctx);
 
-    if (logable(6)) {
-      logfile << "Done with assist", endl;
-      logfile << "New state:", endl;
-      logfile << ctx;
-    }
+    logging::println(logging::TRACE, "Done with assist");
+    logging::println(logging::TRACE, "New state:");
+    logging::println(logging::TRACE, "{}", ctx);
 
     reset_fetch(ctx.commitarf[REG_rip]);
     external_to_core_state(ctx);
     if (requested_switch_to_native) {
-      logfile << "PTL call requested switch to native mode at rip ", (void*)(Waddr)ctx.commitarf[REG_rip], endl;
+      logging::println("PTL call requested switch to native mode at rip {}", (void*)(Waddr)ctx.commitarf[REG_rip]);
       return false;
     }
     return true;
@@ -1058,11 +1028,9 @@ struct SequentialCore {
   bool handle_exception() {
     core_to_external_state(ctx);
 
-    if (logable(4)) {
-      logfile << "PTL Exception ", exception_name(ctx.exception), " called from rip ",
-          (void*)(Waddr)ctx.commitarf[REG_rip], " at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits",
-          endl, flush;
-    }
+    logging::println(logging::INFO, "PTL Exception {} called from rip {} at {} cycles, {} commits", ctx.exception,
+                     (void*)(Waddr)ctx.commitarf[REG_rip], sim_cycle, total_user_insns_committed);
+    logging::flush();
 
     //
     // Map PTL internal hardware exceptions to their x86 equivalents,
@@ -1082,7 +1050,8 @@ struct SequentialCore {
       ctx.x86_exception = EXCEPTION_x86_fpu;
       break;
     default:
-      logfile << "Unsupported internal exception type ", exception_name(ctx.exception), endl, flush;
+      logging::println("Unsupported internal exception type {}", ctx.exception);
+      logging::flush();
       assert(false);
     }
 
@@ -1144,9 +1113,8 @@ struct SequentialCore {
 
     bool barrier = 0;
 
-    if (logable(5))
-      logfile << "[vcpu ", ctx.vcpuid, "] Sequentially executing basic block ", bb->rip, " (", bb->count,
-          " uops), insn limit ", insnlimit, endl;
+    logging::println(logging::DEBUG, "[vcpu {}] Sequentially executing basic block {} ({} uops), insn limit {}",
+                     ctx.vcpuid, W64(bb->rip), bb->count, insnlimit);
 
     if unlikely (config.event_log_enabled) {
       TransOp dummyuop;
@@ -1201,7 +1169,7 @@ struct SequentialCore {
       assert(uopindex < bb->count);
 
       if unlikely (uop.unaligned) {
-        // if (logable(6)) logfile << padstring("", 20), " fetch  rip 0x", (void*)(Waddr)arf[REG_rip], ": split unaligned load or store ", uop, endl;
+        logging::println(logging::INFO, "{:20} fetch  rip {}: split unaligned load or store {}", "", (void*)(Waddr)arf[REG_rip], uop);
         split_unaligned(uop, unaligned_ldst_buf);
         assert(unaligned_ldst_buf.get(uop, synthop));
       }
@@ -1230,7 +1198,7 @@ struct SequentialCore {
       // becomes visible after the store has committed.
       //
       if unlikely (smc_isdirty(rvp.mfnlo) | (smc_isdirty(rvp.mfnhi))) {
-        logfile << "Self-modifying code at rip ", rvp, " detected: mfn was dirty (invalidate and retry)", endl;
+        logging::println("Self-modifying code at rip {} detected: mfn was dirty (invalidate and retry)", rvp);
         bbcache.invalidate_page(rvp.mfnlo, INVALIDATE_REASON_SMC);
         if (rvp.mfnlo != rvp.mfnhi)
           bbcache.invalidate_page(rvp.mfnhi, INVALIDATE_REASON_SMC);
@@ -1421,10 +1389,11 @@ struct SequentialCore {
       barrier = isclass(uop.opcode, OPCLASS_BARRIER);
 
       if unlikely ((arf[REG_rip] == config.log_backwards_from_trigger_rip) && (config.event_log_enabled)) {
-        logfile << "Hit trigger rip ", (void*)(Waddr)config.log_backwards_from_trigger_rip,
-            "; printing event ring buffer:", endl, flush;
-        eventlog.print(logfile);
-        logfile << "End of triggered event dump", endl;
+        logging::println("Hit trigger rip {}; printing event ring buffer:",
+                         (void*)(Waddr)config.log_backwards_from_trigger_rip);
+        logging::flush();
+        eventlog.print();
+        logging::println("End of triggered event dump");
       }
 
       if likely (uop.eom) {
@@ -1460,12 +1429,10 @@ struct SequentialCore {
       uopindex += unaligned_ldst_buf.empty();
       current_uop_in_macro_op++;
 
-      if (logable(9)) {
-        if unlikely (br) {
-          core_to_external_state(ctx);
-          logfile << "Core State after branch:", endl;
-          logfile << ctx;
-        }
+      if unlikely (br) {
+        core_to_external_state(ctx);
+        logging::println(logging::VERBOSE, "Core State after branch:");
+        logging::println(logging::VERBOSE, "{}", ctx);
       }
     }
 
@@ -1547,12 +1514,12 @@ struct SequentialMachine : public PTLsimMachine {
   // is hit (as configured elsewhere in config).
   //
   virtual int run(PTLsimConfig& config) {
-    logfile << "Starting sequential core toplevel loop at ", sim_cycle, " cycles and ", total_user_insns_committed,
-        " commits", endl, flush;
+    logging::println("Starting sequential core toplevel loop at {} cycles and {} commits", sim_cycle,
+                     total_user_insns_committed);
+    logging::flush();
 
     if unlikely (config.event_log_enabled && (!eventlog.start)) {
       eventlog.init(config.event_log_ring_buffer_size);
-      eventlog.logfile = &logfile;
     }
 
     foreach (i, contextcount) {
@@ -1561,14 +1528,13 @@ struct SequentialMachine : public PTLsimMachine {
 
       core.external_to_core_state(ctx);
 
-      logfile << "VCPU ", i, " initial state:", endl;
-      logfile << ctx, endl;
+      logging::println("VCPU {} initial state:", i);
+      logging::println("{}", ctx);
     }
 
     bool exiting = false;
 
-    //logfile << "Current logenable = ", logenable, ", start_log_at_iteration = ", config.start_log_at_iteration, ", loglevel ", config.loglevel, endl;
-    // assert(logable(1));
+    logging::println(logging::INFO, "Current logenable = {}, start_log_at_iteration = {}, loglevel {}", logenable, config.start_log_at_iteration, config.loglevel);
 
     for (;;) {
       if unlikely (iterations >= config.start_log_at_iteration)
@@ -1587,9 +1553,8 @@ struct SequentialMachine : public PTLsimMachine {
       exiting |= check_for_async_sim_break();
 
       if unlikely (config.event_log_enabled) {
-        if unlikely (config.flush_event_log_every_cycle) {
+        if unlikely (config.flush_event_log_every_cycle)
           eventlog.flush(true);
-        }
       }
 
       iterations++;
@@ -1614,23 +1579,20 @@ struct SequentialMachine : public PTLsimMachine {
 
       core.core_to_external_state(ctx);
 
-      if (logable(9)) {
-        logfile << "Core State at end:", endl;
-        logfile << ctx;
-      }
+      logging::println(logging::VERBOSE, "Core State at end:");
+      logging::println(logging::VERBOSE, "{}", ctx);
     }
 
     return exiting;
   }
 
-  virtual void dump_state(ostream& os) {
-    os << "Dumping event log for sequential core:", endl;
-    eventlog.print(os);
+  virtual void dump_state() {
+    logging::println("Dumping event log for sequential core:");
+    eventlog.print();
 
     foreach (i, contextcount) {
       SequentialCore& core = *cores[i];
-      Context& ctx = contextof(i);
-      // core.print_state(os);
+      core.print_state();
     }
   }
 
@@ -1649,10 +1611,11 @@ struct SequentialMachine : public PTLsimMachine {
 SequentialMachine seqmodel("seq");
 
 
-ostream& CommitRecord::print(ostream& os) const {
-  os << "CommitRecord: ", store_count, " stores, ", pte_update_count, " PTE updates", endl;
-  foreach (i, store_count) {
-    os << "  Store ", intstring(i, 3), ": ", stores[i], endl;
+auto std::formatter<CommitRecord>::format(const CommitRecord& cr, std::format_context& ctx) const {
+  auto out = ctx.out();
+  out = std::format_to(out, "CommitRecord: {} stores, {} PTE updates\n", cr.store_count, cr.pte_update_count);
+  foreach (i, cr.store_count) {
+    out = std::format_to(out, "  Store {:>3}: {}\n", i, cr.stores[i]);
   }
-  return os;
+  return out;
 }

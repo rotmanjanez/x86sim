@@ -30,15 +30,13 @@ void AddressSpace::make_accessible(void* p, Waddr size, spat_t top) {
   Waddr address = lowbits((Waddr)p, ADDRESS_SPACE_BITS);
   Waddr firstpage = (Waddr)address >> log2(PAGE_SIZE);
   Waddr lastpage = ((Waddr)address + size - 1) >> log2(PAGE_SIZE);
-  if (logable(1)) {
-    logfile << "SPT: Making byte range ", (void*)(firstpage << log2(PAGE_SIZE)), " to ",
-        (void*)(lastpage << log2(PAGE_SIZE)), " (size ", size, ") accessible for ",
-        ((top == readmap)    ? "read"
-         : (top == writemap) ? "write"
-         : (top == execmap)  ? "exec"
-                             : "UNKNOWN"),
-        endl, flush;
-  }
+  logging::println("SPT: Making byte range {} to {} (size {}) accessible for {}", (void*)(firstpage << log2(PAGE_SIZE)),
+                   (void*)(lastpage << log2(PAGE_SIZE)), size,
+                   ((top == readmap)    ? "read"
+                    : (top == writemap) ? "write"
+                    : (top == execmap)  ? "exec"
+                                        : "UNKNOWN"));
+  logging::flush();
   assert(ceil((W64)address + size, PAGE_SIZE) <= ADDRESS_SPACE_SIZE);
   for (W64 i = firstpage; i <= lastpage; i++) {
     setbit(pageid_to_map_byte(top, i), lowbits(i, 3));
@@ -49,15 +47,15 @@ void AddressSpace::make_inaccessible(void* p, Waddr size, spat_t top) {
   Waddr address = lowbits((Waddr)p, ADDRESS_SPACE_BITS);
   Waddr firstpage = (Waddr)address >> log2(PAGE_SIZE);
   Waddr lastpage = ((Waddr)address + size - 1) >> log2(PAGE_SIZE);
-  if (logable(1)) {
-    logfile << "SPT: Making byte range ", (void*)(firstpage << log2(PAGE_SIZE)), " to ",
-        (void*)(lastpage << log2(PAGE_SIZE)), " (size ", size, ") inaccessible for ",
-        ((top == readmap)    ? "read"
-         : (top == writemap) ? "write"
-         : (top == execmap)  ? "exec"
-                             : "UNKNOWN"),
-        endl, flush;
-  }
+
+  logging::println("SPT: Making byte range {} to {} (size {}) inaccessible for {}",
+                   (void*)(firstpage << log2(PAGE_SIZE)), (void*)(lastpage << log2(PAGE_SIZE)), size,
+                   ((top == readmap)    ? "read"
+                    : (top == writemap) ? "write"
+                    : (top == execmap)  ? "exec"
+                                        : "UNKNOWN"));
+  logging::flush();
+
   assert(ceil((W64)address + size, PAGE_SIZE) <= ADDRESS_SPACE_SIZE);
   for (Waddr i = firstpage; i <= lastpage; i++) {
     clearbit(pageid_to_map_byte(top, i), lowbits(i, 3));
@@ -102,16 +100,9 @@ void AddressSpace::reset() {
 }
 
 void AddressSpace::setattr(void* start, Waddr length, int prot) {
-  //
-  // Check first if it's been assigned a non-stdin (> 0) filehandle,
-  // since this may get called from ptlsim_preinit_entry before streams
-  // have been set up.
-  //
-  if (logfile.filehandle() > 0) {
-    logfile << "setattr: region ", start, " to ", (void*)((char*)start + length), " (", length >> 10,
-        " KB) has user-visible attributes ", ((prot & PROT_READ) ? 'r' : '-'), ((prot & PROT_WRITE) ? 'w' : '-'),
-        ((prot & PROT_EXEC) ? 'x' : '-'), endl;
-  }
+  logging::println("setattr: region {} to {} ({} KB) has user-visible attributes {}{}{}", start,
+                   (void*)((char*)start + length), length >> 10, ((prot & PROT_READ) ? 'r' : '-'),
+                   ((prot & PROT_WRITE) ? 'w' : '-'), ((prot & PROT_EXEC) ? 'x' : '-'));
 
   if (prot & PROT_READ)
     allow_read(start, length);

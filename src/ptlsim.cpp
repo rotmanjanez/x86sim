@@ -5,14 +5,15 @@
 // Copyright 2000-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
+#include <string>
 #include <unordered_map>
+#include <fcntl.h>
 #include "globals.h"
 #include "ptlsim.h"
+#include "logging.h"
 #define CPT_STATS
 #include "stats.h"
 #undef CPT_STATS
-
-#include <elf.h>
 
 #ifndef CONFIG_ONLY
 //
@@ -22,7 +23,6 @@ PTLsimConfig config;
 ConfigurationParser<PTLsimConfig> configparser;
 PTLsimStats stats;
 
-ostream logfile;
 bool logenable = 0;
 W64 sim_cycle = 0;
 W64 unhalted_cycle_count = 0;
@@ -42,7 +42,7 @@ void PTLsimConfig::reset() {
   log_on_console = 0;
   log_ptlsim_boot = 0;
   log_buffer_size = 524288;
-  mm_logfile.reset();
+  mm_logfile.clear();
   mm_log_buffer_size = 16384;
   enable_inline_mm_logging = 0;
   enable_mm_validate = 0;
@@ -61,7 +61,7 @@ void PTLsimConfig::reset() {
   perfect_cache = 0;
   static_branchpred = 0;
 
-  bbcache_dump_filename.reset();
+  bbcache_dump_filename.clear();
 }
 
 template<>
@@ -116,113 +116,81 @@ void ConfigurationParser<PTLsimConfig>::setup() {
 
 #ifndef CONFIG_ONLY
 
-ostream& operator<<(ostream& os, const PTLsimConfig& config) {
-  return configparser.print(os, config);
-}
-
-void print_banner(ostream& os, const PTLsimStats& stats, int argc, char** argv) {
-  utsname hostinfo;
-  sys_uname(&hostinfo);
-
-  os << "//  ", endl;
-#ifdef PTLSIM_AMD64
-  os << "//  PTLsim: Cycle Accurate x86-64 Simulator", endl;
-#else
-  os << "//  PTLsim: Cycle Accurate x86 Simulator (32-bit version)", endl;
-#endif
-  os << "//  Copyright 1999-2007 Matt T. Yourst <yourst@yourst.com>", endl;
-  os << "// ", endl;
-  os << "//  Revision ", stringify(SVNREV), " (", stringify(SVNDATE), ")", endl;
-  os << "//  Built ", __DATE__, " ", __TIME__, " on ", stringify(BUILDHOST), " using gcc-", stringify(__GNUC__), ".",
-      stringify(__GNUC_MINOR__), endl;
-  os << "//  Running on ", hostinfo.nodename, ".", hostinfo.domainname, endl;
-  os << "//  ", endl;
-  os << "//  Arguments: ";
-  foreach (i, argc) {
-    os << argv[i];
-    if (i != (argc - 1))
-      os << ' ';
-  }
-  os << endl;
-  os << endl;
-  os << flush;
-}
-
 void collect_common_sysinfo(PTLsimStats& stats) {
   utsname hostinfo;
   sys_uname(&hostinfo);
 
-  stringbuf sb;
 #define strput(x, y) (strncpy((x), (y), sizeof(x)))
 
-  sb.reset();
-  sb << __DATE__, " ", __TIME__;
-  strput(stats.simulator.version.build_timestamp, sb);
+  std::string build_ts = std::format("{} {}", __DATE__, __TIME__);
+  strput(stats.simulator.version.build_timestamp, build_ts.c_str());
   stats.simulator.version.svn_revision = SVNREV;
   strput(stats.simulator.version.svn_timestamp, stringify(SVNDATE));
   strput(stats.simulator.version.build_hostname, stringify(BUILDHOST));
-  sb.reset();
-  sb << "gcc-", __GNUC__, ".", __GNUC_MINOR__;
-  strput(stats.simulator.version.build_compiler, sb);
+  std::string compiler = std::format("gcc-{}.{}", __GNUC__, __GNUC_MINOR__);
+  strput(stats.simulator.version.build_compiler, compiler.c_str());
 
   stats.simulator.run.timestamp = sys_time(0);
-  sb.reset();
-  sb << hostinfo.nodename, ".", hostinfo.domainname;
-  strput(stats.simulator.run.hostname, sb);
+  std::string hostname = std::format("{}-{} ({})", hostinfo.nodename, hostinfo.sysname, hostinfo.machine);
+  strput(stats.simulator.run.hostname, hostname.c_str());
   strput(stats.simulator.run.kernel_version, hostinfo.release);
 }
 
 void print_usage(int argc, char** argv) {
-  cerr << "Syntax: ptlsim <executable> <arguments...>", endl;
-  cerr << "All other options come from file /home/<username>/.ptlsim/path/to/executable", endl, endl;
-
-  configparser.printusage(cerr, config);
+  logging::eprintln("Syntax: ptlsim <executable> <arguments...>");
+  logging::eprintln("All other options come from file /home/<username>/.ptlsim/path/to/executable");
+  logging::eprintln("");
+  logging::eprint("{}", configparser.options.format_to_string_usage(&config));
 }
 
-stringbuf current_stats_filename;
-stringbuf current_log_filename;
-stringbuf current_bbcache_dump_filename;
+std::string current_stats_filename;
+std::string current_log_filename;
+std::string current_bbcache_dump_filename;
 
 void backup_and_reopen_logfile() {
-  if (config.log_filename) {
-    if (logfile)
-      logfile.close();
-    stringbuf oldname;
-    oldname << config.log_filename, ".backup";
-    sys_unlink(oldname);
-    sys_rename(config.log_filename, oldname);
-    logfile.open(config.log_filename);
+  if (!config.log_filename.empty()) {
+    // Close existing log
+    logging::flush();
+
+    // Backup old log file
+    std::string oldname = std::format("{}.backup", config.log_filename);
+    sys_unlink(oldname.c_str());
+    sys_rename(config.log_filename.c_str(), oldname.c_str());
+
+    // Open new log file
+    logging::set_file_sink(config.log_filename.c_str());
   }
 }
 
 void force_logging_enabled() {
   logenable = 1;
   config.start_log_at_iteration = 0;
-  config.loglevel = 99;
+  config.loglevel = static_cast<int>(logging::Level::VERBOSE); // Maximum verbosity
+  logging::set_level(logging::VERBOSE);
   config.flush_event_log_every_cycle = 1;
 }
 
-void print_sysinfo(ostream& os);
+void print_sysinfo();
 
 bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
   static bool first_time = true;
 
-  if (config.log_filename.set() && (config.log_filename != current_log_filename)) {
+  if (!config.log_filename.empty() && (config.log_filename != current_log_filename)) {
     // Can also use "-logfile /dev/fd/1" to send to stdout (or /dev/fd/2 for stderr):
     backup_and_reopen_logfile();
     current_log_filename = config.log_filename;
   }
 
-  logfile.setchain((config.log_on_console) ? &cout : null);
-
-  logfile.setbuf(config.log_buffer_size);
+  // Set log level in the new logging system
+  logging::set_level(static_cast<int>(config.loglevel));
 
   if ((config.loglevel > 0) & (config.start_log_at_rip == INVALIDRIP) & (config.start_log_at_iteration == infinity)) {
     config.start_log_at_iteration = 0;
   }
 
-  // Force printing every cycle if loglevel >= 6:
-  if (config.loglevel >= 6) {
+  // Force printing every cycle if loglevel <= TRACE (5):
+  // (Note: new system has inverted semantics - lower numbers = more verbose)
+  if (config.loglevel <= static_cast<int>(logging::Level::TRACE)) {
     config.event_log_enabled = 1;
     config.flush_event_log_every_cycle = 1;
   }
@@ -240,9 +208,14 @@ bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
 
   logenable = 1;
 
-  if (config.bbcache_dump_filename.set() && (config.bbcache_dump_filename != current_bbcache_dump_filename)) {
+  if (!config.bbcache_dump_filename.empty() && (config.bbcache_dump_filename != current_bbcache_dump_filename)) {
     // Can also use "-logfile /dev/fd/1" to send to stdout (or /dev/fd/2 for stderr):
-    bbcache_dump_file.open(config.bbcache_dump_filename);
+    if (bbcache_dump_fd >= 0)
+      sys_close(bbcache_dump_fd);
+    bbcache_dump_fd = sys_open(config.bbcache_dump_filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (bbcache_dump_fd < 0) {
+      logging::println(logging::WARNING, "Cannot open bb dump file '{}'", config.bbcache_dump_filename);
+    }
     current_bbcache_dump_filename = config.bbcache_dump_filename;
   }
 
@@ -255,14 +228,10 @@ bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
 
   if (first_time) {
     if (!config.quiet) {
-      print_banner(cerr, stats, argc, argv);
-      print_sysinfo(cerr);
+      logging::eprint("{}", PTLsimBanner{argc, argv});
+      print_sysinfo();
     }
-    print_banner(logfile, stats, argc, argv);
-    print_sysinfo(logfile);
-    cerr << flush;
-    logfile << config;
-    logfile.flush();
+    logging::println(logging::INFO, "{}", config);
     first_time = false;
   }
 
@@ -287,9 +256,6 @@ void PTLsimMachine::reset() {
 void PTLsimMachine::update_stats(PTLsimStats& stats) {
   return;
 }
-void PTLsimMachine::dump_state(ostream& os) {
-  return;
-}
 void PTLsimMachine::flush_tlb(Context& ctx) {
   return;
 }
@@ -297,11 +263,11 @@ void PTLsimMachine::flush_tlb_virt(Context& ctx, Waddr virtaddr) {
   return;
 }
 
-void PTLsimMachine::addmachine(const char* name, PTLsimMachine* machine) {
-  machinetable.emplace(name, machine);
+void PTLsimMachine::addmachine(std::string&& name, PTLsimMachine* machine) {
+  machinetable.emplace(std::move(name), machine);
 }
 
-PTLsimMachine* PTLsimMachine::getmachine(const char* name) {
+PTLsimMachine* PTLsimMachine::getmachine(const std::string& name) {
   auto it = machinetable.find(name);
   if (it == machinetable.end())
     return nullptr;
@@ -326,9 +292,9 @@ void simulateInitializedMachine(PTLsimMachine& machine) {
   current_machine = null;
 }
 
-bool ensureMachineInitialized(PTLsimMachine& m, const char* machinename) {
+bool ensureMachineInitialized(PTLsimMachine& m, const std::string& machinename) {
   if (!m.initialized) {
-    logfile << "Initializing core '", machinename, "'", endl;
+    logging::println("Initializing core '{}'", machinename);
     if (!m.init(config)) {
       return 1;
     }
@@ -337,32 +303,29 @@ bool ensureMachineInitialized(PTLsimMachine& m, const char* machinename) {
   return 0;
 }
 
-bool simulate(const char* machinename) {
+bool simulate(const std::string& machinename) {
   PTLsimMachine* machine = PTLsimMachine::getmachine(machinename);
 
   if (!machine) {
-    logfile << "Cannot find core named '", machinename, "'", endl;
-    cerr << "Cannot find core named '", machinename, "'", endl;
+    logging::println(logging::ERROR, "Cannot find core named '{}'", machinename);
     return 0;
   }
 
   if (ensureMachineInitialized(*machine, machinename)) {
-    logfile << "Cannot initialize core model; check its configuration!", endl;
+    logging::println(logging::ERROR, "Cannot initialize core model; check its configuration!");
     return 0;
   }
 
-  logfile << "Switching to simulation core '", machinename, "'...", endl, flush;
-  cerr << "Switching to simulation core '", machinename, "'...", endl, flush;
-  logfile << "Stopping after ", config.stop_at_user_insns, " commits", endl, flush;
-  cerr << "Stopping after ", config.stop_at_user_insns, " commits", endl, flush;
+  logging::println(logging::INFO, "Switching to simulation core '{}'...", machinename);
+  logging::flush();
+  logging::eprintln("Switching to simulation core '{}'...", machinename);
+  logging::println(logging::INFO, "Stopping after {} commits", config.stop_at_user_insns);
+  logging::flush();
 
   simulateInitializedMachine(*machine);
 
-  stringbuf sb;
-  sb << endl, "Stopped after ", sim_cycle, " cycles, ", total_user_insns_committed, " instructions", endl;
-
-  logfile << sb, flush;
-  cerr << sb, flush;
+  logging::println(logging::INFO, "Stopped after {} cycles, {} instructions", sim_cycle, total_user_insns_committed);
+  logging::flush();
 
   return 0;
 }

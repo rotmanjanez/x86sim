@@ -12,6 +12,8 @@
 #include "globals.h"
 #include "superstl.h"
 
+using namespace superstl;
+
 //
 // Queue
 //
@@ -162,22 +164,24 @@ struct FixedQueue : public std::array<T, SIZE> {
     index = add_index_modulo(head, index, SIZE);
     return (*this)[index];
   }
-
-  ostream& print(ostream& os) const {
-    os << "Queue<", SIZE, ">: head ", head, " to tail ", tail, " (", count, " entries):", endl;
-    foreach_forward((*this), i) {
-      const T& entry = (*this)[i];
-      os << "  slot ", intstring(i, 3), ": ", entry, endl;
-    }
-
-    return os;
-  }
 };
 
 template<class T, int SIZE>
-ostream& operator<<(ostream& os, FixedQueue<T, SIZE>& queue) {
-  return queue.print(os);
-}
+struct std::formatter<FixedQueue<T, SIZE>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const FixedQueue<T, SIZE>& q, std::format_context& ctx) const {
+    auto out = ctx.out();
+    out = std::format_to(out, "Queue<{}>: head {} to tail {} ({} entries):\n", SIZE, q.head, q.tail, q.count);
+
+    for (int i = q.head; i != q.tail; i = add_index_modulo(i, +1, SIZE)) {
+      const T& entry = q[i];
+      out = std::format_to(out, "  slot {:>3}: {}\n", i, entry);
+    }
+
+    return out;
+  }
+};
 
 template<class T, int SIZE>
 struct Queue : public FixedQueue<T, SIZE> {
@@ -200,16 +204,10 @@ struct Queue : public FixedQueue<T, SIZE> {
   }
 };
 
-template<class T, int size>
-ostream& operator<<(ostream& os, Queue<T, size>& queue) {
-  os << "Queue<", size, "]: head ", queue.head, " to tail ", queue.tail, " (", queue.count, " entries):", endl;
-  foreach_forward(queue, i) {
-    const T& entry = queue[i];
-    os << "  ", entry, endl;
-  }
-
-  return os;
-}
+template<class T, int Size>
+struct std::formatter<Queue<T, Size>> : std::formatter<FixedQueue<T, Size>> {
+  // Inherits parse and format from FixedQueue formatter
+};
 
 //
 // Fully Associative Arrays
@@ -332,43 +330,29 @@ struct FullyAssociativeTags {
   T& operator[](int index) { return tags[index]; }
   int operator()(T target) { return probe(target); }
 
-  stringbuf& printway(stringbuf& os, int i) const {
-    os << "  way ", intstring(i, -2), ": ";
-    if (tags[i] != INVALID) {
-      os << "tag 0x", hexstring(tags[i], sizeof(T) * 8);
-      if (evictmap[i])
-        os << " (MRU)";
-    } else {
-      os << "<invalid>";
-    }
-    return os;
-  }
-
-  stringbuf& print(stringbuf& os) const {
-    foreach (i, ways) {
-      printway(os, i);
-      os << endl;
-    }
-    return os;
-  }
-
-  ostream& print(ostream& os) const {
-    stringbuf sb;
-    print(sb);
-    os << sb;
-    return os;
-  }
 };
 
 template<typename T, int ways>
-ostream& operator<<(ostream& os, const FullyAssociativeTags<T, ways>& tags) {
-  return tags.print(os);
-}
+struct std::formatter<FullyAssociativeTags<T, ways>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-template<typename T, int ways>
-stringbuf& operator<<(stringbuf& sb, const FullyAssociativeTags<T, ways>& tags) {
-  return tags.print(sb);
-}
+  auto format(const FullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < ways; i++) {
+      out = std::format_to(out, "  way {:<2}: ", i);
+      if (tags[i] != tags.INVALID) {
+        out = std::format_to(out, "tag 0x{}", hexstring(tags[i], sizeof(T) * 8));
+        if (tags.evictmap[i])
+          out = std::format_to(out, " (MRU)");
+      } else {
+        out = std::format_to(out, "<invalid>");
+      }
+      out = std::format_to(out, "\n");
+    }
+    return out;
+  }
+};
+
 
 //
 // Associative array implemented using vectorized
@@ -485,7 +469,7 @@ struct FullyAssociativeTagsNbitOneHot {
     }
 
     inline ref& operator=(const ref& other) {
-      tags.update(index, other.tagsmirror[other.index]);
+      tags.update(index, other.tags[other.index]);
       return *this;
     }
   };
@@ -580,33 +564,31 @@ struct FullyAssociativeTagsNbitOneHot {
     return select(target, dummy);
   }
 
-  ostream& printid(ostream& os, int slot) const {
+  std::string slotid(int slot) const {
     base_t tag = (*this)[slot];
-    os << intstring(slot, 3), ": ";
-    os << hexstring(tag, 64);
-    os << " ";
-    foreach (i, slices) {
+    std::string result = std::format("{:>3}: {:016x} ", slot, tag);
+    for (int i = 0; i < slices; i++) {
       const byte b = *(((byte*)(&tags[i])) + slot);
-      os << " ", hexstring(b, 8);
+      result += std::format(" {:02x}", b);
     }
     if (!valid[slot])
-      os << " <invalid>";
-    return os;
-  }
-
-  ostream& print(ostream& os) const {
-    foreach (i, size) {
-      printid(os, i);
-      os << endl;
-    }
-    return os;
+      result += " <invalid>";
+    return result;
   }
 };
 
-template<int size, int width, int padsize>
-ostream& operator<<(ostream& os, const FullyAssociativeTagsNbitOneHot<size, width, padsize>& tags) {
-  return tags.print(os);
-}
+template<int Size, int Width, int PadSize>
+struct std::formatter<FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>& tags, std::format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < Size; i++) {
+      out = std::format_to(out, "{}\n", tags.slotid(i));
+    }
+    return out;
+  }
+};
 
 template<typename T, typename V>
 struct NullAssociativeArrayStatisticsCollector {
@@ -693,23 +675,29 @@ struct FullyAssociativeArray {
   V& operator[](int way) { return data[way]; }
 
   V* operator()(T tag) { return select(tag); }
-
-  ostream& print(ostream& os) const {
-    foreach (i, ways) {
-      stringbuf sb;
-      tags.printway(sb, i);
-      os << padstring(sb, -40), " -> ";
-      data[i].print(os, tags.tags[i]);
-      os << endl;
-    }
-    return os;
-  }
 };
 
-template<typename T, typename V, int ways>
-ostream& operator<<(ostream& os, const FullyAssociativeArray<T, V, ways>& assoc) {
-  return assoc.print(os);
-}
+template<typename T, typename V, int ways, typename stats>
+struct std::formatter<FullyAssociativeArray<T, V, ways, stats>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const FullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < ways; i++) {
+      std::string waystr = std::format("  way {:<2}: ", i);
+      if (arr.tags[i] != arr.tags.INVALID) {
+        waystr += std::format("tag 0x{}", hexstring(arr.tags[i], sizeof(T) * 8));
+        if (arr.tags.evictmap[i])
+          waystr += " (MRU)";
+      } else {
+        waystr += "<invalid>";
+      }
+      out = std::format_to(out, "{:<40} -> ", waystr);
+      out = std::format_to(out, "{}\n", arr.data[i]);
+    }
+    return out;
+  }
+};
 
 template<typename T, typename V, int setcount, int waycount, int linesize,
          typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
@@ -739,21 +727,22 @@ struct AssociativeArray {
   }
 
   void invalidate(T addr) { sets[setof(addr)].invalidate(tagof(addr)); }
-
-  ostream& print(ostream& os) const {
-    os << "AssociativeArray<", setcount, " sets, ", waycount, " ways, ", linesize, "-byte lines>:", endl;
-    foreach (set, setcount) {
-      os << "  Set ", set, ":", endl;
-      os << sets[set];
-    }
-    return os;
-  }
 };
 
-template<typename T, typename V, int size, int ways, int linesize>
-ostream& operator<<(ostream& os, const AssociativeArray<T, V, size, ways, linesize>& aa) {
-  return aa.print(os);
-}
+template<typename T, typename V, int setcount, int waycount, int linesize, typename stats>
+struct std::formatter<AssociativeArray<T, V, setcount, waycount, linesize, stats>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const AssociativeArray<T, V, setcount, waycount, linesize, stats>& arr, std::format_context& ctx) const {
+    auto out = ctx.out();
+    out = std::format_to(out, "AssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount, linesize);
+    for (int set = 0; set < setcount; set++) {
+      out = std::format_to(out, "  Set {}:\n", set);
+      out = std::format_to(out, "{}", arr.sets[set]);
+    }
+    return out;
+  }
+};
 
 //
 // Lockable version of associative arrays:
@@ -876,45 +865,30 @@ struct LockableFullyAssociativeTags {
   T& operator[](int index) { return tags[index]; }
   int operator()(T target) { return probe(target); }
 
-  stringbuf& printway(stringbuf& os, int i) const {
-    os << "  way ", intstring(i, -2), ": ";
-    if (tags[i] != INVALID) {
-      os << "tag 0x", hexstring(tags[i], sizeof(T) * 8);
-      if (evictmap[i])
-        os << " (MRU)";
-      if (!unlockedmap[i])
-        os << " (locked)";
-    } else {
-      os << "<invalid>";
-    }
-    return os;
-  }
-
-  stringbuf& print(stringbuf& os) const {
-    foreach (i, ways) {
-      printway(os, i);
-      os << endl;
-    }
-    return os;
-  }
-
-  ostream& print(ostream& os) const {
-    stringbuf sb;
-    print(sb);
-    os << sb;
-    return os;
-  }
 };
 
 template<typename T, int ways>
-ostream& operator<<(ostream& os, const LockableFullyAssociativeTags<T, ways>& tags) {
-  return tags.print(os);
-}
+struct std::formatter<LockableFullyAssociativeTags<T, ways>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-template<typename T, int ways>
-stringbuf& operator<<(stringbuf& sb, const LockableFullyAssociativeTags<T, ways>& tags) {
-  return tags.print(sb);
-}
+  auto format(const LockableFullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < ways; i++) {
+      out = std::format_to(out, "  way {:<2}: ", i);
+      if (tags[i] != tags.INVALID) {
+        out = std::format_to(out, "tag 0x{}", hexstring(tags[i], sizeof(T) * 8));
+        if (tags.evictmap[i])
+          out = std::format_to(out, " (MRU)");
+        if (!tags.unlockedmap[i])
+          out = std::format_to(out, " (locked)");
+      } else {
+        out = std::format_to(out, "<invalid>");
+      }
+      out = std::format_to(out, "\n");
+    }
+    return out;
+  }
+};
 
 template<typename T, typename V, int ways, typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
 struct LockableFullyAssociativeArray {
@@ -1046,23 +1020,31 @@ struct LockableFullyAssociativeArray {
   V& operator[](int way) { return data[way]; }
 
   V* operator()(T tag) { return select(tag); }
-
-  ostream& print(ostream& os) const {
-    foreach (i, ways) {
-      stringbuf sb;
-      tags.printway(sb, i);
-      os << padstring(sb, -40), " -> ";
-      data[i].print(os, tags.tags[i]);
-      os << endl;
-    }
-    return os;
-  }
 };
 
-template<typename T, typename V, int ways>
-ostream& operator<<(ostream& os, const LockableFullyAssociativeArray<T, V, ways>& assoc) {
-  return assoc.print(os);
-}
+template<typename T, typename V, int ways, typename stats>
+struct std::formatter<LockableFullyAssociativeArray<T, V, ways, stats>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const LockableFullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < ways; i++) {
+      std::string waystr = std::format("  way {:<2}: ", i);
+      if (arr.tags[i] != arr.tags.INVALID) {
+        waystr += std::format("tag 0x{}", hexstring(arr.tags[i], sizeof(T) * 8));
+        if (arr.tags.evictmap[i])
+          waystr += " (MRU)";
+        if (!arr.tags.unlockedmap[i])
+          waystr += " (locked)";
+      } else {
+        waystr += "<invalid>";
+      }
+      out = std::format_to(out, "{:<40} -> ", waystr);
+      out = std::format_to(out, "{}\n", arr.data[i]);
+    }
+    return out;
+  }
+};
 
 template<typename T, typename V, int setcount, int waycount, int linesize,
          typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
@@ -1107,21 +1089,24 @@ struct LockableAssociativeArray {
     bool dummy;
     return select_and_lock(addr, dummy);
   }
-
-  ostream& print(ostream& os) const {
-    os << "LockableAssociativeArray<", setcount, " sets, ", waycount, " ways, ", linesize, "-byte lines>:", endl;
-    foreach (set, setcount) {
-      os << "  Set ", set, ":", endl;
-      os << sets[set];
-    }
-    return os;
-  }
 };
 
-template<typename T, typename V, int size, int ways, int linesize>
-ostream& operator<<(ostream& os, const LockableAssociativeArray<T, V, size, ways, linesize>& aa) {
-  return aa.print(os);
-}
+template<typename T, typename V, int setcount, int waycount, int linesize, typename stats>
+struct std::formatter<LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>& arr,
+              std::format_context& ctx) const {
+    auto out = ctx.out();
+    out = std::format_to(out, "LockableAssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount,
+                         linesize);
+    for (int set = 0; set < setcount; set++) {
+      out = std::format_to(out, "  Set {}:\n", set);
+      out = std::format_to(out, "{}", arr.sets[set]);
+    }
+    return out;
+  }
+};
 
 template<int size, int padsize = 0>
 struct FullyAssociativeTags8bit {
@@ -1249,28 +1234,27 @@ struct FullyAssociativeTags8bit {
     }
   }
 
-  ostream& printid(ostream& os, int slot) const {
+  std::string slotid(int slot) const {
     int tag = (*this)[slot];
     if (valid[slot])
-      os << intstring(tag, 3);
+      return std::format("{:>3}", tag);
     else
-      os << "???";
-    return os;
-  }
-
-  ostream& print(ostream& os) const {
-    foreach (i, size) {
-      printid(os, i);
-      os << " ";
-    }
-    return os;
+      return "???";
   }
 };
 
-template<int size, int padsize>
-ostream& operator<<(ostream& os, const FullyAssociativeTags8bit<size, padsize>& tags) {
-  return tags.print(os);
-}
+template<int Size, int PadSize>
+struct std::formatter<FullyAssociativeTags8bit<Size, PadSize>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const FullyAssociativeTags8bit<Size, PadSize>& tags, std::format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < Size; i++) {
+      out = std::format_to(out, "{} ", tags.slotid(i));
+    }
+    return out;
+  }
+};
 
 template<int size, int padsize = 0>
 struct FullyAssociativeTags16bit {
@@ -1398,27 +1382,26 @@ struct FullyAssociativeTags16bit {
     }
   }
 
-  ostream& printid(ostream& os, int slot) const {
+  std::string slotid(int slot) const {
     int tag = (*this)[slot];
     if (valid[slot])
-      os << intstring(tag, 3);
+      return std::format("{:>3}", tag);
     else
-      os << "???";
-    return os;
-  }
-
-  ostream& print(ostream& os) const {
-    foreach (i, size) {
-      printid(os, i);
-      os << " ";
-    }
-    return os;
+      return "???";
   }
 };
 
-template<int size, int padsize>
-ostream& operator<<(ostream& os, const FullyAssociativeTags16bit<size, padsize>& tags) {
-  return tags.print(os);
-}
+template<int Size, int PadSize>
+struct std::formatter<FullyAssociativeTags16bit<Size, PadSize>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const FullyAssociativeTags16bit<Size, PadSize>& tags, std::format_context& ctx) const {
+    auto out = ctx.out();
+    for (int i = 0; i < Size; i++) {
+      out = std::format_to(out, "{} ", tags.slotid(i));
+    }
+    return out;
+  }
+};
 
 #endif // _LOGIC_H_

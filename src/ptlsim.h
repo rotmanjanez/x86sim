@@ -14,6 +14,7 @@
 #include "ptlsim-api.h"
 #include "ptlhwdef.h"
 #include "config.h"
+#include "logging.h"
 
 extern W64 sim_cycle;
 extern W64 unhalted_cycle_count;
@@ -21,8 +22,6 @@ extern W64 total_uops_committed;
 extern W64 total_user_insns_committed;
 
 void user_process_terminated(int rc);
-
-ostream& print_user_context(ostream& os, const UserContext& ctx, int width = 4);
 
 static const int MAX_TRANSOP_BUFFER_SIZE = 4;
 
@@ -36,11 +35,10 @@ struct PTLsimMachine {
   virtual int run(PTLsimConfig& config);
   virtual void reset();
   virtual void update_stats(PTLsimStats& stats);
-  virtual void dump_state(ostream& os);
   virtual void flush_tlb(Context& ctx);
   virtual void flush_tlb_virt(Context& ctx, Waddr virtaddr);
-  static void addmachine(const char* name, PTLsimMachine* machine);
-  static PTLsimMachine* getmachine(const char* name);
+  static void addmachine(std::string&& name, PTLsimMachine* machine);
+  static PTLsimMachine* getmachine(const std::string& name);
   static PTLsimMachine* getcurrent();
 };
 
@@ -80,14 +78,19 @@ void split_unaligned(const TransOp& transop, TransOpBuffer& buf);
 bool handle_config_change(PTLsimConfig& config, int argc = 0, char** argv = null);
 void collect_common_sysinfo(PTLsimStats& stats);
 void collect_sysinfo(PTLsimStats& stats, int argc, char** argv);
-void print_sysinfo(ostream& os);
+void print_sysinfo();
 void backup_and_reopen_logfile();
 void shutdown_subsystems();
 
-bool simulate(const char* machinename);
+bool simulate(const std::string& machinename);
 int inject_events();
 bool check_for_async_sim_break();
 void update_progress();
+
+struct PTLsimBanner {
+  int argc = 0;
+  char** argv = null;
+};
 
 extern "C" void switch_to_sim();
 
@@ -107,9 +110,7 @@ uopimpl_func_t get_synthcode_for_uop(int op, int size, bool setflags, int cond, 
 uopimpl_func_t get_synthcode_for_cond_branch(int opcode, int cond, int size, bool except);
 void synth_uops_for_bb(BasicBlock& bb);
 struct PTLsimStats;
-void print_banner(ostream& os, const PTLsimStats& stats, int argc = 0, char** argv = null);
 
-extern ostream logfile;
 extern W64 user_insn_commits;
 extern W64 iterations;
 extern W64 total_uops_executed;
@@ -124,18 +125,18 @@ extern W64 total_basic_blocks_committed;
 //
 struct PTLsimConfig {
 
-  stringbuf core_name;
+  std::string core_name;
 
   // Logging
   bool quiet;
-  stringbuf log_filename;
+  std::string log_filename;
   W64 loglevel;
   W64 start_log_at_iteration;
   W64 start_log_at_rip;
   bool log_on_console;
   bool log_ptlsim_boot;
   W64 log_buffer_size;
-  stringbuf mm_logfile;
+  std::string mm_logfile;
   W64 mm_log_buffer_size;
   bool enable_inline_mm_logging;
   bool enable_mm_validate;
@@ -164,7 +165,7 @@ struct PTLsimConfig {
   bool static_branchpred;
 
   // Other info
-  stringbuf bbcache_dump_filename;
+  std::string bbcache_dump_filename;
 
   // Simulation Mode
   W64 sequential_mode_insns;
@@ -176,10 +177,56 @@ extern PTLsimConfig config;
 
 extern ConfigurationParser<PTLsimConfig> configparser;
 
-ostream& operator<<(ostream& os, const PTLsimConfig& config);
-
 extern bool logenable;
-#define logable(level) (unlikely(logenable && (config.loglevel >= level)))
 void force_logging_enabled();
+
+namespace std {
+template<>
+struct formatter<PTLsimMachine> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const PTLsimMachine& machine, format_context& ctx) const {
+    return std::format_to(ctx.out(), "PTLsimMachine{{initialized={}}}", machine.initialized);
+  }
+};
+
+template<>
+struct formatter<PTLsimConfig> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const PTLsimConfig& config, format_context& ctx) const {
+    return std::format_to(ctx.out(), "{}", configparser.options.format_to_string_config(&config));
+  }
+};
+
+template<>
+struct formatter<PTLsimBanner> {
+  constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const PTLsimBanner& banner, format_context& ctx) const {
+    utsname hostinfo;
+    sys_uname(&hostinfo);
+
+    auto out = std::format_to(ctx.out(), "//  \n");
+#ifdef PTLSIM_AMD64
+    out = std::format_to(out, "//  PTLsim: Cycle Accurate x86-64 Simulator\n");
+#else
+    out = std::format_to(out, "//  PTLsim: Cycle Accurate x86 Simulator (32-bit version)\n");
+#endif
+    out = std::format_to(out, "//  Copyright 1999-2007 Matt T. Yourst <yourst@yourst.com>\n");
+    out = std::format_to(out, "// \n");
+    out = std::format_to(out, "//  Revision {} ({})\n", stringify(SVNREV), stringify(SVNDATE));
+    out = std::format_to(out, "//  Built {} {} on {} using gcc-{}.{}\n", __DATE__, __TIME__, stringify(BUILDHOST),
+                         stringify(__GNUC__), stringify(__GNUC_MINOR__));
+    out = std::format_to(out, "//  Running on {}-{} ({})\n", hostinfo.nodename, hostinfo.sysname, hostinfo.machine);
+    out = std::format_to(out, "//  \n");
+
+    out = std::format_to(out, "//  Arguments:\n");
+    for (int i = 0; i < banner.argc; i++) {
+      const char* arg = (banner.argv && banner.argv[i]) ? banner.argv[i] : "";
+      out = std::format_to(out, "{} \n", arg);
+    }
+
+    return std::format_to(out, "\n");
+  }
+};
+} // namespace std
 
 #endif // _PTLSIM_H_

@@ -2,6 +2,7 @@
 #define _RASPSIM_HWSETUP_H_
 
 #include "typedefs.h"
+#include <string>
 
 class AddressSpace;
 class Context;
@@ -24,7 +25,7 @@ public:
 
 protected:
   PTLsimMachine* getMachine();
-  const char* getCoreName();
+  const std::string& getCoreName();
 
 public:
   int getRegisterIndex(const char* regname);

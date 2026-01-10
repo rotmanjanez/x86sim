@@ -6,6 +6,7 @@
 //
 
 #include "decode.h"
+#include "logging.h"
 
 template<typename T>
 void assist_div(Context& ctx) {
@@ -207,10 +208,7 @@ void assist_cpuid(Context& ctx) {
   W64& rdx = ctx.commitarf[REG_rdx];
 
   W32 func = rax;
-  if (logable(4)) {
-    logfile << "assist_cpuid: func 0x", hexstring(func, 32), " called from ", (void*)(Waddr)ctx.commitarf[REG_selfrip],
-        ":", endl;
-  }
+  logging::println("assist_cpuid: func 0x{:08x} called from {}:", func, (void*)(Waddr)ctx.commitarf[REG_selfrip]);
 
   switch (func) {
   case 0: {
@@ -471,11 +469,14 @@ struct IRETStackFrame {
   W64 rip, cs, rflags, rsp, ss;
 };
 
-static inline ostream& operator<<(ostream& os, const IRETStackFrame& iretctx) {
-  os << "cs:rip ", (void*)iretctx.cs, ":", (void*)iretctx.rip, ", ss:rsp ", (void*)iretctx.ss, ":", (void*)iretctx.rsp,
-      ", rflags ", (void*)iretctx.rflags;
-  return os;
-}
+template<>
+struct std::formatter<IRETStackFrame> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const IRETStackFrame& iretctx, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "cs:rip {}:{}, ss:rsp {}:{}, rflags {}", (void*)iretctx.cs, (void*)iretctx.rip,
+                          (void*)iretctx.ss, (void*)iretctx.rsp, (void*)iretctx.rflags);
+  }
+};
 
 void assist_iret64(Context& ctx) {
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_selfrip];

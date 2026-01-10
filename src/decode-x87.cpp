@@ -6,6 +6,7 @@
 //
 
 #include "decode.h"
+#include "logging.h"
 
 //
 // x87 assists
@@ -401,7 +402,7 @@ void assist_x87_finit(Context& ctx) {
 //
 //      if ((v % 16) == 0) cout << "  ";
 //      cout << intstring(out, 2), ", ";
-//      if ((v % 16) == 15) cout << endl;
+//      if ((v % 16) == 15) cout << std::endl;
 //      }
 //    }
 //
@@ -418,14 +419,16 @@ W64 warned_about_x87 = 0;
 void check_warned_about_x87() {
   warned_about_x87++;
   if (warned_about_x87 == 16) {
-    stringbuf sb;
-    sb << endl, "//", endl, "// NOTE: This program is using a lot of legacy x87 floating point", endl, "// at ",
-        total_user_insns_committed, " commits, ", sim_cycle, " cycles.", endl,
-        "// PTLsim executes x87 code very sub-optimally: it is HIGHLY recommended", endl,
-        "// that you recompile the program with SSE/SSE2 support and/or update", endl,
-        "// the standard libraries (libc, libm) to an SSE/SSE2-specific version.", endl, "//", endl, endl;
-    logfile << sb;
-    cerr << sb;
+    logging::println(logging::WARNING,
+                     "\n"
+                     "//\n"
+                     "// NOTE: This program is using a lot of legacy x87 floating point\n"
+                     "// at {} commits {} cycles.\n"
+                     "// PTLsim executes x87 code very sub-optimally: it is HIGHLY recommended\n"
+                     "// that you recompile the program with SSE/SSE2 support and/or update\n"
+                     "// the standard libraries (libc, libm) to an SSE/SSE2-specific version.\n"
+                     "//\n",
+                     total_user_insns_committed, sim_cycle);
   }
 }
 
