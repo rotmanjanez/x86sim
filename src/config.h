@@ -12,7 +12,7 @@
 #include <superstl.h>
 #include <stdarg.h>
 
-static const W64 infinity = limits<W64s>::max;
+static const W64 infinity = std::numeric_limits<W64s>::max();
 
 struct ConfigurationOption {
   const char* name;

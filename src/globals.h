@@ -63,34 +63,6 @@ static inline void assert_fail_trap(const char* __assertion, const char* __file,
 #define inf INFINITY
 
 template<typename T>
-struct limits {
-  static const T min = 0;
-  static const T max = 0;
-};
-#define MakeLimits(T, __min, __max)                                                                                    \
-  template<>                                                                                                           \
-  struct limits<T> {                                                                                                   \
-    static const T min = (__min);                                                                                      \
-    static const T max = (__max);                                                                                      \
-  };
-MakeLimits(W8, 0, 0xff);
-MakeLimits(W16, 0, 0xffff);
-MakeLimits(W32, 0, 0xffffffff);
-MakeLimits(W64, 0, 0xffffffffffffffffULL);
-MakeLimits(W8s, 0x80, 0x7f);
-MakeLimits(W16s, 0x8000, 0x7fff);
-MakeLimits(W32s, 0x80000000, 0x7fffffff);
-MakeLimits(W64s, 0x8000000000000000LL, 0x7fffffffffffffffLL);
-#ifdef __x86_64__
-MakeLimits(signed long, 0x8000000000000000LL, 0x7fffffffffffffffLL);
-MakeLimits(unsigned long, 0x0000000000000000LL, 0xffffffffffffffffLL);
-#else
-MakeLimits(signed long, 0x80000000, 0x7fffffff);
-MakeLimits(unsigned long, 0, 0xffffffff);
-#endif
-#undef MakeLimits
-
-template<typename T>
 struct isprimitive_t {
   static const bool primitive = 0;
 };

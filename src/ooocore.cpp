@@ -423,7 +423,7 @@ bool OutOfOrderCore::runcycle() {
       ThreadContext* thread = threads[i];
       priority_value[i] = thread->get_priority();
       if unlikely (!thread->ctx.running)
-        priority_value[i] = limits<int>::max;
+        priority_value[i] = std::numeric_limits<int>::max();
     }
 
     sort(priority_index, threadcount, SortPrecomputedIndexListComparator<int, false>(priority_value));
@@ -1106,7 +1106,7 @@ ostream& EventLog::print(ostream& os, bool only_to_tail) {
 
   OutOfOrderCoreEvent* p = (only_to_tail) ? start : tail;
 
-  W64 cycle = limits<W64>::max;
+  W64 cycle = std::numeric_limits<W64>::max();
   size_t bufsize = end - start;
 
   if (!config.flush_event_log_every_cycle)

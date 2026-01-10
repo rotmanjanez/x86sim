@@ -2162,7 +2162,7 @@ static inline stringbuf& operator<<(stringbuf& sb, const bitvec<N>& v) {
 
 template<int size, typename T>
 static inline T vec_min_index(T* list, const bitvec<size>& include) {
-  int minv = limits<T>::max;
+  int minv = std::numeric_limits<T>::max();
   int mini = 0;
   foreach (i, size) {
     T v = list[i];

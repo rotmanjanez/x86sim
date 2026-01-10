@@ -509,7 +509,7 @@ struct SequentialCoreEventLog {
     return event;
   }
 
-  ostream& print(ostream& os, bool only_to_tail = false, W64 bbcount = limits<W64>::max);
+  ostream& print(ostream& os, bool only_to_tail = false, W64 bbcount = std::numeric_limits<W64>::max());
 
   ostream& print_n_basic_blocks(ostream& os, W64 bbcount) { return print(os, false, bbcount); }
 
@@ -561,7 +561,7 @@ ostream& SequentialCoreEventLog::print(ostream& os, bool only_to_tail, W64 bbcou
 
   int limit = (only_to_tail ? (tail - start) : bufsize);
 
-  if (bbcount < limits<W64>::max) {
+  if (bbcount < std::numeric_limits<W64>::max()) {
     limit = 0;
     p = tail - 1;
     if (p < start)
@@ -581,7 +581,7 @@ ostream& SequentialCoreEventLog::print(ostream& os, bool only_to_tail, W64 bbcou
   if (!config.flush_event_log_every_cycle)
     os << "#-------- Start of event log --------", endl;
 
-  W64 cycle = limits<W64>::max;
+  W64 cycle = std::numeric_limits<W64>::max();
   foreach (i, limit) {
     if unlikely (p >= end)
       p = start;

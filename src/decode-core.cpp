@@ -453,8 +453,8 @@ void TraceDecoder::reset() {
   fast_length_decode_only = 0;
   join_with_prev_insn = 0;
   outcome = DECODE_OUTCOME_OK;
-  stop_at_rip = limits<W64>::max;
-  stop_at_user_insns = limits<W64>::max;
+  stop_at_rip = std::numeric_limits<W64>::max();
+  stop_at_user_insns = std::numeric_limits<W64>::max();
 }
 
 TraceDecoder::TraceDecoder(const RIPVirtPhys& rvp) {
@@ -1632,7 +1632,7 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
 
   stats.decoder.reclaim_rounds++;
 
-  W64 oldest = limits<W64>::max;
+  W64 oldest = std::numeric_limits<W64>::max();
   W64 newest = 0;
   W64 average = 0;
 
