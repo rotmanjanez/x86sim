@@ -11,7 +11,7 @@
 //
 
 byte& AddressSpace::pageid_to_map_byte(spat_t top, Waddr pageid) {
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
   W64 chunkid = pageid >> log2(SPAT_PAGES_PER_CHUNK);
 
   if (!top[chunkid]) {
@@ -66,14 +66,14 @@ void AddressSpace::make_inaccessible(void* p, Waddr size, spat_t top) {
 
 
 AddressSpace::spat_t AddressSpace::allocmap() {
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
   return (spat_t)ptl_mm_alloc_private_pages(SPAT_TOPLEVEL_CHUNKS * sizeof(SPATChunk*));
 #else
   return (spat_t)ptl_mm_alloc_private_pages(SPAT_BYTES);
 #endif
 }
 void AddressSpace::freemap(AddressSpace::spat_t top) {
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
   if (top) {
     foreach (i, SPAT_TOPLEVEL_CHUNKS) {
       if (top[i])

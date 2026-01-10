@@ -11,7 +11,7 @@
 
 #include <globals.h>
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 
 declare_syscall6(__NR_mmap, void*, sys_mmap, void*, start, size_t, length, int, prot, int, flags, int, fd, W64, offset);
 declare_syscall4(__NR_ptrace, W64, sys_ptrace, int, request, pid_t, pid, W64, addr, W64, data);

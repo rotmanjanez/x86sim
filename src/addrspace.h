@@ -23,7 +23,7 @@
 // Address space management
 //
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 
 // Each chunk covers 2 GB of virtual address space:
 #define SPAT_TOPLEVEL_CHUNK_BITS 17
@@ -84,7 +84,7 @@ public:
   //
   // Shadow page attribute table
   //
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
   typedef byte SPATChunk[SPAT_BYTES_PER_CHUNK];
   typedef SPATChunk** spat_t;
 #else
@@ -103,7 +103,7 @@ public:
   void make_inaccessible(void* address, Waddr size, spat_t top);
 
   Waddr pageid(void* address) const {
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
     return ((W64)lowbits((W64)address, ADDRESS_SPACE_BITS)) >> log2(PAGE_SIZE);
 #else
     return ((Waddr)address) >> log2(PAGE_SIZE);
@@ -135,7 +135,7 @@ public:
   int getattr(void* start);
 
   bool fastcheck(Waddr addr, spat_t top) const {
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
     // Is it outside of userspace address range?
     // Check disabled to allow access to VDSO in kernel space.
     if unlikely (addr >> 48)

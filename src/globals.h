@@ -538,7 +538,7 @@ static inline T x86_rol(T r, int n) {
   return r;
 }
 
-#ifndef __x86_64__
+#ifndef PTLSIM_AMD64
 // Need to emulate this on 32-bit x86
 // Throws "explicit template specialization cannot have a storage class" in gcc 4.4.1 (probably 4.3+).
 // Fix as per http://gcc.gnu.org/gcc-4.3/porting_to.html
@@ -763,7 +763,7 @@ inline int lsbindexi32(W32 n) {
   return (n ? r : -1);
 }
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 inline unsigned int lsbindex64(W64 n) {
   return x86_bsf64(n);
 }
@@ -801,7 +801,7 @@ inline int msbindexi32(W32 n) {
   return (n ? r : -1);
 }
 
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
 inline unsigned int msbindex64(W64 n) {
   return x86_bsr64(n);
 }

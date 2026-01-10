@@ -17,7 +17,7 @@ ifndef MACHTYPE
 endif
 
 ifneq (,$(findstring x86_64,"$(MACHTYPE)"))
-	__x86_64__=1
+	PTLSIM_AMD64=1
 endif
 
 # For GCC versions > 4.2 install version 4.2 and uncomment the following line:
@@ -37,8 +37,8 @@ SVNDATE=unknown
 
 INCFLAGS = -Isrc -DBUILDHOST="`hostname -f`" -DSVNREV="$(SVNREV)" -DSVNDATE="$(SVNDATE)"
 
-ifdef __x86_64__
-CFLAGS = -std=c++23 -O2 -fomit-frame-pointer -pipe -march=k8 -fno-builtin-memmove -falign-functions=16 -funroll-loops -funit-at-a-time -minline-all-stringops
+ifdef PTLSIM_AMD64
+CFLAGS = -std=c++23 -O2 -fomit-frame-pointer -pipe -march=k8 -fno-builtin-memmove -falign-functions=16 -funroll-loops -funit-at-a-time -minline-all-stringops -DPTLSIM_AMD64
 #CFLAGS = -O2 -g3 -march=k8 -falign-functions=16 -minline-all-stringops
 # -O1 doesn't work
 CFLAGS32BIT = $(CFLAGS) -m32
@@ -78,7 +78,7 @@ TOPLEVEL = raspsim
 all: $(TOPLEVEL)
 	@echo "Compiled successfully..."
 
-ifdef __x86_64__
+ifdef PTLSIM_AMD64
 raspsim: src/raspsim.o $(OBJS) Makefile
 	$(CXX) $< $(OBJS) -o $@ -Wl,--allow-multiple-definition -static
 

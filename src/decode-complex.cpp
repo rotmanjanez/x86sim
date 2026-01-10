@@ -28,7 +28,7 @@ void assist_idiv(Context& ctx) {
 }
 
 // Not possible in 64-bit mode
-#ifndef __x86_64__
+#ifndef PTLSIM_AMD64
 template<>
 void assist_div<W64>(Context& ctx) {
   assert(false);
@@ -63,7 +63,7 @@ void assist_int(Context& ctx) {
 
 void assist_syscall(Context& ctx) {
   if (ctx.use64) {
-#ifdef __x86_64__
+#ifdef PTLSIM_AMD64
     handle_syscall_64bit();
 #endif
   } else {
