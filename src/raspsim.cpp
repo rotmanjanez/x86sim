@@ -182,7 +182,7 @@ bool handle_config_arg(Raspsim& sim, char* line, dynarray<Waddr>* dump_pages) {
       cerr << "Error: arg has odd size or crosses page boundary", (void*)addr, endl;
       return true;
     }
-    unsigned n = min((Waddr)(4096 - lowbits(addr, 12)), arglen / 2);
+    unsigned n = std::min((Waddr)(4096 - lowbits(addr, 12)), arglen / 2);
     foreach (i, n) {
       char hex_byte[3] = {toks[1][i * 2], toks[1][i * 2 + 1], 0};
       mapped[i] = strtoul(hex_byte, NULL, 16);

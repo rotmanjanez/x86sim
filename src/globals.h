@@ -187,31 +187,10 @@ static inline const W64 DoubleToW64(double x) {
 //
 
 template<typename T>
-static inline T min(const T& a, const T& b) {
-  decltype(a) _a = a;
-  decltype(b) _b = b;
-  return _a > _b ? _b : _a;
-}
-template<typename T>
-static inline T max(const T& a, const T& b) {
-  decltype(a) _a = a;
-  decltype(b) _b = b;
-  return _a > _b ? _a : _b;
-}
-template<typename T>
-static inline T clipto(const T& v, const T& minv, const T& maxv) {
-  return min(max(v, minv), maxv);
-}
-template<typename T>
 static inline bool inrange(const T& v, const T& minv, const T& maxv) {
   std::decay_t<T> _v = v;
   return ((_v >= minv) & (_v <= maxv));
 }
-template<typename T>
-static inline T abs(T x) {
-  decltype(x) _x = x;
-  return (_x < 0) ? -_x : _x;
-} // (built-in for gcc)
 
 // Bit fitting
 static inline bool fits_in_signed_nbit(W64s v, int b) {

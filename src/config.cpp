@@ -13,7 +13,7 @@ ostream& ConfigurationParserBase::printusage(const void* baseptr, ostream& os) c
   int maxlength = 0;
   while (option) {
     if likely (option->type != OPTION_TYPE_SECTION)
-      maxlength = max(maxlength, int(strlen(option->name)));
+      maxlength = std::max(maxlength, int(strlen(option->name)));
     option = option->next;
   }
 

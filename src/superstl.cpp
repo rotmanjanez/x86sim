@@ -170,7 +170,7 @@ int odstream::write(const void* data, int count) {
     chain->write(data, count);
 
   while (count) {
-    int n = min(bufsize - tail, count);
+    int n = std::min(bufsize - tail, count);
     memcpy(buf + tail, p, n);
     tail += n;
     assert(inrange(tail, 0, bufsize));
@@ -234,7 +234,7 @@ void stringbuf::reset(int length) {
   if (buf && (buf != smallbuf))
     delete[] buf;
   buf = (length <= stringbuf_smallbufsize) ? smallbuf : new char[length];
-  length = max(length, stringbuf_smallbufsize);
+  length = std::max(length, stringbuf_smallbufsize);
   p = buf;
   this->length = length;
   p[0] = 0;
@@ -378,19 +378,19 @@ stringbuf& operator<<(stringbuf& os, const intstring& is) {
   char buf[128];
   int len = format_integer(buf, sizeof(buf), is.value);
   bool leftalign = (is.width < 0);
-  int width = (is.width) ? abs<int>(is.width) : len;
+  int width = (is.width) ? std::abs(is.width) : len;
 
-  int reqbytes = max(len, width) + 1;
+  int reqbytes = std::max(len, width) + 1;
   os.reserve(reqbytes);
 
   if (leftalign) {
     memcpy(os.p, buf, len);
     os.p += len;
-    width = max(width - len, 0);
+    width = std::max(width - len, 0);
     memset(os.p, ' ', width);
     os.p += width;
   } else {
-    width = max(width - len, 0);
+    width = std::max(width - len, 0);
     memset(os.p, ' ', width);
     os.p += width;
     memcpy(os.p, buf, len);
@@ -405,19 +405,19 @@ stringbuf& operator<<(stringbuf& os, const floatstring& fs) {
   char buf[128];
   int len = format_float(buf, sizeof(buf), fs.value, fs.precision);
   bool leftalign = (fs.width < 0);
-  int width = (fs.width) ? abs<int>(fs.width) : len;
+  int width = (fs.width) ? std::abs(fs.width) : len;
 
-  int reqbytes = max(len, width) + 1;
+  int reqbytes = std::max(len, width) + 1;
   os.reserve(reqbytes);
 
   if (leftalign) {
     memcpy(os.p, buf, len);
     os.p += len;
-    width = max(width - len, 0);
+    width = std::max(width - len, 0);
     memset(os.p, ' ', width);
     os.p += width;
   } else {
-    width = max(width - len, 0);
+    width = std::max(width - len, 0);
     memset(os.p, ' ', width);
     os.p += width;
     memcpy(os.p, buf, len);
@@ -431,19 +431,19 @@ stringbuf& operator<<(stringbuf& os, const floatstring& fs) {
 stringbuf& operator<<(stringbuf& os, const padstring& s) {
   int len = strlen(s.value);
   bool leftalign = (s.width < 0);
-  int width = (s.width) ? abs<int>(s.width) : len;
+  int width = (s.width) ? std::abs(s.width) : len;
 
-  int reqbytes = max(len, width) + 1;
+  int reqbytes = std::max(len, width) + 1;
   os.reserve(reqbytes);
 
   if (leftalign) {
     memcpy(os.p, s.value, len);
     os.p += len;
-    width = max(width - len, 0);
+    width = std::max(width - len, 0);
     memset(os.p, s.pad, width);
     os.p += width;
   } else {
-    width = max(width - len, 0);
+    width = std::max(width - len, 0);
     memset(os.p, s.pad, width);
     os.p += width;
     memcpy(os.p, s.value, len);
@@ -667,7 +667,7 @@ int idstream::readbuf(byte* dest, int count) {
     // ....|||||||.....
     //     h      t
     // 0123456789abcdef
-    n = min(bufused, count);
+    n = std::min(bufused, count);
     memcpy(dest, &buf[head], n);
     head = addmod(head, n);
     bufused -= n;
@@ -675,7 +675,7 @@ int idstream::readbuf(byte* dest, int count) {
     // ||||.......|||||
     //     t      h
     // 0123456789abcdef
-    n = min(min(bufsize - head, count), bufused);
+    n = std::min(std::min(bufsize - head, count), bufused);
     memcpy(dest, &buf[head], n);
     head = addmod(head, n);
     bufused -= n;
@@ -713,7 +713,7 @@ int idstream::read(void* dest, int count) {
   int r = 0;
   while (count) {
     fillbuf();
-    int n = readbuf(p, min(count, bufsize));
+    int n = readbuf(p, std::min(count, bufsize));
     if (!n) {
       // end of stream
       error = 1;
@@ -1241,7 +1241,7 @@ int format_integer(char* buf, int bufsize, W64s v, int size, int flags, int base
     size = bufsize - 1;
   if ((v < 0) & (base == 10))
     flags ^= FMT_SIGN;
-  char* end = format_number(buf, buf + bufsize - 2, v, base, min(bufsize - 1, size), precision, flags);
+  char* end = format_number(buf, buf + bufsize - 2, v, base, std::min(bufsize - 1, size), precision, flags);
   if (end >= buf + bufsize)
     end = buf + bufsize - 1;
   // null terminate
@@ -1302,8 +1302,8 @@ int format_float(char* buf, int bufsize, double v, int precision, int pad) {
     remaining--;
   }
 
-  int n = format_integer(buf, remaining, wholeint, abs<int>(pad), (left ? FMT_LEFT : 0));
-  remaining = max(remaining - n, 0);
+  int n = format_integer(buf, remaining, wholeint, std::abs(pad), (left ? FMT_LEFT : 0));
+  remaining = std::max(remaining - n, 0);
   total += n;
   if (remaining < 1)
     return total;
@@ -1311,7 +1311,7 @@ int format_float(char* buf, int bufsize, double v, int precision, int pad) {
   buf[n] = '.';
   total++;
   remaining--;
-  n = format_integer(buf + n + 1, max(min(remaining, precision + 1), 0), fracint, 0, 0);
+  n = format_integer(buf + n + 1, std::max(std::min(remaining, precision + 1), 0), fracint, 0, 0);
   total += n;
   buf[total] = 0;
   return total;

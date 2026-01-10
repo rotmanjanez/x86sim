@@ -55,7 +55,7 @@ struct FixedQueue : public std::array<T, SIZE> {
 
   void reset() { head = tail = count = 0; }
 
-  int remaining() const { return max((SIZE - count) - 1, 0); }
+  int remaining() const { return std::max((SIZE - count) - 1, 0); }
 
   bool empty() const { return (!count); }
 

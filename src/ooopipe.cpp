@@ -808,7 +808,7 @@ void ThreadContext::rename() {
 
       if likely ((rob.operands[i]->state == PHYSREG_WAITING) | (rob.operands[i]->state == PHYSREG_BYPASS) |
                  (rob.operands[i]->state == PHYSREG_WRITTEN)) {
-        rob.operands[i]->rob->consumer_count = min(rob.operands[i]->rob->consumer_count + 1, 255);
+        rob.operands[i]->rob->consumer_count = std::min(rob.operands[i]->rob->consumer_count + 1, 255);
       }
     }
 
@@ -1905,7 +1905,7 @@ int ReorderBufferEntry::commit() {
   }
 
   if likely (!(br | st)) {
-    int k = clipto((int)consumer_count, 0, (int)lengthof(stats.ooocore.total.frontend.consumer_count) - 1);
+    int k = std::clamp((int)consumer_count, 0, (int)lengthof(stats.ooocore.total.frontend.consumer_count) - 1);
     per_context_ooocore_stats_update(threadid, frontend.consumer_count[k]++);
   }
 

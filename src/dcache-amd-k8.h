@@ -211,15 +211,15 @@ struct HistogramAssociativeArrayStatisticsCollector {
     // Line has been evicted: update statistics
     W64s lifetime = line.lasttime - line.filltime;
     assert(lifetime >= 0);
-    int lifetimeslot = clipto(lifetime / LIFETIME_INTERVAL, 0, LIFETIME_SLOTS - 1);
+    int lifetimeslot = std::clamp(lifetime / LIFETIME_INTERVAL, 0, LIFETIME_SLOTS - 1);
     line_lifetime_histogram[lifetimeslot]++;
 
     W64s deadtime = sim_cycle - line.lasttime;
-    int deadtimeslot = clipto(deadtime / DEADTIME_INTERVAL, 0, DEADTIME_SLOTS - 1);
+    int deadtimeslot = std::clamp(deadtime / DEADTIME_INTERVAL, 0, DEADTIME_SLOTS - 1);
     line_deadtime_histogram[deadtimeslot]++;
 
     W64 hitcount = line.hitcount;
-    int hitcountslot = clipto(hitcount / HITCOUNT_INTERVAL, 0, HITCOUNT_SLOTS - 1);
+    int hitcountslot = std::clamp(hitcount / HITCOUNT_INTERVAL, 0, HITCOUNT_SLOTS - 1);
     line_hitcount_histogram[hitcountslot]++;
 
     if (logable(6) | FORCE_DEBUG)

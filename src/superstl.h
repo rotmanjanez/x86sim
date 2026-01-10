@@ -14,6 +14,8 @@
 #ifndef _SUPERSTL_H_
 #define _SUPERSTL_H_
 
+#include <algorithm>
+
 //
 // Formatting
 //
@@ -474,7 +476,7 @@ struct percentstring {
 static inline stringbuf& operator<<(stringbuf& os, const percentstring& ps) {
   double f = ps.fraction * 100.;
   W64s intpart = W64s(f);
-  W64s fracpart = clipto(W64s(((f - double(intpart)) * 100) + 0.5), W64s(0), W64s(99));
+  W64s fracpart = std::clamp(W64s(((f - double(intpart)) * 100) + 0.5), W64s(0), W64s(99));
 
   stringbuf sbfrac;
   sbfrac << fracpart;
@@ -496,8 +498,8 @@ struct substring {
 
   substring(const char* str, int start, int length) {
     int r = strlen(str);
-    this->length = min(length, r - start);
-    this->str = str + min(start, r);
+    this->length = std::min(length, r - start);
+    this->str = str + std::min(start, r);
   }
 };
 
@@ -2256,7 +2258,7 @@ struct BitmapAllocator3Level {
     if unlikely (!level2[slot2])
       level3[slot3][offset3] = 0;
 
-    highest_count = max(highest_count, int(index + 1));
+    highest_count = std::max(highest_count, int(index + 1));
 
     return index;
   }

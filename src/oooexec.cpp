@@ -1919,7 +1919,7 @@ int OutOfOrderCore::issue(int cluster) {
       break;
   }
 
-  per_cluster_stats_update(stats.ooocore.issue.width, cluster, [min(issuecount, MAX_ISSUE_WIDTH)]++);
+  per_cluster_stats_update(stats.ooocore.issue.width, cluster, [std::min(issuecount, MAX_ISSUE_WIDTH)]++);
 
   return issuecount;
 }

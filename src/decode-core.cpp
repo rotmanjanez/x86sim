@@ -1642,8 +1642,8 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
   BasicBlock* bb;
 
   while (bb = iter.next()) {
-    oldest = min(oldest, bb->lastused);
-    newest = max(newest, bb->lastused);
+    oldest = std::min(oldest, bb->lastused);
+    newest = std::max(newest, bb->lastused);
     average += bb->lastused;
     n++;
   }

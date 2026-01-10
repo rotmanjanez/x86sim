@@ -259,7 +259,7 @@ int Context::copy_from_user(void* target, Waddr addr, int bytes, PageFaultErrorC
     return n;
   }
 
-  n = min((Waddr)(4096 - lowbits(addr, 12)), (Waddr)bytes);
+  n = std::min((Waddr)(4096 - lowbits(addr, 12)), (Waddr)bytes);
 
   void* mapped_addr = asp.page_virt_to_mapped(addr);
   assert(mapped_addr);
@@ -300,7 +300,7 @@ int Context::copy_to_user(Waddr target, void* source, int bytes, PageFaultErrorC
   }
 
   byte* targetlo = (byte*)asp.page_virt_to_mapped(target);
-  int nlo = min((Waddr)(4096 - lowbits(target, 12)), (Waddr)bytes);
+  int nlo = std::min((Waddr)(4096 - lowbits(target, 12)), (Waddr)bytes);
 
   smc_setdirty(target >> 12);
 

@@ -361,7 +361,7 @@ struct CombinedPredictor {
     //
     if likely (update.cp1) {
       byte& counter = *update.cp1;
-      counter = clipto(counter + (taken ? +1 : -1), 0, 3);
+      counter = std::clamp(counter + (taken ? +1 : -1), 0, 3);
     }
 
     //
@@ -370,7 +370,7 @@ struct CombinedPredictor {
     //
     if likely (update.cp2) {
       byte& counter = *update.cp2;
-      counter = clipto(counter + (taken ? +1 : -1), 0, 3);
+      counter = std::clamp(counter + (taken ? +1 : -1), 0, 3);
     }
 
     //
@@ -385,7 +385,7 @@ struct CombinedPredictor {
         //
         byte& counter = *update.cpmeta;
         bool twolevel_or_bimodal = (update.twolevel == taken);
-        counter = clipto(counter + (twolevel_or_bimodal ? +1 : -1), 0, 3);
+        counter = std::clamp(counter + (twolevel_or_bimodal ? +1 : -1), 0, 3);
       }
     }
 

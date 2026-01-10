@@ -787,7 +787,7 @@ template<int ptlopcode, typename T, bool compare_for_max>
 void uop_impl_min_max(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags) {
   T a = ra;
   T b = rb;
-  T z = (compare_for_max) ? max(a, b) : min(a, b);
+  T z = (compare_for_max) ? std::max(a, b) : std::min(a, b);
   state.reg.rddata = x86_merge<T>(ra, z);
   state.reg.rdflags = x86_genflags<T>(z);
 }
