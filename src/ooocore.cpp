@@ -51,14 +51,14 @@ void StateList::reset() {
 }
 
 int ListOfStateLists::add(StateList* list) {
-  assert(count < lengthof(data));
-  data[count] = list;
+  assert(count < size());
+  (*this)[count] = list;
   return count++;
 }
 
 void ListOfStateLists::reset() {
   foreach (i, count) {
-    data[i]->reset();
+    (*this)[i]->reset();
   }
 }
 

@@ -730,41 +730,6 @@ static inline ostream& operator<<(ostream& os, const range<T>& r) {
   return r.print(os);
 }
 
-/*
-   * Simple array class with optional bounds checking
-   */
-template<typename T, int size>
-struct array {
-public:
-  array() {}
-  static const int length = size;
-
-  T data[size];
-  const T& operator[](int i) const {
-#ifdef CHECK_BOUNDS
-    assert((i >= 0) && (i < size));
-#endif
-    return data[i];
-  }
-
-  T& operator[](int i) {
-#ifdef CHECK_BOUNDS
-    assert((i >= 0) && (i < size));
-#endif
-    return data[i];
-  }
-
-  void clear() {
-    foreach (i, size)
-      data[i] = T();
-  }
-
-  void fill(const T& v) {
-    foreach (i, size)
-      data[i] = v;
-  }
-};
-
 template<typename T, int size>
 struct stack {
 public:
@@ -821,15 +786,6 @@ public:
 template<typename T, int size>
 static inline ostream& operator<<(ostream& os, const stack<T, size>& st) {
   return st.print(os);
-}
-
-template<typename T, int size>
-static inline ostream& operator<<(ostream& os, const array<T, size>& v) {
-  os << "Array of ", size, " elements:", endl;
-  for (int i = 0; i < size; i++) {
-    os << "  [", i, "]: ", v[i], endl;
-  }
-  return os;
 }
 
 /*

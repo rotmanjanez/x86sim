@@ -13,7 +13,7 @@
 
 template<int SIZE>
 struct BimodalPredictor {
-  array<byte, SIZE> table;
+  std::array<byte, SIZE> table;
 
   void reset() {
     foreach (i, SIZE)
@@ -27,8 +27,8 @@ struct BimodalPredictor {
 
 template<int L1SIZE, int L2SIZE, int SHIFTWIDTH, bool HISTORYXOR>
 struct TwoLevelPredictor {
-  array<int, L1SIZE> shiftregs; // L1 history shift register(s)
-  array<byte, L2SIZE> L2table;  // L2 prediction state table
+  std::array<int, L1SIZE> shiftregs; // L1 history shift register(s)
+  std::array<byte, L2SIZE> L2table;  // L2 prediction state table
 
   void reset() {
     // initialize counters uniformly

@@ -539,7 +539,7 @@ static inline ostream& operator<<(ostream& os, const IssueQueue<size, operandcou
 
 struct StateList;
 
-struct ListOfStateLists : public array<StateList*, 64> {
+struct ListOfStateLists : public std::array<StateList*, 64> {
   int count;
 
   ListOfStateLists() { count = 0; }
@@ -900,7 +900,7 @@ public:
 
 ostream& operator<<(ostream& os, const PhysicalRegister& physreg);
 
-struct PhysicalRegisterFile : public array<PhysicalRegister, MAX_PHYS_REG_FILE_SIZE> {
+struct PhysicalRegisterFile : public std::array<PhysicalRegister, MAX_PHYS_REG_FILE_SIZE> {
   byte coreid;
   byte rfid;
   W16 size;
@@ -942,7 +942,7 @@ static inline ostream& operator<<(ostream& os, const PhysicalRegisterFile& physr
 //
 // Register Rename Table
 //
-struct RegisterRenameTable : public array<PhysicalRegister*, TRANSREG_COUNT> {
+struct RegisterRenameTable : public std::array<PhysicalRegister*, TRANSREG_COUNT> {
 #ifdef ENABLE_TRANSIENT_VALUE_TRACKING
   bitvec<TRANSREG_COUNT> renamed_in_this_basic_block;
 #endif

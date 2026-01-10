@@ -8,6 +8,7 @@
 #ifndef _LOGIC_H_
 #define _LOGIC_H_
 
+#include <array>
 #include <globals.h>
 #include <superstl.h>
 
@@ -41,7 +42,7 @@
        i = add_index_modulo(i, -1, (Q).size))
 
 template<class T, int SIZE>
-struct FixedQueue : public array<T, SIZE> {
+struct FixedQueue : public std::array<T, SIZE> {
   int head;  // used for allocation
   int tail;  // used for deallocation
   int count; // count of entries
