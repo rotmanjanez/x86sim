@@ -378,24 +378,6 @@ stringbuf& operator<<(stringbuf& os, const hexstring& hs);
 
 DeclareStringBufToStream(hexstring);
 
-struct bytestring {
-  const byte* bytes;
-  int n;
-  int splitat;
-
-  bytestring() {}
-
-  bytestring(const byte* bytes, int n, int splitat = 16) {
-    this->bytes = bytes;
-    this->n = n;
-    this->splitat = splitat;
-  }
-};
-
-stringbuf& operator<<(stringbuf& os, const bytestring& bs);
-
-DeclareStringBufToStream(bytestring);
-
 struct bytemaskstring {
   const byte* bytes;
   W64 mask;

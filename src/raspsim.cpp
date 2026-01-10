@@ -8,6 +8,8 @@
 #include <vector>
 #include <ranges>
 #include <string_view>
+#include <span>
+#include <print>
 
 #include "globals.h"
 #include "superstl.h"
@@ -21,6 +23,17 @@
 #include "config.h"
 #include "stats.h"
 #include "raspsim-hwsetup.h"
+
+static void print_hex_bytes(FILE* fp, std::span<const byte> bytes, size_t splitat = 16) {
+  for (size_t i = 0; i < bytes.size(); i++) {
+    std::print(fp, "{:02x}", static_cast<unsigned>(bytes[i]));
+    if (((i % splitat) == (splitat - 1)) && (i != bytes.size() - 1))
+      std::print(fp, "\n");
+    else if (i != bytes.size() - 1)
+      std::print(fp, " ");
+  }
+  std::println(fp, "");
+}
 
 struct PTLsimConfig;
 extern PTLsimConfig config;
@@ -307,7 +320,7 @@ int main(int argc, char** argv) {
       cerr << "Error dumping memory: page not mapped ", (void*)addr, endl;
     } else {
       cerr << "Dump of memory at ", (void*)addr, ": ", endl;
-      cerr << bytestring(mapped, PAGE_SIZE), endl;
+      print_hex_bytes(stderr, std::span<const byte>(mapped, PAGE_SIZE));
     }
   }
 
