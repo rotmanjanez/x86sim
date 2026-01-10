@@ -5,6 +5,7 @@
 // Copyright 2000-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
+#include <unordered_map>
 #include <globals.h>
 #include <ptlsim.h>
 #define CPT_STATS
@@ -268,7 +269,7 @@ bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
   return true;
 }
 
-Hashtable<const char*, PTLsimMachine*, 1>* machinetable = null;
+std::unordered_map<std::string, PTLsimMachine*> machinetable{};
 
 // Make sure the vtable gets compiled:
 PTLsimMachine dummymachine;
@@ -297,19 +298,15 @@ void PTLsimMachine::flush_tlb_virt(Context& ctx, Waddr virtaddr) {
 }
 
 void PTLsimMachine::addmachine(const char* name, PTLsimMachine* machine) {
-  if unlikely (!machinetable) {
-    machinetable = new Hashtable<const char*, PTLsimMachine*, 1>();
-  }
-  machinetable->add(name, machine);
+  machinetable.emplace(name, machine);
 }
 
 PTLsimMachine* PTLsimMachine::getmachine(const char* name) {
-  if unlikely (!machinetable)
-    return null;
-  PTLsimMachine** p = machinetable->get(name);
-  if (!p)
-    return null;
-  return *p;
+  auto it = machinetable.find(name);
+  if (it == machinetable.end())
+    return nullptr;
+
+  return it->second;
 }
 
 // Currently executing machine model:

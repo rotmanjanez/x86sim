@@ -11,6 +11,9 @@
 #ifndef _ADDRSPACE_H_
 #define _ADDRSPACE_H_
 
+#include <unordered_map>
+#include <memory>
+
 #include <globals.h>
 #include <superstl.h>
 
@@ -47,17 +50,15 @@ public:
   void reset();
 
 public:
-  Hashtable<Waddr, W8*> mapped_mem;
+  using Page = std::array<W8, PAGE_SIZE>;
+  std::unordered_map<Waddr, std::unique_ptr<Page>> mapped_mem;
 
   void map(Waddr start, Waddr length, int prot) {
     start = floor(start, PAGE_SIZE);
     length = ceil(length, PAGE_SIZE);
     Waddr num_pages = length / PAGE_SIZE;
     foreach (i, num_pages) {
-      W8* old_val;
-      if (mapped_mem.remove(start + i * PAGE_SIZE, old_val))
-        delete[] old_val;
-      mapped_mem.add(start + i * PAGE_SIZE, new W8[PAGE_SIZE]());
+      mapped_mem.insert_or_assign(start + i * PAGE_SIZE, std::make_unique<Page>());
     }
     setattr((byte*)start, length, prot);
   }
@@ -66,18 +67,18 @@ public:
     length = ceil(length, PAGE_SIZE);
     Waddr num_pages = length / PAGE_SIZE;
     foreach (i, num_pages) {
-      W8* old_val;
-      if (mapped_mem.remove(start + i * PAGE_SIZE, old_val))
-        delete[] old_val;
+      mapped_mem.erase(start + i * PAGE_SIZE);
     }
     setattr((byte*)start, length, PROT_NONE);
   }
 
   void* page_virt_to_mapped(Waddr addr) {
-    W8** res = mapped_mem.get(floor(addr, PAGE_SIZE));
-    if (!res)
-      return res;
-    return (W8*)*res + lowbits(addr, 12);
+    auto it = mapped_mem.find(floor(addr, PAGE_SIZE));
+    if (it == mapped_mem.end())
+      return nullptr;
+
+    W8* base = it->second.get()->data();
+    return base + lowbits(addr, 12);
   }
 
   //
