@@ -65,7 +65,6 @@ struct ConfigurationParserBase {
   }
 
   int parse(void* baseptr, int argc, char* argv[]);
-  int parse(void* baseptr, char* argstr);
   ostream& printusage(const void* baseptr, ostream& os) const;
   ostream& print(const void* baseptr, ostream& os) const;
 };
