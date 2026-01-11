@@ -531,8 +531,8 @@ static inline ostream& operator<<(ostream& os, const IssueQueue<size, operandcou
 #define foreach_list_mutable_linktype(L, obj, entry, nextentry, linktype)                                              \
   linktype* entry;                                                                                                     \
   linktype* nextentry;                                                                                                 \
-  for (entry = (L).next, nextentry = entry->next, prefetch(entry->next), obj = (typeof(obj))entry; entry != &(L);      \
-       entry = nextentry, nextentry = entry->next, prefetch(nextentry), obj = (typeof(obj))entry)
+  for (entry = (L).next, nextentry = entry->next, prefetch(entry->next), obj = (decltype(obj))entry; entry != &(L);    \
+       entry = nextentry, nextentry = entry->next, prefetch(nextentry), obj = (decltype(obj))entry)
 
 #define foreach_list_mutable(L, obj, entry, nextentry)                                                                 \
   foreach_list_mutable_linktype(L, obj, entry, nextentry, selfqueuelink)

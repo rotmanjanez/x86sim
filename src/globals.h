@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <cmath>
 #include <cstddef>
+#include <type_traits>
 extern "C" {
 #include <sys/ptrace.h>
 }
@@ -129,16 +130,6 @@ struct ispointer_t<T*> {
 // Restricted (non-aliased) pointers:
 #define noalias __restrict__
 
-// Default placement versions of operator new.
-inline void* operator new(size_t, void* p) {
-  return p;
-}
-inline void* operator new[](size_t, void* p) {
-  return p;
-}
-inline void operator delete(void*, void*) {}
-inline void operator delete[](void*, void*) {}
-
 // Add raw data auto-casts to a structured or bitfield type
 #define RawDataAccessors(structtype, rawtype)                                                                          \
   structtype() {}                                                                                                      \
@@ -197,14 +188,14 @@ static inline const W64 DoubleToW64(double x) {
 
 template<typename T>
 static inline T min(const T& a, const T& b) {
-  typeof(a) _a = a;
-  typeof(b) _b = b;
+  decltype(a) _a = a;
+  decltype(b) _b = b;
   return _a > _b ? _b : _a;
 }
 template<typename T>
 static inline T max(const T& a, const T& b) {
-  typeof(a) _a = a;
-  typeof(b) _b = b;
+  decltype(a) _a = a;
+  decltype(b) _b = b;
   return _a > _b ? _a : _b;
 }
 template<typename T>
@@ -213,12 +204,12 @@ static inline T clipto(const T& v, const T& minv, const T& maxv) {
 }
 template<typename T>
 static inline bool inrange(const T& v, const T& minv, const T& maxv) {
-  typeof(v) _v = v;
+  std::decay_t<T> _v = v;
   return ((_v >= minv) & (_v <= maxv));
 }
 template<typename T>
 static inline T abs(T x) {
-  typeof(x) _x = x;
+  decltype(x) _x = x;
   return (_x < 0) ? -_x : _x;
 } // (built-in for gcc)
 
@@ -785,9 +776,8 @@ void condmove(K cond, T& v, T newv) {
   asm("test %[cond],%[cond]; cmovnz %[newv],%[v]" : [v] "+r"(v) : [cond] "r"(cond), [newv] "rm"(newv) : "flags");
 }
 
-#define typeof __typeof__
-#define ptralign(ptr, bytes) ((typeof(ptr))((unsigned long)(ptr) & ~((bytes) - 1)))
-#define ptrmask(ptr, bytes) ((typeof(ptr))((unsigned long)(ptr) & ((bytes) - 1)))
+#define ptralign(ptr, bytes) ((decltype(ptr))((unsigned long)(ptr) & ~((bytes) - 1)))
+#define ptrmask(ptr, bytes) ((decltype(ptr))((unsigned long)(ptr) & ((bytes) - 1)))
 
 template<typename T>
 inline void arraycopy(T* dest, const T* source, int count) {
