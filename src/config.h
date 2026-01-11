@@ -65,7 +65,6 @@ struct ConfigurationParserBase {
   }
 
   int parse(void* baseptr, int argc, char* argv[]);
-  int parse(void* baseptr, char* argstr);
   ostream& printusage(const void* baseptr, ostream& os) const;
   ostream& print(const void* baseptr, ostream& os) const;
 };
@@ -105,9 +104,5 @@ struct ConfigurationParser : public T {
   // Provided by user:
   void setup();
 };
-
-void expand_command_list(dynarray<char*>& list, int argc, char** argv, int depth = 0);
-void expand_command_list(dynarray<char*>& list, char* args, int depth = 0);
-void free_command_list(dynarray<char*>& list);
 
 #endif // _CONFIG_H_
