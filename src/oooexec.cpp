@@ -102,7 +102,7 @@ bool IssueQueue<size, operandcount>::insert(tag_t uopid, const tag_t* operands, 
 
   int slot = count++;
 
-  assert(!bit(valid, slot));
+  assert(!valid[slot]);
 
   uopids.insertslot(slot, uopid);
 
@@ -121,7 +121,7 @@ bool IssueQueue<size, operandcount>::insert(tag_t uopid, const tag_t* operands, 
 
 template<int size, int operandcount>
 void IssueQueue<size, operandcount>::tally_broadcast_matches(IssueQueue<size, operandcount>::tag_t sourceid,
-                                                             const bitvec<size>& mask, int operand) const {
+                                                             const std::bitset<size>& mask, int operand) const {
   if likely (!config.event_log_enabled)
     return;
 
@@ -131,10 +131,10 @@ void IssueQueue<size, operandcount>::tally_broadcast_matches(IssueQueue<size, op
   ThreadContext* thread = core.threads[threadid];
   const ReorderBufferEntry* source = &thread->ROB[rob_idx];
 
-  bitvec<size> temp = mask;
+  std::bitset<size> temp = mask;
 
-  while (*temp) {
-    int slot = temp.lsb();
+  while (temp.any()) {
+    int slot = lsb(temp);
     int robid = uopof(slot);
 
     int threadid_tmp, rob_idx_tmp;
@@ -169,7 +169,7 @@ bool IssueQueue<size, operandcount>::broadcast(tag_t uopid) {
   vec_t tagvec = assoc_t::prep(uopid);
 
   foreach (operand, operandcount) {
-    bitvec<size> mask = tags[operand].invalidate(tagvec);
+    std::bitset<size> mask = tags[operand].invalidate(tagvec);
     if unlikely (config.event_log_enabled)
       tally_broadcast_matches(uopid, mask, operand);
   }
@@ -184,9 +184,9 @@ bool IssueQueue<size, operandcount>::broadcast(tag_t uopid) {
 //
 template<int size, int operandcount>
 int IssueQueue<size, operandcount>::issue() {
-  if (!allready)
+  if (allready.none())
     return -1;
-  int slot = allready.lsb();
+  int slot = lsb(allready);
   issued[slot] = 1;
   return slot;
 }
@@ -238,9 +238,9 @@ bool IssueQueue<size, operandcount>::remove(int slot) {
     tags[i].collapse(slot);
   }
 
-  valid = valid.remove(slot, 1);
-  issued = issued.remove(slot, 1);
-  allready = allready.remove(slot, 1);
+  valid.reset(slot);
+  issued.reset(slot);
+  allready.reset(slot);
 
   count--;
   assert(count >= 0);
@@ -2216,7 +2216,7 @@ W64 ReorderBufferEntry::annul(bool keep_misspec_uop, bool return_first_annulled_
 // re-dispatched, <prevrob> should be null.
 //
 
-void ReorderBufferEntry::redispatch(const bitvec<MAX_OPERANDS>& dependent_operands, ReorderBufferEntry* prevrob) {
+void ReorderBufferEntry::redispatch(const std::bitset<MAX_OPERANDS>& dependent_operands, ReorderBufferEntry* prevrob) {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
 
@@ -2228,7 +2228,7 @@ void ReorderBufferEntry::redispatch(const bitvec<MAX_OPERANDS>& dependent_operan
   if unlikely (config.event_log_enabled) {
     event = core.eventlog.add(EVENT_REDISPATCH_EACH_ROB, this);
     event->redispatch.current_state_list = current_state_list;
-    event->redispatch.dependent_operands = dependent_operands.integer();
+    event->redispatch.dependent_operands = dependent_operands;
     foreach (i, MAX_OPERANDS)
       operands[i]->fill_operand_info(event->redispatch.opinfo[i]);
   }
@@ -2297,7 +2297,7 @@ void ReorderBufferEntry::redispatch_dependents(bool inclusive) {
   ThreadContext& thread = getthread();
   Queue<ReorderBufferEntry, ROB_SIZE>& ROB = thread.ROB;
 
-  bitvec<ROB_SIZE> depmap;
+  std::bitset<ROB_SIZE> depmap;
   depmap = 0;
   depmap[index()] = 1;
 
@@ -2322,7 +2322,7 @@ void ReorderBufferEntry::redispatch_dependents(bool inclusive) {
       continue;
     }
 
-    bitvec<MAX_OPERANDS> dependent_operands;
+    std::bitset<MAX_OPERANDS> dependent_operands;
     dependent_operands = 0;
 
     foreach (i, MAX_OPERANDS) {
@@ -2340,7 +2340,7 @@ void ReorderBufferEntry::redispatch_dependents(bool inclusive) {
     // re-dispatch the ld.acq but not the st.rel and vice versa; both must be
     // redispatched together.
     //
-    bool dep = (*dependent_operands) | (robidx == index()) | isstore(uop.opcode);
+    bool dep = dependent_operands.any() | (robidx == index()) | isstore(uop.opcode);
 
     if unlikely (dep) {
       count++;
