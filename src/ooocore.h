@@ -430,9 +430,9 @@ struct IssueQueue {
   // issued      1 1
   // complete    0 1
 
-  bitvec<size> valid;
-  bitvec<size> issued;
-  bitvec<size> allready;
+  std::bitset<size> valid;
+  std::bitset<size> issued;
+  std::bitset<size> allready;
   int count;
   byte coreid;
   int shared_entries;
@@ -474,7 +474,7 @@ struct IssueQueue {
   bool remove(int slot);
 
   ostream& print(ostream& os) const;
-  void tally_broadcast_matches(tag_t sourceid, const bitvec<size>& mask, int operand) const;
+  void tally_broadcast_matches(tag_t sourceid, const std::bitset<size>& mask, int operand) const;
 
   //
   // Replay a uop that has already issued once.
@@ -720,7 +720,7 @@ struct ReorderBufferEntry : public selfqueuelink {
   void replay();
   void replay_locked();
   int pseudocommit();
-  void redispatch(const bitvec<MAX_OPERANDS>& dependent_operands, ReorderBufferEntry* prevrob);
+  void redispatch(const std::bitset<MAX_OPERANDS>& dependent_operands, ReorderBufferEntry* prevrob);
   void redispatch_dependents(bool inclusive = true);
   void loadwakeup();
   void fencewakeup();
@@ -944,7 +944,7 @@ static inline ostream& operator<<(ostream& os, const PhysicalRegisterFile& physr
 //
 struct RegisterRenameTable : public std::array<PhysicalRegister*, TRANSREG_COUNT> {
 #ifdef ENABLE_TRANSIENT_VALUE_TRACKING
-  bitvec<TRANSREG_COUNT> renamed_in_this_basic_block;
+  std::bitset<TRANSREG_COUNT> renamed_in_this_basic_block;
 #endif
   ostream& print(ostream& os) const;
 };
@@ -1267,7 +1267,7 @@ struct OutOfOrderCoreEvent {
       StateList* current_state_list;
       W16 iqslot;
       W16 count;
-      byte dependent_operands;
+      std::bitset<MAX_OPERANDS> dependent_operands;
       PhysicalRegisterOperandInfo opinfo[MAX_OPERANDS];
     } redispatch;
     struct {
@@ -1668,7 +1668,7 @@ struct OutOfOrderCore {
   OutOfOrderCoreCacheCallbacks cache_callbacks;
 
   // Unaligned load/store predictor
-  bitvec<UNALIGNED_PREDICTOR_SIZE> unaligned_predictor;
+  std::bitset<UNALIGNED_PREDICTOR_SIZE> unaligned_predictor;
   static int hash_unaligned_predictor_slot(const RIPVirtPhysBase& rvp);
   bool get_unaligned_hint(const RIPVirtPhysBase& rvp) const;
   void set_unaligned_hint(const RIPVirtPhysBase& rvp, bool value);
@@ -1700,7 +1700,7 @@ struct OutOfOrderCore {
 
 struct OutOfOrderMachine : public PTLsimMachine {
   OutOfOrderCore* cores[MAX_SMT_CORES];
-  bitvec<MAX_CONTEXTS> stopped;
+  std::bitset<MAX_CONTEXTS> stopped;
   OutOfOrderMachine(const char* name);
   virtual bool init(PTLsimConfig& config);
   virtual int run(PTLsimConfig& config);

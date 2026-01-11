@@ -770,7 +770,7 @@ void OutOfOrderCore::dump_smt_state(ostream& os) {
   caches.print(os);
 
   os << "Unaligned predictor:", endl;
-  os << "  ", unaligned_predictor.popcount(), " unaligned bits out of ", UNALIGNED_PREDICTOR_SIZE, " bits", endl;
+  os << "  ", unaligned_predictor.count(), " unaligned bits out of ", UNALIGNED_PREDICTOR_SIZE, " bits", endl;
   os << "  Raw data: ", unaligned_predictor, endl;
 
   foreach (i, threadcount) {
@@ -1563,11 +1563,11 @@ ostream& OutOfOrderCoreEvent::print(ostream& os) const {
   case EVENT_REDISPATCH_EACH_ROB: {
     os << "redisp rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " from state ",
         redispatch.current_state_list->name, ": dep on ";
-    if (!redispatch.dependent_operands) {
+    if (redispatch.dependent_operands.none()) {
       os << " [self]";
     } else {
       foreach (i, MAX_OPERANDS) {
-        if (bit(redispatch.dependent_operands, i))
+        if (redispatch.dependent_operands[i])
           os << " ", redispatch.opinfo[i];
       }
     }
@@ -1840,7 +1840,7 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
 
     if unlikely (stopping) {
       // logfile << "Waiting for all VCPUs to stop at ", sim_cycle, ": mask = ", stopped, " (need ", contextcount, " VCPUs)", endl;
-      exiting |= (stopped.integer() == bitmask(contextcount));
+      exiting |= (stopped.count() == contextcount);
     }
 
     if unlikely (exiting)

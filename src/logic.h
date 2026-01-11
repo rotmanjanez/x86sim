@@ -250,7 +250,7 @@ struct InvalidTag<W8> {
 
 template<typename T, int ways>
 struct FullyAssociativeTags {
-  bitvec<ways> evictmap;
+  std::bitset<ways> evictmap;
   T tags[ways];
 
   static const T INVALID = InvalidTag<T>::INVALID;
@@ -267,7 +267,7 @@ struct FullyAssociativeTags {
   void use(int way) {
     evictmap[way] = 1;
     // Performance is somewhat better with this off with higher associativity caches:
-    // if (evictmap.allset()) evictmap = 0;
+    // if (evictmap.all()) evictmap = 0;
   }
 
   //
@@ -294,13 +294,13 @@ struct FullyAssociativeTags {
     return way;
   }
 
-  int lru() const { return (evictmap.allset()) ? 0 : (~evictmap).lsb(); }
+  int lru() const { return (evictmap.all()) ? 0 : lsb(~evictmap); }
 
   int select(T target, T& oldtag) {
     int way = probe(target);
     if (way < 0) {
       way = lru();
-      if (evictmap.allset())
+      if (evictmap.all())
         evictmap = 0;
       oldtag = tags[way];
       tags[way] = target;
@@ -408,8 +408,8 @@ struct FullyAssociativeTagsNbitOneHot {
 
   vec16b tags[slices][chunkcount + padchunkcount] alignto(16);
   base_t tagsmirror[size]; // for fast scalar access
-  bitvec<size> valid;
-  bitvec<size> evictmap;
+  std::bitset<size> valid;
+  std::bitset<size> evictmap;
 
   FullyAssociativeTagsNbitOneHot() { reset(); }
 
@@ -504,9 +504,9 @@ struct FullyAssociativeTagsNbitOneHot {
   }
 
   int insert(base_t tag) {
-    if (valid.allset())
+    if (valid.all())
       return -1;
-    int idx = (~valid).lsb();
+    int idx = lsb(~valid);
     return insertslot(idx, tag);
   }
 
@@ -525,8 +525,8 @@ struct FullyAssociativeTagsNbitOneHot {
     return 1;
   }
 
-  bitvec<size> masked_match(base_t targettag, base_t tagmask) {
-    bitvec<size> m;
+  std::bitset<size> masked_match(base_t targettag, base_t tagmask) {
+    std::bitset<size> m;
 
     foreach (i, size) {
       base_t tag = tagsmirror[i];
@@ -536,7 +536,7 @@ struct FullyAssociativeTagsNbitOneHot {
     return m;
   }
 
-  void masked_invalidate(const bitvec<size>& slotmask) {
+  void masked_invalidate(const std::bitset<size>& slotmask) {
     foreach (i, size) {
       if unlikely (slotmask[i])
         invalidateslot(i);
@@ -546,7 +546,7 @@ struct FullyAssociativeTagsNbitOneHot {
   void use(int way) {
     evictmap[way] = 1;
 
-    if (evictmap.allset()) {
+    if (evictmap.all()) {
       evictmap = 0;
       evictmap[way] = 1;
     }
@@ -560,13 +560,13 @@ struct FullyAssociativeTagsNbitOneHot {
     return way;
   }
 
-  int lru() const { return (evictmap.allset()) ? 0 : (~evictmap).lsb(); }
+  int lru() const { return (evictmap.all()) ? 0 : lsb(~evictmap); }
 
   int select(base_t target, base_t& oldtag) {
     int way = probe(target);
     if (way < 0) {
       way = lru();
-      if (evictmap.allset())
+      if (evictmap.all())
         evictmap = 0;
       oldtag = tagsmirror[way];
       update(way, target);
@@ -761,8 +761,8 @@ ostream& operator<<(ostream& os, const AssociativeArray<T, V, size, ways, linesi
 
 template<typename T, int ways>
 struct LockableFullyAssociativeTags {
-  bitvec<ways> evictmap;
-  bitvec<ways> unlockedmap;
+  std::bitset<ways> evictmap;
+  std::bitset<ways> unlockedmap;
   T tags[ways];
 
   static const T INVALID = InvalidTag<T>::INVALID;
@@ -771,7 +771,7 @@ struct LockableFullyAssociativeTags {
 
   void reset() {
     evictmap = 0;
-    unlockedmap.setall();
+    unlockedmap.set();
     foreach (i, ways) {
       tags[i] = INVALID;
     }
@@ -780,7 +780,7 @@ struct LockableFullyAssociativeTags {
   void use(int way) {
     evictmap[way] = 1;
     // Performance is somewhat better with this off with higher associativity caches:
-    // if (evictmap.allset()) evictmap = 0;
+    // if (evictmap.all()) evictmap = 0;
   }
 
   //
@@ -808,10 +808,10 @@ struct LockableFullyAssociativeTags {
   }
 
   int lru() const {
-    if (!unlockedmap)
+    if (unlockedmap.none())
       return -1;
-    bitvec<ways> w = (~evictmap) & unlockedmap;
-    return (*w) ? w.lsb() : 0;
+    auto w = (~evictmap) & unlockedmap;
+    return w.any() ? lsb(w) : 0;
   }
 
   int select(T target, T& oldtag) {
@@ -820,7 +820,7 @@ struct LockableFullyAssociativeTags {
       way = lru();
       if (way < 0)
         return -1;
-      if (evictmap.allset())
+      if (evictmap.all())
         evictmap = 0;
       oldtag = tags[way];
       tags[way] = target;
@@ -1132,7 +1132,7 @@ struct FullyAssociativeTags8bit {
   static const int padchunkcount = (padsize + 15) / 16;
 
   vec_t tags[chunkcount + padchunkcount] alignto(16);
-  bitvec<size> valid;
+  std::bitset<size> valid;
 
   W64 getvalid() { return valid.integer(); }
 
@@ -1160,41 +1160,43 @@ struct FullyAssociativeTags8bit {
   }
 
   int insert(base_t tag) {
-    if (valid.allset())
+    if (valid.all())
       return -1;
-    int idx = (~valid).lsb();
+    int idx = lsb(~valid);
     return insertslot(idx, tag);
   }
 
-  bitvec<size> match(const vec_t target) const {
-    bitvec<size> m = 0;
+  std::bitset<size> match(const vec_t target) const {
+    std::bitset<size> m = 0;
 
     foreach (i, chunkcount) {
-      m = m.accum(i * 16, 16, x86_sse_pmovmskb(x86_sse_pcmpeqb(target, tags[i])));
+      auto v = x86_sse_pmovmskb(x86_sse_pcmpeqb(target, tags[i]));
+      m |= v << (i * 16);
     }
 
     return m & valid;
   }
 
-  bitvec<size> match(base_t target) const { return match(prep(target)); }
+  std::bitset<size> match(base_t target) const { return match(prep(target)); }
 
-  bitvec<size> matchany(const vec_t target) const {
-    bitvec<size> m = 0;
+  std::bitset<size> matchany(const vec_t target) const {
+    std::bitset<size> m = 0;
 
     vec_t zero = prep(0);
 
     foreach (i, chunkcount) {
-      m = m.accum(i * 16, 16, x86_sse_pmovmskb(x86_sse_pcmpeqb(x86_sse_pandb(tags[i], target), zero)));
+      auto v = x86_sse_pmovmskb(x86_sse_pcmpeqb(x86_sse_pandb(tags[i], target), zero));
+      m |= v << (i * 16);
     }
 
     return (~m) & valid;
   }
 
-  bitvec<size> matchany(base_t target) const { return matchany(prep(target)); }
+  std::bitset<size> matchany(base_t target) const { return matchany(prep(target)); }
 
   int search(const vec_t target) const {
-    bitvec<size> bitmap = match(target);
-    int idx = bitmap.lsb();
+    std::bitset<size> bitmap = match(target);
+    int idx = lsb(bitmap);
     if (!bitmap)
       idx = -1;
     return idx;
@@ -1209,18 +1211,18 @@ struct FullyAssociativeTags8bit {
 
   int search(base_t tag) const { return search(prep(tag)); }
 
-  bitvec<size> extract(base_t tag) { return extract(prep(tag)); }
+  std::bitset<size> extract(base_t tag) { return extract(prep(tag)); }
 
   void invalidateslot(int index) { valid[index] = 0; }
 
-  const bitvec<size>& invalidatemask(const bitvec<size>& mask) {
+  const std::bitset<size>& invalidatemask(const std::bitset<size>& mask) {
     valid &= ~mask;
     return mask;
   }
 
-  bitvec<size> invalidate(const vec_t target) { return invalidatemask(match(target)); }
+  std::bitset<size> invalidate(const vec_t target) { return invalidatemask(match(target)); }
 
-  bitvec<size> invalidate(base_t target) { return invalidate(prep(target)); }
+  std::bitset<size> invalidate(base_t target) { return invalidate(prep(target)); }
 
   void collapse(int index) {
     base_t* tagbase = (base_t*)&tags;
@@ -1279,7 +1281,7 @@ struct FullyAssociativeTags16bit {
   static const int padchunkcount = ((padsize * 2) + 15) / 16;
 
   vec_t tags[chunkcount + padchunkcount] alignto(16);
-  bitvec<size> valid;
+  std::bitset<size> valid;
 
   W64 getvalid() { return valid.integer(); }
 
@@ -1307,42 +1309,44 @@ struct FullyAssociativeTags16bit {
   }
 
   int insert(base_t tag) {
-    if (valid.allset())
+    if (valid.all())
       return -1;
-    int idx = (~valid).lsb();
+    int idx = lsb(~valid);
     return insertslot(idx, tag);
   }
 
-  bitvec<size> match(const vec_t target) const {
-    bitvec<size> m = 0;
+  std::bitset<size> match(const vec_t target) const {
+    std::bitset<size> m = 0;
 
     foreach (i, chunkcount) {
-      m = m.accum(i * 8, 8, x86_sse_pmovmskw(x86_sse_pcmpeqw(target, tags[i])));
+      auto v = x86_sse_pmovmskw(x86_sse_pcmpeqw(target, tags[i]));
+      m |= v << (i * 8);
     }
 
     return m & valid;
   }
 
-  bitvec<size> match(base_t target) const { return match(prep(target)); }
+  std::bitset<size> match(base_t target) const { return match(prep(target)); }
 
-  bitvec<size> matchany(const vec_t target) const {
-    bitvec<size> m = 0;
+  std::bitset<size> matchany(const vec_t target) const {
+    std::bitset<size> m = 0;
 
     vec_t zero = prep(0);
 
     foreach (i, chunkcount) {
-      m = m.accum(i * 8, 8, x86_sse_pmovmskw(x86_sse_pcmpeqw(x86_sse_pandw(tags[i], target), zero)));
+      auto v = x86_sse_pmovmskw(x86_sse_pcmpeqw(x86_sse_pandw(tags[i], target), zero));
+      m |= v << (i * 8);
     }
 
     return (~m) & valid;
   }
 
-  bitvec<size> matchany(base_t target) const { return matchany(prep(target)); }
+  std::bitset<size> matchany(base_t target) const { return matchany(prep(target)); }
 
   int search(const vec_t target) const {
-    bitvec<size> bitmap = match(target);
-    int idx = bitmap.lsb();
-    if (!bitmap)
+    std::bitset<size> bitmap = match(target);
+    int idx = lsb(bitmap);
+    if (bitmap.none())
       idx = -1;
     return idx;
   }
@@ -1356,18 +1360,18 @@ struct FullyAssociativeTags16bit {
 
   int search(base_t tag) const { return search(prep(tag)); }
 
-  bitvec<size> extract(base_t tag) { return extract(prep(tag)); }
+  std::bitset<size> extract(base_t tag) { return extract(prep(tag)); }
 
   void invalidateslot(int index) { valid[index] = 0; }
 
-  const bitvec<size>& invalidatemask(const bitvec<size>& mask) {
+  const std::bitset<size>& invalidatemask(const std::bitset<size>& mask) {
     valid &= ~mask;
     return mask;
   }
 
-  bitvec<size> invalidate(const vec_t target) { return invalidatemask(match(target)); }
+  std::bitset<size> invalidate(const vec_t target) { return invalidatemask(match(target)); }
 
-  bitvec<size> invalidate(base_t target) { return invalidate(prep(target)); }
+  std::bitset<size> invalidate(base_t target) { return invalidate(prep(target)); }
 
   void collapse(int index) {
     base_t* tagbase = (base_t*)&tags;
@@ -1379,7 +1383,7 @@ struct FullyAssociativeTags16bit {
       x86_sse_stvwu(dp++, x86_sse_ldvwu(sp++));
     }
 
-    valid = valid.remove(index);
+    valid.reset(index);
   }
 
   void decrement(base_t amount = 1) {

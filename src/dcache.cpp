@@ -56,8 +56,8 @@ W64 L3StatsCollectorBase::line_hitcount_histogram[DCACHE_L3_LINE_HITCOUNT_SLOTS]
 
 template<int size>
 void LoadFillReqQueue<size>::restart() {
-  while (!freemap.allset()) {
-    int idx = (~freemap).lsb();
+  while (!freemap.all()) {
+    int idx = lsb(~freemap);
     LoadFillReq& req = reqs[idx];
     if (logable(6))
       logfile << "iter ", iterations, ": force final wakeup/reset of LFRQ slot ", idx, ": ", req, endl;
@@ -119,7 +119,7 @@ int LoadFillReqQueue<size>::add(const LoadFillReq& req) {
     }
   }
 #endif
-  int idx = freemap.lsb();
+  int idx = lsb(freemap);
   changestate(idx, freemap, waiting);
   reqs[idx] = req;
   assert(count < size);
@@ -136,7 +136,7 @@ int LoadFillReqQueue<size>::add(const LoadFillReq& req) {
 // miss buffer can be freed.
 //
 template<int size>
-void LoadFillReqQueue<size>::wakeup(W64 address, const bitvec<LFRQ_SIZE>& lfrqmask) {
+void LoadFillReqQueue<size>::wakeup(W64 address, const std::bitset<LFRQ_SIZE>& lfrqmask) {
   if (logable(6))
     logfile << "LFRQ.wakeup(", (void*)(Waddr)address, ", ", lfrqmask, ")", endl;
   //assert(L2.probe(address));
@@ -165,10 +165,10 @@ void LoadFillReqQueue<size>::clock() {
   //
   int wakeupcount = 0;
   foreach (i, MAX_WAKEUPS_PER_CYCLE) {
-    if unlikely (!ready)
+    if unlikely (ready.none())
       break;
 
-    int idx = ready.lsb();
+    int idx = lsb(ready);
     LoadFillReq& req = reqs[idx];
 
     if (logable(6))
@@ -221,7 +221,7 @@ ostream& LoadFillReqQueue<size>::print(ostream& os) const {
   os << "  Wait:   ", waiting, endl;
   os << "  Ready:  ", ready, endl;
   foreach (i, size) {
-    if (!bit(freemap, i)) {
+    if (!freemap[i]) {
       os << "  slot ", intstring(i, 2), ": ", reqs[i], endl;
     }
   }
@@ -237,7 +237,7 @@ void MissBuffer<SIZE>::reset() {
   foreach (i, SIZE) {
     missbufs[i].reset();
   }
-  freemap.setall();
+  freemap.set();
   count = 0;
 }
 
@@ -264,7 +264,7 @@ void MissBuffer<SIZE>::reset(int threadid) {
       //
       // NOTE SD: mb.lfrqmap should be zero by now (mb.reset() above)
       if (*mb.lfrqmap) {
-        bitvec<LFRQ_SIZE> tmp_lfrqmap = mb.lfrqmap ^ hierarchy.lfrq.waiting;
+        std::bitset<LFRQ_SIZE> tmp_lfrqmap = mb.lfrqmap ^ hierarchy.lfrq.waiting;
         if (*tmp_lfrqmap) {
           if (logable(6))
             logfile << "Multithread share same missbufs[", i, "] : its lfrqmap is ", mb.lfrqmap, " LFRQ waiting map ",
@@ -282,18 +282,22 @@ void MissBuffer<SIZE>::reset(int threadid) {
 
     if (logable(6))
       logfile << "Adjusting LFR wakeups for missbuf[", i, "] : before lfrqmap is ", mb.lfrqmap, endl;
-    for (size_t l = mb.lfrqmap.lsb(-1); l != -1; l = mb.lfrqmap.nextlsb(l, -1)) {
-      // Go through all associated LFRs and check their thread ID
-      // NOTE: This could also be done in LFRQ::reset or through several
-      //       assumptions about the waiting bitmap, as above.
-      const LoadFillReq& lfr = hierarchy.lfrq.reqs[l];
-      if (lfr.lsi.threadid == threadid)
-        mb.lfrqmap[l] = 0;
-    }
+    if (mb.lfrqmap.any())
+      for (size_t l = 0; l < mb.lfrqmap.size(); ++l) {
+        if (!mb.lfrqmap[l])
+          continue;
+
+        // Go through all associated LFRs and check their thread ID
+        // NOTE: This could also be done in LFRQ::reset or through several
+        //       assumptions about the waiting bitmap, as above.
+        const LoadFillReq& lfr = hierarchy.lfrq.reqs[l];
+        if (lfr.lsi.threadid == threadid)
+          mb.lfrqmap[l] = 0;
+      }
     if (logable(6))
       logfile << "Adjusting LFR wakeups for missbuf[", i, "] : after  lfrqmap is ", mb.lfrqmap, endl;
 
-    if likely (!mb.lfrqmap && (mb.threadid == threadid)) {
+    if likely (mb.lfrqmap.none() && (mb.threadid == threadid)) {
       // Drop empty MBEs that had only wakeups for the flushed thread
       if (logable(6))
         logfile << "[vcpu ", threadid, "] reset missbuf slot ", i, ": for rob", mb.rob, endl;
@@ -308,7 +312,7 @@ void MissBuffer<SIZE>::reset(int threadid) {
 
 template<int SIZE>
 void MissBuffer<SIZE>::restart() {
-  if likely (!(freemap.allset())) {
+  if likely (!(freemap.all())) {
     foreach (i, SIZE) {
       missbufs[i].lfrqmap = 0;
     }
@@ -361,7 +365,7 @@ int MissBuffer<SIZE>::initiate_miss(W64 addr, bool hit_in_L2, bool icache, int r
     return -1;
   }
 
-  idx = freemap.lsb();
+  idx = lsb(freemap);
   freemap[idx] = 0;
   assert(count < SIZE);
   count++;
@@ -461,7 +465,7 @@ int MissBuffer<SIZE>::initiate_miss(LoadFillReq& req, bool hit_in_L2, int rob) {
 
 template<int SIZE>
 void MissBuffer<SIZE>::clock() {
-  if likely (freemap.allset())
+  if likely (freemap.all())
     return;
 
   bool DEBUG = logable(6);
@@ -515,8 +519,8 @@ void MissBuffer<SIZE>::clock() {
             logfile << "[vcpu ", mb.threadid, "] mb", i, ": delivered ", (void*)(Waddr)mb.addr, " to L1 dcache (map ",
                 mb.lfrqmap, ")", endl;
           // If the L2 line size is bigger than the L1 line size, this will validate multiple lines in the L1 when an L2 line arrives:
-          // foreach (i, L2_LINE_SIZE / L1_LINE_SIZE) L1.validate(mb.addr + i*L1_LINE_SIZE, bitvec<L1_LINE_SIZE>().setall());
-          hierarchy.L1.validate(mb.addr, bitvec<L1_LINE_SIZE>().setall());
+          // foreach (i, L2_LINE_SIZE / L1_LINE_SIZE) L1.validate(mb.addr + i*L1_LINE_SIZE, std::bitset<L1_LINE_SIZE>().set());
+          hierarchy.L1.validate(mb.addr, std::bitset<L1_LINE_SIZE>().set());
           stats.dcache.missbuf.deliver.L2_to_L1D++;
           hierarchy.lfrq.wakeup(mb.addr, mb.lfrqmap);
         }
@@ -525,8 +529,8 @@ void MissBuffer<SIZE>::clock() {
           if (DEBUG)
             logfile << "[vcpu ", mb.threadid, "] mb", i, ": delivered ", (void*)(Waddr)mb.addr, " to L1 icache", endl;
           // If the L2 line size is bigger than the L1 line size, this will validate multiple lines in the L1 when an L2 line arrives:
-          // foreach (i, L2_LINE_SIZE / L1I_LINE_SIZE) L1I.validate(mb.addr + i*L1I_LINE_SIZE, bitvec<L1I_LINE_SIZE>().setall());
-          hierarchy.L1I.validate(mb.addr, bitvec<L1I_LINE_SIZE>().setall());
+          // foreach (i, L2_LINE_SIZE / L1I_LINE_SIZE) L1I.validate(mb.addr + i*L1I_LINE_SIZE, std::bitset<L1I_LINE_SIZE>().set());
+          hierarchy.L1I.validate(mb.addr, std::bitset<L1I_LINE_SIZE>().set());
           stats.dcache.missbuf.deliver.L2_to_L1I++;
           LoadStoreInfo lsi = 0;
           lsi.rob = mb.rob;
@@ -635,7 +639,7 @@ int CacheHierarchy::issueload_slowpath(Waddr physaddr, SFR& sfra, LoadStoreInfo 
     //
     // We had at least a partial L2 hit, but is the requested data actually mapped into the line?
     //
-    bitvec<L2_LINE_SIZE> sframask, reqmask;
+    std::bitset<L2_LINE_SIZE> sframask, reqmask;
     prep_L2_sframask_and_reqmask((lsi.sfrused) ? &sfra : null, physaddr, lsi.sizeshift, sframask, reqmask);
     L2hit =
         (lsi.sfrused) ? ((reqmask & (sframask | L2line->valid)) == reqmask) : ((reqmask & L2line->valid) == reqmask);
@@ -648,16 +652,16 @@ int CacheHierarchy::issueload_slowpath(Waddr physaddr, SFR& sfra, LoadStoreInfo 
 #ifdef CACHE_ALWAYS_HITS
   L1line = L1.select(physaddr);
   L1line->tag = L1.tagof(physaddr);
-  L1line->valid.setall();
+  L1line->valid.set();
   L2line->tag = L2.tagof(physaddr);
-  L2line->valid.setall();
+  L2line->valid.set();
   L2hit = 1;
 #endif
 
 #ifdef L2_ALWAYS_HITS
   L2line = L2.select(physaddr);
   L2line->tag = L2.tagof(physaddr);
-  L2line->valid.setall();
+  L2line->valid.set();
   L2line->lru = sim_cycle;
   L2hit = 1;
 #endif
@@ -709,13 +713,13 @@ int CacheHierarchy::get_lfrq_mb_state(int lfrqslot) const {
 }
 
 bool CacheHierarchy::covered_by_sfr(W64 addr, SFR* sfr, int sizeshift) {
-  bitvec<L1_LINE_SIZE> sframask, reqmask;
+  std::bitset<L1_LINE_SIZE> sframask, reqmask;
   prep_sframask_and_reqmask(sfr, addr, sizeshift, sframask, reqmask);
   return ((sframask & reqmask) == reqmask);
 }
 
 bool CacheHierarchy::probe_cache_and_sfr(W64 addr, const SFR* sfr, int sizeshift) {
-  bitvec<L1_LINE_SIZE> sframask, reqmask;
+  std::bitset<L1_LINE_SIZE> sframask, reqmask;
   prep_sframask_and_reqmask(sfr, addr, sizeshift, sframask, reqmask);
 
   //
@@ -828,9 +832,9 @@ W64 CacheHierarchy::commitstore(const SFR& sfr, int threadid, bool perform_actua
   L1line->valid |= ((W64)sfr.bytemask << lowbits(addr, 6));
   L2line->valid |= ((W64)sfr.bytemask << lowbits(addr, 6));
 
-  if unlikely (!L1line->valid.allset()) {
+  if unlikely (!L1line->valid.all()) {
     per_context_dcache_stats_update(threadid, store.prefetches++);
-    missbuf.initiate_miss(addr, L2line->valid.allset(), false, 0xffff, threadid);
+    missbuf.initiate_miss(addr, L2line->valid.all(), false, 0xffff, threadid);
   }
 
   stoptimer(store_flush_timer);

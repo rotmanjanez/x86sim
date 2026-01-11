@@ -128,7 +128,7 @@ struct CacheLine {
 #endif
   void reset() { clearstats(); }
   void invalidate() { reset(); }
-  void fill(W64 tag, const bitvec<linesize>& valid) {}
+  void fill(W64 tag, const std::bitset<linesize>& valid) {}
 
   void clearstats() {
 #ifdef TRACK_LINE_USAGE
@@ -148,7 +148,7 @@ static inline ostream& operator<<(ostream& os, const CacheLine<linesize>& line) 
 
 template<int linesize>
 struct CacheLineWithValidMask {
-  bitvec<linesize> valid;
+  std::bitset<linesize> valid;
 #ifdef TRACK_LINE_USAGE
   W32 filltime;
   W32 lasttime;
@@ -168,7 +168,7 @@ struct CacheLineWithValidMask {
     clearstats();
   }
   void invalidate() { reset(); }
-  void fill(W64 tag, const bitvec<linesize>& valid) { this->valid |= valid; }
+  void fill(W64 tag, const std::bitset<linesize>& valid) { this->valid |= valid; }
   ostream& print(ostream& os, W64 tag) const;
 };
 
@@ -318,7 +318,7 @@ struct DataCache : public AssociativeArray<W64, V, setcount, waycount, linesize,
 };
 
 struct L1Cache : public DataCache<L1CacheLine, L1_SET_COUNT, L1_WAY_COUNT, L1_LINE_SIZE, L1StatsCollector> {
-  L1CacheLine* validate(W64 addr, const bitvec<L1_LINE_SIZE>& valid) {
+  L1CacheLine* validate(W64 addr, const std::bitset<L1_LINE_SIZE>& valid) {
     addr = tagof(addr);
     L1CacheLine* line = select(addr);
     line->fill(addr, valid);
@@ -335,7 +335,7 @@ static inline ostream& operator<<(ostream& os, const L1Cache& cache) {
 //
 
 struct L1ICache : public DataCache<L1ICacheLine, L1I_SET_COUNT, L1I_WAY_COUNT, L1I_LINE_SIZE, L1IStatsCollector> {
-  L1ICacheLine* validate(W64 addr, const bitvec<L1I_LINE_SIZE>& valid) {
+  L1ICacheLine* validate(W64 addr, const std::bitset<L1I_LINE_SIZE>& valid) {
     addr = tagof(addr);
     L1ICacheLine* line = select(addr);
     line->fill(addr, valid);
@@ -381,16 +381,19 @@ struct L3Cache : public DataCache<L3CacheLine, L3_SET_COUNT, L3_WAY_COUNT, L3_LI
 };
 #endif
 
-static inline void prep_sframask_and_reqmask(const SFR* sfr, W64 addr, int sizeshift, bitvec<L1_LINE_SIZE>& sframask,
-                                             bitvec<L1_LINE_SIZE>& reqmask) {
-  sframask = (sfr) ? (bitvec<L1_LINE_SIZE>(sfr->bytemask) << 8 * lowbits(sfr->physaddr, log2(L1_LINE_SIZE) - 3)) : 0;
-  reqmask = bitvec<L1_LINE_SIZE>(bitmask(1 << sizeshift)) << lowbits(addr, log2(L1_LINE_SIZE));
+static inline void prep_sframask_and_reqmask(const SFR* sfr, W64 addr, int sizeshift,
+                                             std::bitset<L1_LINE_SIZE>& sframask, std::bitset<L1_LINE_SIZE>& reqmask) {
+  sframask =
+      (sfr) ? (std::bitset<L1_LINE_SIZE>(sfr->bytemask) << 8 * lowbits(sfr->physaddr, log2(L1_LINE_SIZE) - 3)) : 0;
+  reqmask = std::bitset<L1_LINE_SIZE>(bitmask(1 << sizeshift)) << lowbits(addr, log2(L1_LINE_SIZE));
 }
 
-static inline void prep_L2_sframask_and_reqmask(const SFR* sfr, W64 addr, int sizeshift, bitvec<L2_LINE_SIZE>& sframask,
-                                                bitvec<L2_LINE_SIZE>& reqmask) {
-  sframask = (sfr) ? (bitvec<L2_LINE_SIZE>(sfr->bytemask) << 8 * lowbits(sfr->physaddr, log2(L2_LINE_SIZE) - 3)) : 0;
-  reqmask = bitvec<L2_LINE_SIZE>(bitmask(1 << sizeshift)) << lowbits(addr, log2(L2_LINE_SIZE));
+static inline void prep_L2_sframask_and_reqmask(const SFR* sfr, W64 addr, int sizeshift,
+                                                std::bitset<L2_LINE_SIZE>& sframask,
+                                                std::bitset<L2_LINE_SIZE>& reqmask) {
+  sframask =
+      (sfr) ? (std::bitset<L2_LINE_SIZE>(sfr->bytemask) << 8 * lowbits(sfr->physaddr, log2(L2_LINE_SIZE) - 3)) : 0;
+  reqmask = std::bitset<L2_LINE_SIZE>(bitmask(1 << sizeshift)) << lowbits(addr, log2(L2_LINE_SIZE));
 }
 
 //
@@ -434,7 +437,7 @@ struct TranslationLookasideBuffer : public FullyAssociativeTagsNbitOneHot<size, 
   int flush_thread(W64 threadid) {
     W64 tag = threadid << 36;
     W64 tagmask = 0xfULL << 36;
-    bitvec<size> slotmask = base_t::masked_match(tag, tagmask);
+    std::bitset<size> slotmask = base_t::masked_match(tag, tagmask);
     int n = slotmask.popcount();
     base_t::masked_invalidate(slotmask);
     return n;
@@ -479,9 +482,9 @@ static inline ostream& operator<<(ostream& os, const LoadFillReq& req) {
 template<int size>
 struct LoadFillReqQueue {
   CacheHierarchy& hierarchy;
-  bitvec<size> freemap; // Slot is free
-  bitvec<size> waiting; // Waiting for the line to arrive in the L1
-  bitvec<size> ready;   // Wait to extract/signext and write into register
+  std::bitset<size> freemap; // Slot is free
+  std::bitset<size> waiting; // Waiting for the line to arrive in the L1
+  std::bitset<size> ready;   // Wait to extract/signext and write into register
   LoadFillReq reqs[size];
   int count;
 
@@ -501,7 +504,7 @@ struct LoadFillReqQueue {
     count = 0;
   }
 
-  void changestate(int idx, bitvec<size>& oldstate, bitvec<size>& newstate) {
+  void changestate(int idx, std::bitset<size>& oldstate, std::bitset<size>& newstate) {
     oldstate[idx] = 0;
     newstate[idx] = 1;
   }
@@ -523,7 +526,7 @@ struct LoadFillReqQueue {
 
   int add(const LoadFillReq& req);
 
-  void wakeup(W64 address, const bitvec<LFRQ_SIZE>& lfrqmask);
+  void wakeup(W64 address, const std::bitset<LFRQ_SIZE>& lfrqmask);
 
   void clock();
 
@@ -551,7 +554,7 @@ struct MissBuffer {
     W16 rob;
     W8 threadid;
 
-    bitvec<LFRQ_SIZE> lfrqmap; // which LFRQ entries should this load wake up?
+    std::bitset<LFRQ_SIZE> lfrqmap; // which LFRQ entries should this load wake up?
     void reset() {
       lfrqmap = 0;
       addr = 0xffffffffffffffffULL;
@@ -569,7 +572,7 @@ struct MissBuffer {
 
   CacheHierarchy& hierarchy;
   Entry missbufs[SIZE];
-  bitvec<SIZE> freemap;
+  std::bitset<SIZE> freemap;
   int count;
 
   void reset();

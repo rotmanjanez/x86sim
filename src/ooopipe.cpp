@@ -319,7 +319,7 @@ void ThreadContext::redispatch_deadlock_recovery() {
   //
 
   ReorderBufferEntry* prevrob = null;
-  bitvec<MAX_OPERANDS> noops = 0;
+  std::bitset<MAX_OPERANDS> noops = 0;
 
   foreach_forward(ROB, robidx) {
   ReorderBufferEntry& rob = ROB[robidx];
