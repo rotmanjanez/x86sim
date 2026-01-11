@@ -38,14 +38,6 @@ extern "C" {
 #define getcaller() (__builtin_return_address(0))
 #define asmlinkage extern "C"
 
-//
-// Asserts
-//
-#if defined __cplusplus
-#define __ASSERT_VOID_CAST static_cast<void>
-#else
-#define __ASSERT_VOID_CAST (void)
-#endif
 
 asmlinkage void assert_fail(const char* __assertion, const char* __file, unsigned int __line, const char* __function)
     __attribute__((__noreturn__));
@@ -56,11 +48,6 @@ static inline void assert_fail_trap(const char* __assertion, const char* __file,
   asm("ud2a" : : "a"(__assertion), "b"(__file), "c"(__line), "d"(__function));
 }
 
-#define __CONCAT(x, y) x##y
-#define __STRING(x) #x
-
-#define nan NAN
-#define inf INFINITY
 
 template<typename T>
 struct isprimitive_t {
@@ -169,19 +156,6 @@ static inline bool fits_in_signed_nbit(W64s v, int b) {
   return inrange(v, W64s(-(1ULL << (b - 1))), W64s(+(1ULL << (b - 1)) - 1));
 }
 
-static inline bool fits_in_signed_nbit_tagged(W64s v, int b) {
-  return inrange(v, W64s(-(1ULL << (b - 1)) + 1), W64s(+(1ULL << (b - 1)) - 1));
-}
-
-static inline bool fits_in_signed_8bit(W64s v) {
-  return fits_in_signed_nbit(v, 8);
-}
-static inline bool fits_in_signed_16bit(W64s v) {
-  return fits_in_signed_nbit(v, 16);
-}
-static inline bool fits_in_signed_32bit(W64s v) {
-  return fits_in_signed_nbit(v, 32);
-}
 
 #define sqr(x) ((x) * (x))
 #define cube(x) ((x) * (x) * (x))

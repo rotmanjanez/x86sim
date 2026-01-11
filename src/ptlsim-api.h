@@ -12,21 +12,6 @@
 #include <globals.h>
 #include <ptlhwdef.h>
 
-// From ptlhwdef.h
-// void Context::propagate_x86_exception(byte exception, W32 errorcode, Waddr virtaddr);
-// int Context::copy_from_user(void* target, Waddr addr, int bytes, PageFaultErrorCode& pfec, Waddr& faultaddr, bool forexec, Level1PTE& ptelo, Level1PTE& ptehi);
-// int Context::copy_to_user(Waddr target, void* source, int bytes, PageFaultErrorCode& pfec, Waddr& faultaddr);
-// int Context::write_segreg(unsigned int segid, W16 selector);
-// Waddr Context::check_and_translate(Waddr virtaddr, int sizeshift, bool store, bool internal, int& exception, PageFaultErrorCode& pfec, PTEUpdate& pteupdate, Level1PTE& pteused);
-// RIPVirtPhys& RIPVirtPhys::update(Context& ctx, int bytes);
-
-// From ptlsim.h
-// bool check_for_async_sim_break();
-// void print_sysinfo(ostream& os);
-// int inject_events();
-
-// void assist_ptlcall(Context& ctx);
-
 extern bool asp_check_exec(void* addr);
 
 extern bool smc_isdirty(Waddr mfn);

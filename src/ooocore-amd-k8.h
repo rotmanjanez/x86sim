@@ -10,11 +10,6 @@
 
 #ifndef _OOOCORE_H_
 #define _OOOCORE_H_
-
-// With these disabled, simulation is faster
-// #define ENABLE_CHECKS
-// #define ENABLE_LOGGING
-
 //
 // Enable SMT operation:
 //
