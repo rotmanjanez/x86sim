@@ -2329,11 +2329,10 @@ BasicBlock* BasicBlockCache::translate_and_clone(Context& ctx, Waddr rip) {
 #undef MAX_RIP
 
 ostream& BasicBlockCache::print(ostream& os) {
-  dynarray<BasicBlock*> bblist;
-  getentries(bblist);
+  auto bblist = getentries();
 
-  foreach (i, bblist.length) {
-    const BasicBlock& bb = *bblist[i];
+  for (const auto* ptr : bblist) {
+    const BasicBlock& bb = *ptr;
     double percent_of_total_uops = ((double)(bb.hitcount * bb.tagcount) / (double)total_uops_committed);
     double percent_of_total_bbs = ((double)(bb.hitcount) / (double)total_basic_blocks_committed);
 
