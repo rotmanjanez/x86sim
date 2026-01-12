@@ -4,6 +4,10 @@
 //
 // Copyright 2020-2020 Alexis Engelke <engelke@in.tum.de>
 //
+#include <charconv>
+#include <vector>
+#include <ranges>
+#include <string_view>
 
 #include "globals.h"
 #include "superstl.h"
@@ -124,11 +128,18 @@ void Raspsim::handle_syscall_32bit(int semantics) {
 }
 
 
-bool handle_config_arg(Raspsim& sim, char* line, dynarray<Waddr>* dump_pages) {
-  if (*line == '\0')
+bool handle_config_arg(Raspsim& sim, const std::string_view line, std::vector<Waddr>& dump_pages) {
+  using std::operator""sv;
+
+  if (line.empty())
     return false;
-  dynarray<char*> toks;
-  toks.tokenize(line, " ");
+
+  std::vector<std::string_view> toks;
+  for (auto tok : std::views::split(line, " "sv)) {
+    auto sv = std::string_view(tok.begin(), tok.end());
+    if (!sv.empty())
+      toks.push_back(sv);
+  }
   if (toks.empty())
     return false;
 
@@ -136,48 +147,57 @@ bool handle_config_arg(Raspsim& sim, char* line, dynarray<Waddr>* dump_pages) {
     return false;
   }
 
+  auto parse_hex = [](std::string_view str) -> std::optional<W64> {
+    W64 v;
+    if (str.starts_with("0x"))
+      str = str.substr(2);
+    auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), v, 16);
+    if (ec == std::errc())
+      return v;
+    return std::nullopt;
+  };
+
   if (toks[0][0] == 'M') { // allocate page M<addr> <prot>
     if (toks.size() != 2) {
       cerr << "Error: option ", line, " has wrong number of arguments", endl;
       return true;
     }
-    char* endp;
-    W64 addr = strtoull(toks[0] + 1, &endp, 16);
-    if (*endp != '\0' || lowbits(addr, 12)) {
-      cerr << "Error: invalid value ", toks[0], " ", endp, endl;
+    auto addrOpt = parse_hex(toks[0].substr(1));
+    if (!addrOpt || lowbits(*addrOpt, 12)) {
+      cerr << "Error: invalid value ", toks[0], endl;
       return true;
     }
     int prot = 0;
-    if (!strcmp(toks[1], "ro"))
+    if (toks[1] == "ro")
       prot = PROT_READ;
-    else if (!strcmp(toks[1], "rw"))
+    else if (toks[1] == "rw")
       prot = PROT_READ | PROT_WRITE;
-    else if (!strcmp(toks[1], "rx"))
+    else if (toks[1] == "rx")
       prot = PROT_READ | PROT_EXEC;
-    else if (!strcmp(toks[1], "rwx"))
+    else if (toks[1] == "rwx")
       prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     else {
       cerr << "Error: invalid mem prot ", toks[1], endl;
       return true;
     }
-    sim.map(addr, Raspsim::getPageSize(), prot);
+    sim.map(*addrOpt, Raspsim::getPageSize(), prot);
   } else if (toks[0][0] == 'W') { // write to mem W<addr> <hexbytes>, may not cross page boundaries
     if (toks.size() != 2) {
       cerr << "Error: option ", line, " has wrong number of arguments", endl;
       return true;
     }
-    char* endp;
-    W64 addr = strtoull(toks[0] + 1, &endp, 16);
-    if (*endp != '\0') {
+    auto addrOpt = parse_hex(toks[0].substr(1));
+    if (!addrOpt) {
       cerr << "Error: invalid value ", toks[0], endl;
       return true;
     }
-    byte* mapped = sim.getMappedPage(addr);
+    byte* mapped = sim.getMappedPage(*addrOpt);
     if (!mapped) {
-      cerr << "Error: page not mapped ", (void*)addr, endl;
+      cerr << "Error: page not mapped ", (void*)*addrOpt, endl;
       return true;
     }
-    Waddr arglen = strlen(toks[1]);
+    Waddr addr = *addrOpt;
+    Waddr arglen = toks[1].length();
     if ((arglen & 1) || arglen / 2 > 4096 - lowbits(addr, 12)) {
       cerr << "Error: arg has odd size or crosses page boundary", (void*)addr, endl;
       return true;
@@ -192,38 +212,37 @@ bool handle_config_arg(Raspsim& sim, char* line, dynarray<Waddr>* dump_pages) {
       cerr << "Error: option ", line, " has wrong number of arguments", endl;
       return true;
     }
-    char* endp;
-    W64 addr = strtoull(toks[0] + 1, &endp, 16);
-    if (*endp != '\0') {
+    auto addrOpt = parse_hex(toks[0].substr(1));
+    if (!addrOpt) {
       cerr << "Error: invalid value ", toks[0], endl;
       return true;
     }
-    dump_pages->push(floor(addr, PAGE_SIZE));
-  } else if (!strcmp(toks[0], "Fnox87")) {
+    dump_pages.push_back(floor(*addrOpt, PAGE_SIZE));
+  } else if (toks[0] == "Fnox87") {
     sim.disableX87();
-  } else if (!strcmp(toks[0], "Fnosse")) {
+  } else if (toks[0] == "Fnosse") {
     sim.disableSSE();
-  } else if (!strcmp(toks[0], "Fnocache")) {
+  } else if (toks[0] == "Fnocache") {
     sim.enablePerfectCache();
-  } else if (!strcmp(toks[0], "Fstbrpred")) {
+  } else if (toks[0] == "Fstbrpred") {
     sim.enableStaticBranchPrediction();
   } else {
     if (toks.size() != 2) {
       cerr << "Error: option ", line, " has wrong number of arguments", endl;
       return true;
     }
-    int reg = sim.getRegisterIndex(toks[0]);
+    std::string reg_str(toks[0]);
+    int reg = sim.getRegisterIndex(reg_str.c_str());
     if (reg < 0) {
       cerr << "Error: invalid register ", toks[0], endl;
       return true;
     }
-    char* endp;
-    W64 v = strtoull(toks[1], &endp, 0);
-    if (*endp != '\0') {
+    auto valOpt = parse_hex(toks[1]);
+    if (!valOpt) {
       cerr << "Error: invalid value ", toks[1], endl;
       return true;
     }
-    sim.setRegisterValue(reg, v);
+    sim.setRegisterValue(reg, *valOpt);
   }
 
   return false;
@@ -242,7 +261,7 @@ int main(int argc, char** argv) {
   handle_config_change(config, ptlsim_arg_count - 1, argv + 1);
 
   Raspsim sim{};
-  dynarray<Waddr> dump_pages;
+  std::vector<Waddr> dump_pages;
   // TODO(AE): set seccomp filter before parsing arguments
   bool parse_err = false;
   for (unsigned i = ptlsim_arg_count; i < argc; i++) {
@@ -261,10 +280,10 @@ int main(int argc, char** argv) {
         char* p = strchr(line, '#');
         if (p)
           *p = 0;
-        parse_err |= handle_config_arg(sim, line, &dump_pages);
+        parse_err |= handle_config_arg(sim, (char*)line, dump_pages);
       }
     } else {
-      parse_err |= handle_config_arg(sim, argv[i], &dump_pages);
+      parse_err |= handle_config_arg(sim, argv[i], dump_pages);
     }
   }
   if (parse_err) {
@@ -282,8 +301,7 @@ int main(int argc, char** argv) {
   cerr << "End state:", endl;
   cerr << sim.getContext(), endl;
 
-  foreach (i, dump_pages.length) {
-    Waddr addr = dump_pages[i];
+  for (Waddr addr : dump_pages) {
     byte* mapped = sim.getMappedPage(addr);
     if (!mapped) {
       cerr << "Error dumping memory: page not mapped ", (void*)addr, endl;

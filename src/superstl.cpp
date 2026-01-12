@@ -821,32 +821,6 @@ void* idstream::mmap(long long size) {
   return p;
 }
 
-template<>
-char* dynarray<char*>::tokenize(char* string, const char* seplist) {
-  byte issep[256];
-  setzero(issep);
-  foreach (i, strlen(seplist)) {
-    issep[(byte)seplist[i]] = 1;
-  }
-
-  char* pbase = string;
-  char* p = pbase;
-
-  while (*p) {
-    while ((*p) && issep[*p])
-      p++;
-    if unlikely (!(*p))
-      break;
-    push(p);
-    while ((*p) && (!issep[*p]))
-      p++;
-    int k = (!!(*p));
-    *p = 0;
-    p += k;
-  }
-
-  return pbase;
-}
 
 //
 // x86 compatible non-excepting divide and remainder:

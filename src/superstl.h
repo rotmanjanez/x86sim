@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <bitset>
 #include <bit>
+#include <vector>
 
 //
 // Formatting
@@ -272,6 +273,11 @@ static inline ostream& operator<<(ostream& os, const T& v) {
   stringbuf sb;
   sb << v;
   os.write((char*)sb, sb.size());
+  return os;
+}
+
+inline ostream& operator<<(ostream& os, const std::string_view v) {
+  os.write(v.data(), v.size());
   return os;
 }
 
@@ -643,185 +649,6 @@ static inline istream& operator>>(istream& is, stringbuf& sb) {
 extern istream cin;
 extern ostream cout;
 extern ostream cerr;
-
-
-//
-// Turn a raw-memory into an array of <T> filled with <value>
-//
-template<typename T, bool>
-struct ArrayConstructor {
-  inline static void init(T* noalias p, size_t length) {
-    foreach (i, length) {
-      new (p + i) T();
-    }
-  }
-};
-
-// Specialization for primitive initialization
-template<typename T>
-struct ArrayConstructor<T, true> {
-  inline static void init(T* noalias p, size_t length) {}
-};
-
-template<typename T, bool>
-struct ArrayInitializer {
-  inline static void init(T* noalias p, size_t length, const T value) {
-    foreach (i, length) {
-      new (p + i) T(value);
-    }
-  }
-};
-
-// Specialization for primitive initialization
-template<typename T>
-struct ArrayInitializer<T, true> {
-  inline static void init(T* noalias p, size_t length, const T value) {
-    foreach (i, length) {
-      p[i] = value;
-    }
-  }
-};
-
-template<typename T>
-static inline T* renew(T* p, size_t oldcount, size_t newcount) {
-  if unlikely (newcount <= oldcount)
-    return p;
-  T* pp = (T*)malloc(sizeof(T) * newcount);
-  if unlikely (!p)
-    assert(oldcount == 0);
-
-  if likely (p) {
-    arraycopy(pp, p, oldcount);
-    free(p);
-  }
-
-  ArrayConstructor<T, isprimitive(T) | ispointer(T)>::init(pp + oldcount, newcount - oldcount);
-
-  return pp;
-}
-
-/*
-   * Simple STL-like dynamic array class.
-   */
-template<class T>
-class dynarray {
-protected:
-public:
-  T* data;
-  size_t length;
-  size_t reserved;
-  size_t granularity;
-
-public:
-  inline T& operator[](int i) { return data[i]; }
-  inline T operator[](int i) const { return data[i]; }
-
-  operator T*() const { return data; }
-
-  // NOTE: g *must* be a power of two!
-  dynarray() {
-    length = reserved = 0;
-    granularity = 16;
-    data = null;
-  }
-
-  dynarray(int initcap, int g = 16) {
-    length = 0;
-    reserved = 0;
-    granularity = g;
-    data = null;
-    reserve(initcap);
-  }
-
-  ~dynarray() {
-    if (!(isprimitive(T) | ispointer(T))) {
-      foreach (i, reserved)
-        data[i].~T();
-    }
-
-    free(data);
-    data = null;
-    length = 0;
-    reserved = 0;
-  }
-
-  inline int capacity() const { return reserved; }
-  inline bool empty() const { return (length == 0); }
-  inline void clear() { resize(0); }
-  inline int size() const { return length; }
-  inline int count() const { return length; }
-
-  void push(const T& obj) {
-    T& pushed = push();
-    pushed = obj;
-  }
-
-  T& push() {
-    reserve(length + 1);
-    length++;
-    return data[length - 1];
-  }
-
-  T& pop() {
-    length--;
-    return data[length];
-  }
-
-  void resize(int newsize) {
-    if likely (newsize > length)
-      reserve(newsize);
-    length = newsize;
-  }
-
-  void resize(int newsize, const T& emptyvalue) {
-    int oldlength = length;
-    resize(newsize);
-    if unlikely (newsize <= oldlength)
-      return;
-    for (int i = oldlength; i < reserved; i++) {
-      data[i] = emptyvalue;
-    }
-  }
-
-  void reserve(int newsize) {
-    if unlikely (newsize <= reserved)
-      return;
-    newsize = (newsize + (granularity - 1)) & ~(granularity - 1);
-    int oldsize = length;
-    data = renew(data, length, newsize);
-    reserved = newsize;
-  }
-
-  void fill(const T value) {
-    foreach (i, length) {
-      data[i] = value;
-    }
-  }
-
-  // Only works with specialization for character arrays:
-  char* tokenize(char* string, const char* seplist) { abort(); }
-};
-
-template<class T>
-static inline const T& operator<<(dynarray<T>& buf, const T& v) {
-  return buf.push(v);
-}
-template<class T>
-static inline const T& operator>>(dynarray<T>& buf, T& v) {
-  return (v = buf.pop());
-}
-
-template<>
-char* dynarray<char*>::tokenize(char* string, const char* seplist);
-
-template<class T>
-static inline ostream& operator<<(ostream& os, const dynarray<T>& v) {
-  os << "Array of ", v.size(), " elements (", v.capacity(), " reserved): ", endl;
-  for (int i = 0; i < v.size(); i++) {
-    os << "  [", i, "]: ", v[i], endl;
-  }
-  return os;
-}
 
 /*
    * CRC32
@@ -1333,16 +1160,16 @@ public:
     }
   };
 
-  dynarray<T*>& getentries(dynarray<T*>& a) {
-    a.resize(count);
+  std::vector<T*> getentries() {
+    std::vector<T*> result(count);
     int n = 0;
     Iterator iter(this);
     T* t;
     while (t = iter.next()) {
       assert(n < count);
-      a[n++] = t;
+      result[n++] = t;
     }
-    return a;
+    return result;
   }
 
   SelfHashtable() { reset(); }
