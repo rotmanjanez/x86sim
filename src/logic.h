@@ -9,8 +9,8 @@
 #define _LOGIC_H_
 
 #include <array>
-#include <globals.h>
-#include <superstl.h>
+#include "globals.h"
+#include "superstl.h"
 
 //
 // Queue

@@ -5,8 +5,8 @@
 // Copyright 2000-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <globals.h>
-#include <ptlsim.h>
+#include "globals.h"
+#include "ptlsim.h"
 
 
 // No operation

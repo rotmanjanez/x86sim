@@ -17,7 +17,7 @@ extern "C" {
 #include <sys/ptrace.h>
 }
 
-#include <typedefs.h>
+#include "typedefs.h"
 
 #ifdef __cplusplus
 
@@ -616,7 +616,7 @@ asmlinkage{
 
 #include <stdarg.h>
 
-#include <syscalls.h>
+#include "syscalls.h"
 
 #ifdef PAGE_SIZE
 #undef PAGE_SIZE
@@ -839,7 +839,7 @@ inline int add_index_modulo(int index, int increment, int bufsize) {
   return index;
 }
 
-#include <superstl.h>
+#include "superstl.h"
 
 using namespace superstl;
 

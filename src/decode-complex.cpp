@@ -5,7 +5,7 @@
 // Copyright 1999-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <decode.h>
+#include "decode.h"
 
 template<typename T>
 void assist_div(Context& ctx) {

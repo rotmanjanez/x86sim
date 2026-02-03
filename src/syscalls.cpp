@@ -9,7 +9,7 @@
 // GNU General Public License, Version 2.
 //
 
-#include <globals.h>
+#include "globals.h"
 
 #define syslinkage extern "C"
 

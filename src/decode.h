@@ -9,8 +9,8 @@
 #ifndef _DECODE_H_
 #define _DECODE_H_
 
-#include <globals.h>
-#include <ptlsim.h>
+#include "globals.h"
+#include "ptlsim.h"
 
 struct RexByte {
   // a.k.a., b, x, r, w

@@ -5,10 +5,10 @@
 // Copyright 1999-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <globals.h>
-#include <ptlsim.h>
-#include <decode.h>
-#include <stats.h>
+#include "globals.h"
+#include "ptlsim.h"
+#include "decode.h"
+#include "stats.h"
 
 
 BasicBlockCache bbcache;

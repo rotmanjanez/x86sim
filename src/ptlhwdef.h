@@ -61,7 +61,7 @@
 #define ARCHREG_INT_BASE 0
 #define ARCHREG_SSE_BASE 16
 
-#include <registers.def>
+#include "registers.def"
 
 
 #ifndef __ASM_ONLY__
@@ -69,10 +69,10 @@
 // The following definitions are used by C++ code
 //
 
-#include <globals.h>
+#include "globals.h"
 extern W64 sim_cycle;
-#include <logic.h>
-#include <config.h>
+#include "logic.h"
+#include "config.h"
 
 //
 // Exceptions:

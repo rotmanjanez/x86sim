@@ -5,18 +5,18 @@
 // Copyright 2020-2020 Alexis Engelke <engelke@in.tum.de>
 //
 
-#include <globals.h>
-#include <superstl.h>
-#include <mm.h>
+#include "globals.h"
+#include "superstl.h"
+#include "mm.h"
 
 #include <elf.h>
 
-#include <ptlsim.h>
-#include <ptlsim-api.h>
-#include <ptlhwdef.h>
-#include <config.h>
-#include <stats.h>
-#include <raspsim-hwsetup.h>
+#include "ptlsim.h"
+#include "ptlsim-api.h"
+#include "ptlhwdef.h"
+#include "config.h"
+#include "stats.h"
+#include "raspsim-hwsetup.h"
 
 struct PTLsimConfig;
 extern PTLsimConfig config;

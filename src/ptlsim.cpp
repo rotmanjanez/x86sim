@@ -6,10 +6,10 @@
 //
 
 #include <unordered_map>
-#include <globals.h>
-#include <ptlsim.h>
+#include "globals.h"
+#include "ptlsim.h"
 #define CPT_STATS
-#include <stats.h>
+#include "stats.h"
 #undef CPT_STATS
 
 #include <elf.h>

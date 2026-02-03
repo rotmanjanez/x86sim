@@ -9,8 +9,8 @@
 #ifndef _PTLSIM_API_H_
 #define _PTLSIM_API_H_
 
-#include <globals.h>
-#include <ptlhwdef.h>
+#include "globals.h"
+#include "ptlhwdef.h"
 
 extern bool asp_check_exec(void* addr);
 
