@@ -706,6 +706,8 @@
 
 #define NR_syscalls 294
 
+#endif
+
 #ifdef PTLSIM_AMD64
 
 declare_syscall6(__NR_mmap, void*, sys_mmap, void*, start, size_t, length, int, prot, int, flags, int, fd, W64, offset);
