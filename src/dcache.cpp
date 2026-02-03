@@ -5,8 +5,8 @@
 // Copyright 2005-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <dcache.h>
-#include <stats.h>
+#include "dcache.h"
+#include "stats.h"
 
 using namespace CacheSubsystem;
 

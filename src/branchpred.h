@@ -11,7 +11,7 @@
 #ifndef _BRANCHPRED_H_
 #define _BRANCHPRED_H_
 
-#include <ptlsim.h>
+#include "ptlsim.h"
 
 #define BRANCH_HINT_UNCOND 0
 #define BRANCH_HINT_COND (1 << 0)

@@ -5,12 +5,12 @@
 // Copyright 2003-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <globals.h>
-#include <ptlsim.h>
-#include <seqcore.h>
-#include <branchpred.h>
-#include <dcache.h>
-#include <stats.h>
+#include "globals.h"
+#include "ptlsim.h"
+#include "seqcore.h"
+#include "branchpred.h"
+#include "dcache.h"
+#include "stats.h"
 
 // With these disabled, simulation is faster
 #define ENABLE_CHECKS

@@ -5,7 +5,7 @@
 // Copyright 2000-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <config.h>
+#include "config.h"
 
 ostream& ConfigurationParserBase::printusage(const void* baseptr, ostream& os) const {
   os << "Options are:", endl;

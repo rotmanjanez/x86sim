@@ -9,7 +9,7 @@
 #ifndef _SEQCORE_H_
 #define _SEQCORE_H_
 
-#include <ptlsim.h>
+#include "ptlsim.h"
 
 //
 // Free-standing sequential execution of one basic block

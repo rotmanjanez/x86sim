@@ -1,6 +1,6 @@
-#include <raspsim-hwsetup.h>
-#include <addrspace.h>
-#include <ptlsim.h>
+#include "raspsim-hwsetup.h"
+#include "addrspace.h"
+#include "ptlsim.h"
 
 struct PTLsimConfig;
 extern PTLsimConfig config;

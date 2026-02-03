@@ -7,8 +7,8 @@
 // GNU General Public License, Version 2.
 //
 
-#include <globals.h>
-#include <superstl.h>
+#include "globals.h"
+#include "superstl.h"
 
 // For debugging of messages before crashes:
 bool force_synchronous_streams = false;

@@ -5,7 +5,7 @@
 // Copyright 1999-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <decode.h>
+#include "decode.h"
 
 bool TraceDecoder::decode_fast() {
   DecodedOperand rd;

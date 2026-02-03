@@ -7,16 +7,16 @@
 // Copyright 2006-2008 Hui Zeng <hzeng@cs.binghamton.edu>
 //
 
-#include <globals.h>
+#include "globals.h"
 #include <elf.h>
-#include <ptlsim.h>
-#include <branchpred.h>
-#include <logic.h>
-#include <dcache.h>
+#include "ptlsim.h"
+#include "branchpred.h"
+#include "logic.h"
+#include "dcache.h"
 
 #define INSIDE_OOOCORE
-#include <ooocore.h>
-#include <stats.h>
+#include "ooocore.h"
+#include "stats.h"
 
 #ifndef ENABLE_CHECKS
 #undef assert

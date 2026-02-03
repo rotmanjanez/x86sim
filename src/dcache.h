@@ -9,7 +9,7 @@
 #ifndef _DCACHE_H_
 #define _DCACHE_H_
 
-#include <ptlsim.h>
+#include "ptlsim.h"
 
 struct LoadStoreInfo {
   W16 rob;

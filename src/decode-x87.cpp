@@ -5,7 +5,7 @@
 // Copyright 1999-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <decode.h>
+#include "decode.h"
 
 //
 // x87 assists
@@ -383,7 +383,7 @@ void assist_x87_finit(Context& ctx) {
 // Mapping table: 128 (bits 6:0) -> 4 (x87 flag bits)
 //
 //
-// #include <ptlhwdef.h>
+// #include "ptlhwdef.h"
 //
 // void gen_fcmpcc_to_fcom_flags() {
 //

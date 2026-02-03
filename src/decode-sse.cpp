@@ -5,7 +5,7 @@
 // Copyright 1999-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <decode.h>
+#include "decode.h"
 
 static const byte sse_float_datatype_to_ptl_datatype[4] = {DATATYPE_FLOAT, DATATYPE_VEC_FLOAT, DATATYPE_DOUBLE,
                                                            DATATYPE_VEC_DOUBLE};

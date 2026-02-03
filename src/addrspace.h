@@ -14,10 +14,10 @@
 #include <unordered_map>
 #include <memory>
 
-#include <globals.h>
-#include <superstl.h>
+#include "globals.h"
+#include "superstl.h"
 
-#include <ptlsim.h>
+#include "ptlsim.h"
 
 //
 // Address space management

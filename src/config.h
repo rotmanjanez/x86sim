@@ -8,8 +8,8 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-#include <globals.h>
-#include <superstl.h>
+#include "globals.h"
+#include "superstl.h"
 #include <stdarg.h>
 
 static const W64 infinity = std::numeric_limits<W64s>::max();

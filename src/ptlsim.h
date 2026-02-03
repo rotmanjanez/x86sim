@@ -9,11 +9,11 @@
 #ifndef _PTLSIM_H_
 #define _PTLSIM_H_
 
-#include <globals.h>
-#include <mm.h>
-#include <ptlsim-api.h>
-#include <ptlhwdef.h>
-#include <config.h>
+#include "globals.h"
+#include "mm.h"
+#include "ptlsim-api.h"
+#include "ptlhwdef.h"
+#include "config.h"
 
 extern W64 sim_cycle;
 extern W64 unhalted_cycle_count;

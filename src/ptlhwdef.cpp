@@ -5,8 +5,8 @@
 // Copyright 1999-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <ptlsim.h>
-#include <dcache.h>
+#include "ptlsim.h"
+#include "dcache.h"
 
 const char* opclass_names[OPCLASS_COUNT] = {
     "logic",       "addsub", "addsubc", "addshift",   "sel",        "cmp",        "br.cc",

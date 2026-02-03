@@ -8,8 +8,8 @@
 // GNU General Public License, Version 2.
 //
 
-#include <branchpred.h>
-#include <stats.h>
+#include "branchpred.h"
+#include "stats.h"
 
 template<int SIZE>
 struct BimodalPredictor {

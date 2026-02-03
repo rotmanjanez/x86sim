@@ -1,7 +1,7 @@
 #ifndef _RASPSIM_HWSETUP_H_
 #define _RASPSIM_HWSETUP_H_
 
-#include <typedefs.h>
+#include "typedefs.h"
 
 class AddressSpace;
 class Context;

@@ -9,15 +9,15 @@
 #ifndef _STATS_H_
 #define _STATS_H_
 
-#include <globals.h>
-#include <superstl.h>
-#include <ptlsim.h>
+#include "globals.h"
+#include "superstl.h"
+#include "ptlsim.h"
 
 #define STATS_ONLY
-#include <decode.h>
-#include <ooocore.h>
-#include <dcache.h>
-#include <branchpred.h>
+#include "decode.h"
+#include "ooocore.h"
+#include "dcache.h"
+#include "branchpred.h"
 #undef STATS_ONLY
 
 
