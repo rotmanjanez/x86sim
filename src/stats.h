@@ -21,7 +21,7 @@
 #undef STATS_ONLY
 
 
-#define increment_clipped_histogram(h, slot, incr) h[clipto(W64(slot), W64(0), W64(lengthof(h)-1))] += incr;
+#define increment_clipped_histogram(h, slot, incr) h[clipto(W64(slot), W64(0), W64(lengthof(h) - 1))] += incr;
 
 //
 // This file is run through dstbuild to auto-generate
@@ -148,7 +148,7 @@ struct PTLsimStats { // rootnode:
 
   struct external {
     W64 assists[ASSIST_COUNT]; // label: assist_names
-    W64 traps[256]; // label: x86_exception_names
+    W64 traps[256];            // label: x86_exception_names
 #ifdef PTLSIM_HYPERVISOR
     EventsInMode cycles_in_mode;
     EventsInMode insns_in_mode;

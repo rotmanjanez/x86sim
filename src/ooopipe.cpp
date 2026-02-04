@@ -33,8 +33,10 @@ using namespace OutOfOrderModel;
 void OutOfOrderCoreCacheCallbacks::icache_wakeup(LoadStoreInfo lsi, W64 physaddr) {
   foreach (i, core.threadcount) {
     ThreadContext* thread = core.threads[i];
-    if unlikely (thread && thread->waiting_for_icache_fill && (floor(thread->waiting_for_icache_fill_physaddr, CacheSubsystem::L1_LINE_SIZE) == physaddr)) {
-      if (logable(6)) logfile << "[vcpu ", thread->ctx.vcpuid, "] i-cache wakeup of physaddr ", (void*)(Waddr)physaddr, endl;
+    if unlikely (thread && thread->waiting_for_icache_fill &&
+                 (floor(thread->waiting_for_icache_fill_physaddr, CacheSubsystem::L1_LINE_SIZE) == physaddr)) {
+      if (logable(6))
+        logfile << "[vcpu ", thread->ctx.vcpuid, "] i-cache wakeup of physaddr ", (void*)(Waddr)physaddr, endl;
       thread->waiting_for_icache_fill = 0;
       thread->waiting_for_icache_fill_physaddr = 0;
     }
@@ -52,17 +54,18 @@ static W32 phys_reg_files_writable_by_uop(const TransOp& uop) {
   W32 c = opinfo[uop.opcode].opclass;
 
 #ifdef UNIFIED_INT_FP_PHYS_REG_FILE
-  return
-    (c & OPCLASS_STORE) ? OutOfOrderCore::PHYS_REG_FILE_MASK_ST :
-    (c & OPCLASS_BRANCH) ? OutOfOrderCore::PHYS_REG_FILE_MASK_BR :
-    OutOfOrderCore::PHYS_REG_FILE_MASK_INT;
+  return (c & OPCLASS_STORE)    ? OutOfOrderCore::PHYS_REG_FILE_MASK_ST
+         : (c & OPCLASS_BRANCH) ? OutOfOrderCore::PHYS_REG_FILE_MASK_BR
+                                : OutOfOrderCore::PHYS_REG_FILE_MASK_INT;
 #else
-  return
-    (c & OPCLASS_STORE) ? OutOfOrderCore::PHYS_REG_FILE_MASK_ST :
-    (c & OPCLASS_BRANCH) ? OutOfOrderCore::PHYS_REG_FILE_MASK_BR :
-    (c & (OPCLASS_LOAD | OPCLASS_PREFETCH)) ? ((uop.datatype == DATATYPE_INT) ? OutOfOrderCore::PHYS_REG_FILE_MASK_INT : OutOfOrderCore::PHYS_REG_FILE_MASK_FP) :
-    ((c & OPCLASS_FP) | inrange((int)uop.rd, REG_xmml0, REG_xmmh15) | inrange((int)uop.rd, REG_fptos, REG_ctx)) ? OutOfOrderCore::PHYS_REG_FILE_MASK_FP :
-    OutOfOrderCore::PHYS_REG_FILE_MASK_INT;
+  return (c & OPCLASS_STORE)    ? OutOfOrderCore::PHYS_REG_FILE_MASK_ST
+         : (c & OPCLASS_BRANCH) ? OutOfOrderCore::PHYS_REG_FILE_MASK_BR
+         : (c & (OPCLASS_LOAD | OPCLASS_PREFETCH))
+             ? ((uop.datatype == DATATYPE_INT) ? OutOfOrderCore::PHYS_REG_FILE_MASK_INT
+                                               : OutOfOrderCore::PHYS_REG_FILE_MASK_FP)
+         : ((c & OPCLASS_FP) | inrange((int)uop.rd, REG_xmml0, REG_xmmh15) | inrange((int)uop.rd, REG_fptos, REG_ctx))
+             ? OutOfOrderCore::PHYS_REG_FILE_MASK_FP
+             : OutOfOrderCore::PHYS_REG_FILE_MASK_INT;
 #endif
 }
 
@@ -73,10 +76,11 @@ void ThreadContext::annul_fetchq() {
   // that the core can annul normally. Therefore, we must go backwards in
   // the fetch queue to annul these updates, in addition to checking the ROB.
   //
-  foreach_backward (fetchq, i) {
+  foreach_backward(fetchq, i) {
     FetchBufferEntry& fetchbuf = fetchq[i];
-    if unlikely (isbranch(fetchbuf.opcode) && (fetchbuf.predinfo.bptype & (BRANCH_HINT_CALL|BRANCH_HINT_RET))) {
-      if unlikely (config.event_log_enabled) core.eventlog.add(EVENT_ANNUL_FETCHQ_RAS, fetchbuf);
+    if unlikely (isbranch(fetchbuf.opcode) && (fetchbuf.predinfo.bptype & (BRANCH_HINT_CALL | BRANCH_HINT_RET))) {
+      if unlikely (config.event_log_enabled)
+        core.eventlog.add(EVENT_ANNUL_FETCHQ_RAS, fetchbuf);
       branchpred.annulras(fetchbuf.predinfo);
     }
   }
@@ -103,16 +107,18 @@ void ThreadContext::flush_pipeline() {
   // through a partially committed x86 instruction. This is dangerous,
   // especially if the instruction has already partially updated
   // architectural state.
-  if unlikely (logable(1) && rob_ready_to_commit_queue.count &&
-               !ROB.peekhead()->uop.som) {
+  if unlikely (logable(1) && rob_ready_to_commit_queue.count && !ROB.peekhead()->uop.som) {
 
-    logfile << "[vcpu ", ctx.vcpuid, "] thread ", threadid, ": Flushing through a "
-               "partially committed x86 instruction, this is likely BAD:",endl;
+    logfile << "[vcpu ", ctx.vcpuid, "] thread ", threadid,
+        ": Flushing through a "
+        "partially committed x86 instruction, this is likely BAD:",
+        endl;
 
     foreach_forward(ROB, i) {
       ReorderBufferEntry& rob = ROB[i];
-      logfile <<"  ", rob, endl;
-      if (rob.uop.eom) break;
+      logfile << "  ", rob, endl;
+      if (rob.uop.eom)
+        break;
     }
   }
 
@@ -132,26 +138,25 @@ void ThreadContext::flush_pipeline() {
 
     if unlikely (config.event_log_enabled)
       core.eventlog.add(EVENT_ANNUL_FLUSH, &rob);
-
   }
 
   // free all register in arch state:
-  foreach (i, PHYS_REG_FILE_COUNT){
+  foreach (i, PHYS_REG_FILE_COUNT) {
     StateList& list = core.physregfiles[i].states[PHYSREG_ARCH];
     PhysicalRegister* obj;
     int n = 0;
-    foreach_list_mutable( list, obj, entry, nextentry) {
+    foreach_list_mutable(list, obj, entry, nextentry) {
       n++;
       obj->reset(threadid);
     }
   }
 
   // free all register in arch state:
-  foreach (i, PHYS_REG_FILE_COUNT){
+  foreach (i, PHYS_REG_FILE_COUNT) {
     StateList& list = core.physregfiles[i].states[PHYSREG_PENDINGFREE];
     PhysicalRegister* obj;
     int n = 0;
-    foreach_list_mutable( list, obj, entry, nextentry) {
+    foreach_list_mutable(list, obj, entry, nextentry) {
       n++;
       obj->reset(threadid);
     }
@@ -206,9 +211,11 @@ void ThreadContext::reset_fetch_unit(W64 realrip) {
 //
 void ThreadContext::invalidate_smc() {
   if unlikely (smc_invalidate_pending) {
-    if (logable(5)) logfile << "SMC invalidate pending on ", smc_invalidate_rvp, endl;
+    if (logable(5))
+      logfile << "SMC invalidate pending on ", smc_invalidate_rvp, endl;
     bbcache.invalidate_page(smc_invalidate_rvp.mfnlo, INVALIDATE_REASON_SMC);
-    if unlikely (smc_invalidate_rvp.mfnlo != smc_invalidate_rvp.mfnhi) bbcache.invalidate_page(smc_invalidate_rvp.mfnhi, INVALIDATE_REASON_SMC);
+    if unlikely (smc_invalidate_rvp.mfnlo != smc_invalidate_rvp.mfnhi)
+      bbcache.invalidate_page(smc_invalidate_rvp.mfnhi, INVALIDATE_REASON_SMC);
     smc_invalidate_pending = 0;
   }
 }
@@ -291,14 +298,18 @@ void ThreadContext::external_to_core_state() {
 // a result or are otherwise stalled.
 //
 void ThreadContext::redispatch_deadlock_recovery() {
-  if (logable(6)) core.dump_smt_state(logfile);
+  if (logable(6))
+    core.dump_smt_state(logfile);
 
   per_context_ooocore_stats_update(threadid, dispatch.redispatch.deadlock_flushes++);
   // don't want to reset the counter for no commit in this case
   W64 previous_last_commit_at_cycle = last_commit_at_cycle;
   flush_pipeline();
-  last_commit_at_cycle = previous_last_commit_at_cycle; /// so we can exit after no commit after deadlock recovery a few times in a roll
-  logfile << "[vcpu ", ctx.vcpuid, "] thread ", threadid, ": reset thread.last_commit_at_cycle to be before redispatch_deadlock_recovery() ", previous_last_commit_at_cycle, endl;
+  last_commit_at_cycle =
+      previous_last_commit_at_cycle; /// so we can exit after no commit after deadlock recovery a few times in a roll
+  logfile << "[vcpu ", ctx.vcpuid, "] thread ", threadid,
+      ": reset thread.last_commit_at_cycle to be before redispatch_deadlock_recovery() ", previous_last_commit_at_cycle,
+      endl;
   /*
   //
   // This is a more selective scheme than the full pipeline flush.
@@ -395,7 +406,7 @@ bool ThreadContext::fetch() {
   }
 
   if unlikely (waiting_for_icache_fill) {
-    if unlikely (config.event_log_enabled){
+    if unlikely (config.event_log_enabled) {
       event = eventlog.add(EVENT_FETCH_ICACHE_WAIT);
       event->threadid = threadid;
       event->rip = fetchrip;
@@ -409,7 +420,7 @@ bool ThreadContext::fetch() {
     if unlikely (!fetchq.remaining()) {
       if unlikely (config.event_log_enabled) {
         if (!fetchcount) {
-          event =  eventlog.add(EVENT_FETCH_FETCHQ_FULL);
+          event = eventlog.add(EVENT_FETCH_FETCHQ_FULL);
           event->threadid = threadid;
           event->uuid = fetch_uuid;
         }
@@ -447,7 +458,8 @@ bool ThreadContext::fetch() {
 
     if unlikely ((!current_basic_block) || (current_basic_block_transop_index >= current_basic_block->count)) {
       fetch_bb_address_ringbuf[fetch_bb_address_ringbuf_head] = fetchrip;
-      fetch_bb_address_ringbuf_head = add_index_modulo(fetch_bb_address_ringbuf_head, +1, lengthof(fetch_bb_address_ringbuf));
+      fetch_bb_address_ringbuf_head =
+          add_index_modulo(fetch_bb_address_ringbuf_head, +1, lengthof(fetch_bb_address_ringbuf));
       fetch_or_translate_basic_block(fetchrip);
     }
 
@@ -474,7 +486,7 @@ bool ThreadContext::fetch() {
       bool hit = core.caches.probe_icache(fetchrip, physaddr);
       hit |= config.perfect_cache;
       if unlikely (!hit) {
-        int missbuf = core.caches.initiate_icache_miss(physaddr, fetch_uuid,threadid);
+        int missbuf = core.caches.initiate_icache_miss(physaddr, fetch_uuid, threadid);
         if unlikely (config.event_log_enabled) {
           event = eventlog.add(EVENT_FETCH_ICACHE_MISS, fetchrip);
           event->fetch.missbuf = missbuf;
@@ -509,8 +521,8 @@ bool ThreadContext::fetch() {
 
     // If opcode is OP_ld_a16/OP_st_a16, it must be aligned.
     transop.unaligned = core.get_unaligned_hint(fetchrip) &&
-      ((transop.opcode == OP_ld) | (transop.opcode == OP_ldx) | (transop.opcode == OP_st)) &&
-      (transop.cond == LDST_ALIGN_NORMAL);
+                        ((transop.opcode == OP_ld) | (transop.opcode == OP_ldx) | (transop.opcode == OP_st)) &&
+                        (transop.cond == LDST_ALIGN_NORMAL);
     transop.ld_st_truly_unaligned = 0;
     transop.rip = fetchrip;
     transop.uuid = fetch_uuid;
@@ -525,7 +537,8 @@ bool ThreadContext::fetch() {
     // are forced into the pipeline.
     //
     if unlikely (transop.unaligned) {
-      if unlikely (config.event_log_enabled) eventlog.add(EVENT_FETCH_SPLIT, transop);
+      if unlikely (config.event_log_enabled)
+        eventlog.add(EVENT_FETCH_SPLIT, transop);
       split_unaligned(transop, unaligned_ldst_buf);
       assert(unaligned_ldst_buf.get(transop, synthop));
     }
@@ -539,7 +552,8 @@ bool ThreadContext::fetch() {
 
     if unlikely (isclass(transop.opcode, OPCLASS_BARRIER)) {
       // We've hit an assist: stall the frontend until we resume or redirect
-      if unlikely (config.event_log_enabled) eventlog.add(EVENT_FETCH_ASSIST, transop);
+      if unlikely (config.event_log_enabled)
+        eventlog.add(EVENT_FETCH_ASSIST, transop);
       per_context_ooocore_stats_update(threadid, fetch.stop.microcode_assist++);
       stall_frontend = 1;
     }
@@ -554,16 +568,16 @@ bool ThreadContext::fetch() {
 
     if (isbranch(transop.opcode)) {
       transop.predinfo.uuid = transop.uuid;
-      transop.predinfo.bptype =
-        (isclass(transop.opcode, OPCLASS_COND_BRANCH) << log2(BRANCH_HINT_COND)) |
-        (isclass(transop.opcode, OPCLASS_INDIR_BRANCH) << log2(BRANCH_HINT_INDIRECT)) |
-        (bit(transop.extshift, log2(BRANCH_HINT_PUSH_RAS)) << log2(BRANCH_HINT_CALL)) |
-        (bit(transop.extshift, log2(BRANCH_HINT_POP_RAS)) << log2(BRANCH_HINT_RET));
+      transop.predinfo.bptype = (isclass(transop.opcode, OPCLASS_COND_BRANCH) << log2(BRANCH_HINT_COND)) |
+                                (isclass(transop.opcode, OPCLASS_INDIR_BRANCH) << log2(BRANCH_HINT_INDIRECT)) |
+                                (bit(transop.extshift, log2(BRANCH_HINT_PUSH_RAS)) << log2(BRANCH_HINT_CALL)) |
+                                (bit(transop.extshift, log2(BRANCH_HINT_POP_RAS)) << log2(BRANCH_HINT_RET));
 
       // SMP/SMT: Fill in with target thread ID (if the predictor supports this):
       transop.predinfo.ctxid = 0;
       transop.predinfo.ripafter = fetchrip + transop.bytes;
-      predrip = branchpred.predict(transop.predinfo, transop.predinfo.bptype, transop.predinfo.ripafter, transop.riptaken);
+      predrip =
+          branchpred.predict(transop.predinfo, transop.predinfo.bptype, transop.predinfo.ripafter, transop.riptaken);
       redirectrip = 1;
       per_context_ooocore_stats_update(threadid, branchpred.predictions++);
     }
@@ -597,8 +611,8 @@ bool ThreadContext::fetch() {
       fetchrip.rip += transop.bytes;
       fetchrip.update(ctx);
 
-      if unlikely (isbranch(transop.opcode) && (transop.predinfo.bptype & (BRANCH_HINT_CALL|BRANCH_HINT_RET)))
-                    branchpred.updateras(transop.predinfo, transop.predinfo.ripafter);
+      if unlikely (isbranch(transop.opcode) && (transop.predinfo.bptype & (BRANCH_HINT_CALL | BRANCH_HINT_RET)))
+        branchpred.updateras(transop.predinfo, transop.predinfo.ripafter);
 
       if unlikely (redirectrip) {
         // follow to target, then end fetching for this cycle if predicted taken
@@ -652,7 +666,8 @@ BasicBlock* ThreadContext::fetch_or_translate_basic_block(const RIPVirtPhys& rvp
   current_basic_block->acquire();
   current_basic_block->use(sim_cycle);
 
-  if unlikely (!current_basic_block->synthops) synth_uops_for_bb(*current_basic_block);
+  if unlikely (!current_basic_block->synthops)
+    synth_uops_for_bb(*current_basic_block);
   assert(current_basic_block->synthops);
 
   current_basic_block_transop_index = 0;
@@ -701,8 +716,10 @@ void ThreadContext::rename() {
 
     foreach (i, PHYS_REG_FILE_COUNT) {
       int reg_file_to_check = add_index_modulo(core.round_robin_reg_file_offset, i, PHYS_REG_FILE_COUNT);
-      if likely (bit(acceptable_phys_reg_files, reg_file_to_check) && core.physregfiles[reg_file_to_check].remaining()) {
-        phys_reg_file = reg_file_to_check; break;
+      if likely (bit(acceptable_phys_reg_files, reg_file_to_check) &&
+                 core.physregfiles[reg_file_to_check].remaining()) {
+        phys_reg_file = reg_file_to_check;
+        break;
       }
     }
 
@@ -722,19 +739,28 @@ void ThreadContext::rename() {
     bool br = isbranch(fetchbuf.opcode);
 
     if unlikely (ld && (loads_in_flight >= LDQ_SIZE)) {
-      if unlikely (config.event_log_enabled) { if likely (!prepcount) core.eventlog.add(EVENT_RENAME_LDQ_FULL)->threadid = threadid; }
+      if unlikely (config.event_log_enabled) {
+        if likely (!prepcount)
+          core.eventlog.add(EVENT_RENAME_LDQ_FULL)->threadid = threadid;
+      }
       per_context_ooocore_stats_update(threadid, frontend.status.ldq_full++);
       break;
     }
 
     if unlikely (st && (stores_in_flight >= STQ_SIZE)) {
-      if unlikely (config.event_log_enabled) { if likely (!prepcount) core.eventlog.add(EVENT_RENAME_STQ_FULL)->threadid = threadid; }
+      if unlikely (config.event_log_enabled) {
+        if likely (!prepcount)
+          core.eventlog.add(EVENT_RENAME_STQ_FULL)->threadid = threadid;
+      }
       per_context_ooocore_stats_update(threadid, frontend.status.stq_full++);
       break;
     }
 
-    if unlikely ((ld|st) && (!LSQ.remaining())) {
-      if unlikely (config.event_log_enabled) { if likely (!prepcount) core.eventlog.add(EVENT_RENAME_MEMQ_FULL)->threadid = threadid; }
+    if unlikely ((ld | st) && (!LSQ.remaining())) {
+      if unlikely (config.event_log_enabled) {
+        if likely (!prepcount)
+          core.eventlog.add(EVENT_RENAME_MEMQ_FULL)->threadid = threadid;
+      }
       break;
     }
 
@@ -744,7 +770,7 @@ void ThreadContext::rename() {
     ReorderBufferEntry& rob = *ROB.alloc();
     PhysicalRegister* physreg = null;
 
-    LoadStoreQueueEntry* lsqp = (ld|st) ? LSQ.alloc() : null;
+    LoadStoreQueueEntry* lsqp = (ld | st) ? LSQ.alloc() : null;
     LoadStoreQueueEntry& lsq = *lsqp;
 
     rob.reset();
@@ -752,7 +778,7 @@ void ThreadContext::rename() {
     rob.entry_valid = 1;
     rob.cycles_left = FRONTEND_STAGES;
     rob.lsq = null;
-    if unlikely (ld|st) {
+    if unlikely (ld | st) {
       rob.lsq = &lsq;
       lsq.rob = &rob;
       lsq.store = st;
@@ -765,7 +791,7 @@ void ThreadContext::rename() {
       stores_in_flight += (st == 1);
     }
 
-    per_context_ooocore_stats_update(threadid, frontend.alloc.reg += (!(ld|st|br)));
+    per_context_ooocore_stats_update(threadid, frontend.alloc.reg += (!(ld | st | br)));
     per_context_ooocore_stats_update(threadid, frontend.alloc.ldreg += ld);
     per_context_ooocore_stats_update(threadid, frontend.alloc.sfr += st);
     per_context_ooocore_stats_update(threadid, frontend.alloc.br += br);
@@ -784,8 +810,7 @@ void ThreadContext::rename() {
       rob.operands[i]->addref(rob, threadid);
       assert(rob.operands[i]->state != PHYSREG_FREE);
 
-      if likely ((rob.operands[i]->state == PHYSREG_WAITING) |
-                 (rob.operands[i]->state == PHYSREG_BYPASS) |
+      if likely ((rob.operands[i]->state == PHYSREG_WAITING) | (rob.operands[i]->state == PHYSREG_BYPASS) |
                  (rob.operands[i]->state == PHYSREG_WRITTEN)) {
         rob.operands[i]->rob->consumer_count = min(rob.operands[i]->rob->consumer_count + 1, 255);
       }
@@ -836,7 +861,8 @@ void ThreadContext::rename() {
     if unlikely (config.event_log_enabled) {
       OutOfOrderCoreEvent* event = core.eventlog.add(EVENT_RENAME_OK, &rob);
 
-      foreach (i, MAX_OPERANDS) rob.operands[i]->fill_operand_info(event->rename.opinfo[i]);
+      foreach (i, MAX_OPERANDS)
+        rob.operands[i]->fill_operand_info(event->rename.opinfo[i]);
 
       if likely (archdest_can_commit[transop.rd]) {
         event->rename.oldphys = specrrt[transop.rd]->index();
@@ -896,7 +922,8 @@ void ThreadContext::rename() {
     }
 
 #ifdef ENABLE_TRANSIENT_VALUE_TRACKING
-    if unlikely (br) specrrt.renamed_in_this_basic_block.reset();
+    if unlikely (br)
+      specrrt.renamed_in_this_basic_block.reset();
 #endif
 
     per_context_ooocore_stats_update(threadid, frontend.renamed.none += ((!renamed_reg) && (!renamed_flags)));
@@ -931,135 +958,71 @@ void ThreadContext::frontend() {
 //
 // Dispatch and Cluster Selection
 //
-static byte bit_indices_set_8bits[1<<8][8] = {
-  {0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0},
-  {1, 1, 1, 1, 1, 1, 1, 1}, {0, 1, 0, 1, 0, 1, 0, 1},
-  {2, 2, 2, 2, 2, 2, 2, 2}, {0, 2, 0, 2, 0, 2, 0, 2},
-  {1, 2, 1, 2, 1, 2, 1, 2}, {0, 1, 2, 0, 1, 2, 0, 1},
-  {3, 3, 3, 3, 3, 3, 3, 3}, {0, 3, 0, 3, 0, 3, 0, 3},
-  {1, 3, 1, 3, 1, 3, 1, 3}, {0, 1, 3, 0, 1, 3, 0, 1},
-  {2, 3, 2, 3, 2, 3, 2, 3}, {0, 2, 3, 0, 2, 3, 0, 2},
-  {1, 2, 3, 1, 2, 3, 1, 2}, {0, 1, 2, 3, 0, 1, 2, 3},
-  {4, 4, 4, 4, 4, 4, 4, 4}, {0, 4, 0, 4, 0, 4, 0, 4},
-  {1, 4, 1, 4, 1, 4, 1, 4}, {0, 1, 4, 0, 1, 4, 0, 1},
-  {2, 4, 2, 4, 2, 4, 2, 4}, {0, 2, 4, 0, 2, 4, 0, 2},
-  {1, 2, 4, 1, 2, 4, 1, 2}, {0, 1, 2, 4, 0, 1, 2, 4},
-  {3, 4, 3, 4, 3, 4, 3, 4}, {0, 3, 4, 0, 3, 4, 0, 3},
-  {1, 3, 4, 1, 3, 4, 1, 3}, {0, 1, 3, 4, 0, 1, 3, 4},
-  {2, 3, 4, 2, 3, 4, 2, 3}, {0, 2, 3, 4, 0, 2, 3, 4},
-  {1, 2, 3, 4, 1, 2, 3, 4}, {0, 1, 2, 3, 4, 0, 1, 2},
-  {5, 5, 5, 5, 5, 5, 5, 5}, {0, 5, 0, 5, 0, 5, 0, 5},
-  {1, 5, 1, 5, 1, 5, 1, 5}, {0, 1, 5, 0, 1, 5, 0, 1},
-  {2, 5, 2, 5, 2, 5, 2, 5}, {0, 2, 5, 0, 2, 5, 0, 2},
-  {1, 2, 5, 1, 2, 5, 1, 2}, {0, 1, 2, 5, 0, 1, 2, 5},
-  {3, 5, 3, 5, 3, 5, 3, 5}, {0, 3, 5, 0, 3, 5, 0, 3},
-  {1, 3, 5, 1, 3, 5, 1, 3}, {0, 1, 3, 5, 0, 1, 3, 5},
-  {2, 3, 5, 2, 3, 5, 2, 3}, {0, 2, 3, 5, 0, 2, 3, 5},
-  {1, 2, 3, 5, 1, 2, 3, 5}, {0, 1, 2, 3, 5, 0, 1, 2},
-  {4, 5, 4, 5, 4, 5, 4, 5}, {0, 4, 5, 0, 4, 5, 0, 4},
-  {1, 4, 5, 1, 4, 5, 1, 4}, {0, 1, 4, 5, 0, 1, 4, 5},
-  {2, 4, 5, 2, 4, 5, 2, 4}, {0, 2, 4, 5, 0, 2, 4, 5},
-  {1, 2, 4, 5, 1, 2, 4, 5}, {0, 1, 2, 4, 5, 0, 1, 2},
-  {3, 4, 5, 3, 4, 5, 3, 4}, {0, 3, 4, 5, 0, 3, 4, 5},
-  {1, 3, 4, 5, 1, 3, 4, 5}, {0, 1, 3, 4, 5, 0, 1, 3},
-  {2, 3, 4, 5, 2, 3, 4, 5}, {0, 2, 3, 4, 5, 0, 2, 3},
-  {1, 2, 3, 4, 5, 1, 2, 3}, {0, 1, 2, 3, 4, 5, 0, 1},
-  {6, 6, 6, 6, 6, 6, 6, 6}, {0, 6, 0, 6, 0, 6, 0, 6},
-  {1, 6, 1, 6, 1, 6, 1, 6}, {0, 1, 6, 0, 1, 6, 0, 1},
-  {2, 6, 2, 6, 2, 6, 2, 6}, {0, 2, 6, 0, 2, 6, 0, 2},
-  {1, 2, 6, 1, 2, 6, 1, 2}, {0, 1, 2, 6, 0, 1, 2, 6},
-  {3, 6, 3, 6, 3, 6, 3, 6}, {0, 3, 6, 0, 3, 6, 0, 3},
-  {1, 3, 6, 1, 3, 6, 1, 3}, {0, 1, 3, 6, 0, 1, 3, 6},
-  {2, 3, 6, 2, 3, 6, 2, 3}, {0, 2, 3, 6, 0, 2, 3, 6},
-  {1, 2, 3, 6, 1, 2, 3, 6}, {0, 1, 2, 3, 6, 0, 1, 2},
-  {4, 6, 4, 6, 4, 6, 4, 6}, {0, 4, 6, 0, 4, 6, 0, 4},
-  {1, 4, 6, 1, 4, 6, 1, 4}, {0, 1, 4, 6, 0, 1, 4, 6},
-  {2, 4, 6, 2, 4, 6, 2, 4}, {0, 2, 4, 6, 0, 2, 4, 6},
-  {1, 2, 4, 6, 1, 2, 4, 6}, {0, 1, 2, 4, 6, 0, 1, 2},
-  {3, 4, 6, 3, 4, 6, 3, 4}, {0, 3, 4, 6, 0, 3, 4, 6},
-  {1, 3, 4, 6, 1, 3, 4, 6}, {0, 1, 3, 4, 6, 0, 1, 3},
-  {2, 3, 4, 6, 2, 3, 4, 6}, {0, 2, 3, 4, 6, 0, 2, 3},
-  {1, 2, 3, 4, 6, 1, 2, 3}, {0, 1, 2, 3, 4, 6, 0, 1},
-  {5, 6, 5, 6, 5, 6, 5, 6}, {0, 5, 6, 0, 5, 6, 0, 5},
-  {1, 5, 6, 1, 5, 6, 1, 5}, {0, 1, 5, 6, 0, 1, 5, 6},
-  {2, 5, 6, 2, 5, 6, 2, 5}, {0, 2, 5, 6, 0, 2, 5, 6},
-  {1, 2, 5, 6, 1, 2, 5, 6}, {0, 1, 2, 5, 6, 0, 1, 2},
-  {3, 5, 6, 3, 5, 6, 3, 5}, {0, 3, 5, 6, 0, 3, 5, 6},
-  {1, 3, 5, 6, 1, 3, 5, 6}, {0, 1, 3, 5, 6, 0, 1, 3},
-  {2, 3, 5, 6, 2, 3, 5, 6}, {0, 2, 3, 5, 6, 0, 2, 3},
-  {1, 2, 3, 5, 6, 1, 2, 3}, {0, 1, 2, 3, 5, 6, 0, 1},
-  {4, 5, 6, 4, 5, 6, 4, 5}, {0, 4, 5, 6, 0, 4, 5, 6},
-  {1, 4, 5, 6, 1, 4, 5, 6}, {0, 1, 4, 5, 6, 0, 1, 4},
-  {2, 4, 5, 6, 2, 4, 5, 6}, {0, 2, 4, 5, 6, 0, 2, 4},
-  {1, 2, 4, 5, 6, 1, 2, 4}, {0, 1, 2, 4, 5, 6, 0, 1},
-  {3, 4, 5, 6, 3, 4, 5, 6}, {0, 3, 4, 5, 6, 0, 3, 4},
-  {1, 3, 4, 5, 6, 1, 3, 4}, {0, 1, 3, 4, 5, 6, 0, 1},
-  {2, 3, 4, 5, 6, 2, 3, 4}, {0, 2, 3, 4, 5, 6, 0, 2},
-  {1, 2, 3, 4, 5, 6, 1, 2}, {0, 1, 2, 3, 4, 5, 6, 0},
-  {7, 7, 7, 7, 7, 7, 7, 7}, {0, 7, 0, 7, 0, 7, 0, 7},
-  {1, 7, 1, 7, 1, 7, 1, 7}, {0, 1, 7, 0, 1, 7, 0, 1},
-  {2, 7, 2, 7, 2, 7, 2, 7}, {0, 2, 7, 0, 2, 7, 0, 2},
-  {1, 2, 7, 1, 2, 7, 1, 2}, {0, 1, 2, 7, 0, 1, 2, 7},
-  {3, 7, 3, 7, 3, 7, 3, 7}, {0, 3, 7, 0, 3, 7, 0, 3},
-  {1, 3, 7, 1, 3, 7, 1, 3}, {0, 1, 3, 7, 0, 1, 3, 7},
-  {2, 3, 7, 2, 3, 7, 2, 3}, {0, 2, 3, 7, 0, 2, 3, 7},
-  {1, 2, 3, 7, 1, 2, 3, 7}, {0, 1, 2, 3, 7, 0, 1, 2},
-  {4, 7, 4, 7, 4, 7, 4, 7}, {0, 4, 7, 0, 4, 7, 0, 4},
-  {1, 4, 7, 1, 4, 7, 1, 4}, {0, 1, 4, 7, 0, 1, 4, 7},
-  {2, 4, 7, 2, 4, 7, 2, 4}, {0, 2, 4, 7, 0, 2, 4, 7},
-  {1, 2, 4, 7, 1, 2, 4, 7}, {0, 1, 2, 4, 7, 0, 1, 2},
-  {3, 4, 7, 3, 4, 7, 3, 4}, {0, 3, 4, 7, 0, 3, 4, 7},
-  {1, 3, 4, 7, 1, 3, 4, 7}, {0, 1, 3, 4, 7, 0, 1, 3},
-  {2, 3, 4, 7, 2, 3, 4, 7}, {0, 2, 3, 4, 7, 0, 2, 3},
-  {1, 2, 3, 4, 7, 1, 2, 3}, {0, 1, 2, 3, 4, 7, 0, 1},
-  {5, 7, 5, 7, 5, 7, 5, 7}, {0, 5, 7, 0, 5, 7, 0, 5},
-  {1, 5, 7, 1, 5, 7, 1, 5}, {0, 1, 5, 7, 0, 1, 5, 7},
-  {2, 5, 7, 2, 5, 7, 2, 5}, {0, 2, 5, 7, 0, 2, 5, 7},
-  {1, 2, 5, 7, 1, 2, 5, 7}, {0, 1, 2, 5, 7, 0, 1, 2},
-  {3, 5, 7, 3, 5, 7, 3, 5}, {0, 3, 5, 7, 0, 3, 5, 7},
-  {1, 3, 5, 7, 1, 3, 5, 7}, {0, 1, 3, 5, 7, 0, 1, 3},
-  {2, 3, 5, 7, 2, 3, 5, 7}, {0, 2, 3, 5, 7, 0, 2, 3},
-  {1, 2, 3, 5, 7, 1, 2, 3}, {0, 1, 2, 3, 5, 7, 0, 1},
-  {4, 5, 7, 4, 5, 7, 4, 5}, {0, 4, 5, 7, 0, 4, 5, 7},
-  {1, 4, 5, 7, 1, 4, 5, 7}, {0, 1, 4, 5, 7, 0, 1, 4},
-  {2, 4, 5, 7, 2, 4, 5, 7}, {0, 2, 4, 5, 7, 0, 2, 4},
-  {1, 2, 4, 5, 7, 1, 2, 4}, {0, 1, 2, 4, 5, 7, 0, 1},
-  {3, 4, 5, 7, 3, 4, 5, 7}, {0, 3, 4, 5, 7, 0, 3, 4},
-  {1, 3, 4, 5, 7, 1, 3, 4}, {0, 1, 3, 4, 5, 7, 0, 1},
-  {2, 3, 4, 5, 7, 2, 3, 4}, {0, 2, 3, 4, 5, 7, 0, 2},
-  {1, 2, 3, 4, 5, 7, 1, 2}, {0, 1, 2, 3, 4, 5, 7, 0},
-  {6, 7, 6, 7, 6, 7, 6, 7}, {0, 6, 7, 0, 6, 7, 0, 6},
-  {1, 6, 7, 1, 6, 7, 1, 6}, {0, 1, 6, 7, 0, 1, 6, 7},
-  {2, 6, 7, 2, 6, 7, 2, 6}, {0, 2, 6, 7, 0, 2, 6, 7},
-  {1, 2, 6, 7, 1, 2, 6, 7}, {0, 1, 2, 6, 7, 0, 1, 2},
-  {3, 6, 7, 3, 6, 7, 3, 6}, {0, 3, 6, 7, 0, 3, 6, 7},
-  {1, 3, 6, 7, 1, 3, 6, 7}, {0, 1, 3, 6, 7, 0, 1, 3},
-  {2, 3, 6, 7, 2, 3, 6, 7}, {0, 2, 3, 6, 7, 0, 2, 3},
-  {1, 2, 3, 6, 7, 1, 2, 3}, {0, 1, 2, 3, 6, 7, 0, 1},
-  {4, 6, 7, 4, 6, 7, 4, 6}, {0, 4, 6, 7, 0, 4, 6, 7},
-  {1, 4, 6, 7, 1, 4, 6, 7}, {0, 1, 4, 6, 7, 0, 1, 4},
-  {2, 4, 6, 7, 2, 4, 6, 7}, {0, 2, 4, 6, 7, 0, 2, 4},
-  {1, 2, 4, 6, 7, 1, 2, 4}, {0, 1, 2, 4, 6, 7, 0, 1},
-  {3, 4, 6, 7, 3, 4, 6, 7}, {0, 3, 4, 6, 7, 0, 3, 4},
-  {1, 3, 4, 6, 7, 1, 3, 4}, {0, 1, 3, 4, 6, 7, 0, 1},
-  {2, 3, 4, 6, 7, 2, 3, 4}, {0, 2, 3, 4, 6, 7, 0, 2},
-  {1, 2, 3, 4, 6, 7, 1, 2}, {0, 1, 2, 3, 4, 6, 7, 0},
-  {5, 6, 7, 5, 6, 7, 5, 6}, {0, 5, 6, 7, 0, 5, 6, 7},
-  {1, 5, 6, 7, 1, 5, 6, 7}, {0, 1, 5, 6, 7, 0, 1, 5},
-  {2, 5, 6, 7, 2, 5, 6, 7}, {0, 2, 5, 6, 7, 0, 2, 5},
-  {1, 2, 5, 6, 7, 1, 2, 5}, {0, 1, 2, 5, 6, 7, 0, 1},
-  {3, 5, 6, 7, 3, 5, 6, 7}, {0, 3, 5, 6, 7, 0, 3, 5},
-  {1, 3, 5, 6, 7, 1, 3, 5}, {0, 1, 3, 5, 6, 7, 0, 1},
-  {2, 3, 5, 6, 7, 2, 3, 5}, {0, 2, 3, 5, 6, 7, 0, 2},
-  {1, 2, 3, 5, 6, 7, 1, 2}, {0, 1, 2, 3, 5, 6, 7, 0},
-  {4, 5, 6, 7, 4, 5, 6, 7}, {0, 4, 5, 6, 7, 0, 4, 5},
-  {1, 4, 5, 6, 7, 1, 4, 5}, {0, 1, 4, 5, 6, 7, 0, 1},
-  {2, 4, 5, 6, 7, 2, 4, 5}, {0, 2, 4, 5, 6, 7, 0, 2},
-  {1, 2, 4, 5, 6, 7, 1, 2}, {0, 1, 2, 4, 5, 6, 7, 0},
-  {3, 4, 5, 6, 7, 3, 4, 5}, {0, 3, 4, 5, 6, 7, 0, 3},
-  {1, 3, 4, 5, 6, 7, 1, 3}, {0, 1, 3, 4, 5, 6, 7, 0},
-  {2, 3, 4, 5, 6, 7, 2, 3}, {0, 2, 3, 4, 5, 6, 7, 0},
-  {1, 2, 3, 4, 5, 6, 7, 1}, {0, 1, 2, 3, 4, 5, 6, 7},
+static byte bit_indices_set_8bits[1 << 8][8] = {
+    {0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0}, {1, 1, 1, 1, 1, 1, 1, 1}, {0, 1, 0, 1, 0, 1, 0, 1},
+    {2, 2, 2, 2, 2, 2, 2, 2}, {0, 2, 0, 2, 0, 2, 0, 2}, {1, 2, 1, 2, 1, 2, 1, 2}, {0, 1, 2, 0, 1, 2, 0, 1},
+    {3, 3, 3, 3, 3, 3, 3, 3}, {0, 3, 0, 3, 0, 3, 0, 3}, {1, 3, 1, 3, 1, 3, 1, 3}, {0, 1, 3, 0, 1, 3, 0, 1},
+    {2, 3, 2, 3, 2, 3, 2, 3}, {0, 2, 3, 0, 2, 3, 0, 2}, {1, 2, 3, 1, 2, 3, 1, 2}, {0, 1, 2, 3, 0, 1, 2, 3},
+    {4, 4, 4, 4, 4, 4, 4, 4}, {0, 4, 0, 4, 0, 4, 0, 4}, {1, 4, 1, 4, 1, 4, 1, 4}, {0, 1, 4, 0, 1, 4, 0, 1},
+    {2, 4, 2, 4, 2, 4, 2, 4}, {0, 2, 4, 0, 2, 4, 0, 2}, {1, 2, 4, 1, 2, 4, 1, 2}, {0, 1, 2, 4, 0, 1, 2, 4},
+    {3, 4, 3, 4, 3, 4, 3, 4}, {0, 3, 4, 0, 3, 4, 0, 3}, {1, 3, 4, 1, 3, 4, 1, 3}, {0, 1, 3, 4, 0, 1, 3, 4},
+    {2, 3, 4, 2, 3, 4, 2, 3}, {0, 2, 3, 4, 0, 2, 3, 4}, {1, 2, 3, 4, 1, 2, 3, 4}, {0, 1, 2, 3, 4, 0, 1, 2},
+    {5, 5, 5, 5, 5, 5, 5, 5}, {0, 5, 0, 5, 0, 5, 0, 5}, {1, 5, 1, 5, 1, 5, 1, 5}, {0, 1, 5, 0, 1, 5, 0, 1},
+    {2, 5, 2, 5, 2, 5, 2, 5}, {0, 2, 5, 0, 2, 5, 0, 2}, {1, 2, 5, 1, 2, 5, 1, 2}, {0, 1, 2, 5, 0, 1, 2, 5},
+    {3, 5, 3, 5, 3, 5, 3, 5}, {0, 3, 5, 0, 3, 5, 0, 3}, {1, 3, 5, 1, 3, 5, 1, 3}, {0, 1, 3, 5, 0, 1, 3, 5},
+    {2, 3, 5, 2, 3, 5, 2, 3}, {0, 2, 3, 5, 0, 2, 3, 5}, {1, 2, 3, 5, 1, 2, 3, 5}, {0, 1, 2, 3, 5, 0, 1, 2},
+    {4, 5, 4, 5, 4, 5, 4, 5}, {0, 4, 5, 0, 4, 5, 0, 4}, {1, 4, 5, 1, 4, 5, 1, 4}, {0, 1, 4, 5, 0, 1, 4, 5},
+    {2, 4, 5, 2, 4, 5, 2, 4}, {0, 2, 4, 5, 0, 2, 4, 5}, {1, 2, 4, 5, 1, 2, 4, 5}, {0, 1, 2, 4, 5, 0, 1, 2},
+    {3, 4, 5, 3, 4, 5, 3, 4}, {0, 3, 4, 5, 0, 3, 4, 5}, {1, 3, 4, 5, 1, 3, 4, 5}, {0, 1, 3, 4, 5, 0, 1, 3},
+    {2, 3, 4, 5, 2, 3, 4, 5}, {0, 2, 3, 4, 5, 0, 2, 3}, {1, 2, 3, 4, 5, 1, 2, 3}, {0, 1, 2, 3, 4, 5, 0, 1},
+    {6, 6, 6, 6, 6, 6, 6, 6}, {0, 6, 0, 6, 0, 6, 0, 6}, {1, 6, 1, 6, 1, 6, 1, 6}, {0, 1, 6, 0, 1, 6, 0, 1},
+    {2, 6, 2, 6, 2, 6, 2, 6}, {0, 2, 6, 0, 2, 6, 0, 2}, {1, 2, 6, 1, 2, 6, 1, 2}, {0, 1, 2, 6, 0, 1, 2, 6},
+    {3, 6, 3, 6, 3, 6, 3, 6}, {0, 3, 6, 0, 3, 6, 0, 3}, {1, 3, 6, 1, 3, 6, 1, 3}, {0, 1, 3, 6, 0, 1, 3, 6},
+    {2, 3, 6, 2, 3, 6, 2, 3}, {0, 2, 3, 6, 0, 2, 3, 6}, {1, 2, 3, 6, 1, 2, 3, 6}, {0, 1, 2, 3, 6, 0, 1, 2},
+    {4, 6, 4, 6, 4, 6, 4, 6}, {0, 4, 6, 0, 4, 6, 0, 4}, {1, 4, 6, 1, 4, 6, 1, 4}, {0, 1, 4, 6, 0, 1, 4, 6},
+    {2, 4, 6, 2, 4, 6, 2, 4}, {0, 2, 4, 6, 0, 2, 4, 6}, {1, 2, 4, 6, 1, 2, 4, 6}, {0, 1, 2, 4, 6, 0, 1, 2},
+    {3, 4, 6, 3, 4, 6, 3, 4}, {0, 3, 4, 6, 0, 3, 4, 6}, {1, 3, 4, 6, 1, 3, 4, 6}, {0, 1, 3, 4, 6, 0, 1, 3},
+    {2, 3, 4, 6, 2, 3, 4, 6}, {0, 2, 3, 4, 6, 0, 2, 3}, {1, 2, 3, 4, 6, 1, 2, 3}, {0, 1, 2, 3, 4, 6, 0, 1},
+    {5, 6, 5, 6, 5, 6, 5, 6}, {0, 5, 6, 0, 5, 6, 0, 5}, {1, 5, 6, 1, 5, 6, 1, 5}, {0, 1, 5, 6, 0, 1, 5, 6},
+    {2, 5, 6, 2, 5, 6, 2, 5}, {0, 2, 5, 6, 0, 2, 5, 6}, {1, 2, 5, 6, 1, 2, 5, 6}, {0, 1, 2, 5, 6, 0, 1, 2},
+    {3, 5, 6, 3, 5, 6, 3, 5}, {0, 3, 5, 6, 0, 3, 5, 6}, {1, 3, 5, 6, 1, 3, 5, 6}, {0, 1, 3, 5, 6, 0, 1, 3},
+    {2, 3, 5, 6, 2, 3, 5, 6}, {0, 2, 3, 5, 6, 0, 2, 3}, {1, 2, 3, 5, 6, 1, 2, 3}, {0, 1, 2, 3, 5, 6, 0, 1},
+    {4, 5, 6, 4, 5, 6, 4, 5}, {0, 4, 5, 6, 0, 4, 5, 6}, {1, 4, 5, 6, 1, 4, 5, 6}, {0, 1, 4, 5, 6, 0, 1, 4},
+    {2, 4, 5, 6, 2, 4, 5, 6}, {0, 2, 4, 5, 6, 0, 2, 4}, {1, 2, 4, 5, 6, 1, 2, 4}, {0, 1, 2, 4, 5, 6, 0, 1},
+    {3, 4, 5, 6, 3, 4, 5, 6}, {0, 3, 4, 5, 6, 0, 3, 4}, {1, 3, 4, 5, 6, 1, 3, 4}, {0, 1, 3, 4, 5, 6, 0, 1},
+    {2, 3, 4, 5, 6, 2, 3, 4}, {0, 2, 3, 4, 5, 6, 0, 2}, {1, 2, 3, 4, 5, 6, 1, 2}, {0, 1, 2, 3, 4, 5, 6, 0},
+    {7, 7, 7, 7, 7, 7, 7, 7}, {0, 7, 0, 7, 0, 7, 0, 7}, {1, 7, 1, 7, 1, 7, 1, 7}, {0, 1, 7, 0, 1, 7, 0, 1},
+    {2, 7, 2, 7, 2, 7, 2, 7}, {0, 2, 7, 0, 2, 7, 0, 2}, {1, 2, 7, 1, 2, 7, 1, 2}, {0, 1, 2, 7, 0, 1, 2, 7},
+    {3, 7, 3, 7, 3, 7, 3, 7}, {0, 3, 7, 0, 3, 7, 0, 3}, {1, 3, 7, 1, 3, 7, 1, 3}, {0, 1, 3, 7, 0, 1, 3, 7},
+    {2, 3, 7, 2, 3, 7, 2, 3}, {0, 2, 3, 7, 0, 2, 3, 7}, {1, 2, 3, 7, 1, 2, 3, 7}, {0, 1, 2, 3, 7, 0, 1, 2},
+    {4, 7, 4, 7, 4, 7, 4, 7}, {0, 4, 7, 0, 4, 7, 0, 4}, {1, 4, 7, 1, 4, 7, 1, 4}, {0, 1, 4, 7, 0, 1, 4, 7},
+    {2, 4, 7, 2, 4, 7, 2, 4}, {0, 2, 4, 7, 0, 2, 4, 7}, {1, 2, 4, 7, 1, 2, 4, 7}, {0, 1, 2, 4, 7, 0, 1, 2},
+    {3, 4, 7, 3, 4, 7, 3, 4}, {0, 3, 4, 7, 0, 3, 4, 7}, {1, 3, 4, 7, 1, 3, 4, 7}, {0, 1, 3, 4, 7, 0, 1, 3},
+    {2, 3, 4, 7, 2, 3, 4, 7}, {0, 2, 3, 4, 7, 0, 2, 3}, {1, 2, 3, 4, 7, 1, 2, 3}, {0, 1, 2, 3, 4, 7, 0, 1},
+    {5, 7, 5, 7, 5, 7, 5, 7}, {0, 5, 7, 0, 5, 7, 0, 5}, {1, 5, 7, 1, 5, 7, 1, 5}, {0, 1, 5, 7, 0, 1, 5, 7},
+    {2, 5, 7, 2, 5, 7, 2, 5}, {0, 2, 5, 7, 0, 2, 5, 7}, {1, 2, 5, 7, 1, 2, 5, 7}, {0, 1, 2, 5, 7, 0, 1, 2},
+    {3, 5, 7, 3, 5, 7, 3, 5}, {0, 3, 5, 7, 0, 3, 5, 7}, {1, 3, 5, 7, 1, 3, 5, 7}, {0, 1, 3, 5, 7, 0, 1, 3},
+    {2, 3, 5, 7, 2, 3, 5, 7}, {0, 2, 3, 5, 7, 0, 2, 3}, {1, 2, 3, 5, 7, 1, 2, 3}, {0, 1, 2, 3, 5, 7, 0, 1},
+    {4, 5, 7, 4, 5, 7, 4, 5}, {0, 4, 5, 7, 0, 4, 5, 7}, {1, 4, 5, 7, 1, 4, 5, 7}, {0, 1, 4, 5, 7, 0, 1, 4},
+    {2, 4, 5, 7, 2, 4, 5, 7}, {0, 2, 4, 5, 7, 0, 2, 4}, {1, 2, 4, 5, 7, 1, 2, 4}, {0, 1, 2, 4, 5, 7, 0, 1},
+    {3, 4, 5, 7, 3, 4, 5, 7}, {0, 3, 4, 5, 7, 0, 3, 4}, {1, 3, 4, 5, 7, 1, 3, 4}, {0, 1, 3, 4, 5, 7, 0, 1},
+    {2, 3, 4, 5, 7, 2, 3, 4}, {0, 2, 3, 4, 5, 7, 0, 2}, {1, 2, 3, 4, 5, 7, 1, 2}, {0, 1, 2, 3, 4, 5, 7, 0},
+    {6, 7, 6, 7, 6, 7, 6, 7}, {0, 6, 7, 0, 6, 7, 0, 6}, {1, 6, 7, 1, 6, 7, 1, 6}, {0, 1, 6, 7, 0, 1, 6, 7},
+    {2, 6, 7, 2, 6, 7, 2, 6}, {0, 2, 6, 7, 0, 2, 6, 7}, {1, 2, 6, 7, 1, 2, 6, 7}, {0, 1, 2, 6, 7, 0, 1, 2},
+    {3, 6, 7, 3, 6, 7, 3, 6}, {0, 3, 6, 7, 0, 3, 6, 7}, {1, 3, 6, 7, 1, 3, 6, 7}, {0, 1, 3, 6, 7, 0, 1, 3},
+    {2, 3, 6, 7, 2, 3, 6, 7}, {0, 2, 3, 6, 7, 0, 2, 3}, {1, 2, 3, 6, 7, 1, 2, 3}, {0, 1, 2, 3, 6, 7, 0, 1},
+    {4, 6, 7, 4, 6, 7, 4, 6}, {0, 4, 6, 7, 0, 4, 6, 7}, {1, 4, 6, 7, 1, 4, 6, 7}, {0, 1, 4, 6, 7, 0, 1, 4},
+    {2, 4, 6, 7, 2, 4, 6, 7}, {0, 2, 4, 6, 7, 0, 2, 4}, {1, 2, 4, 6, 7, 1, 2, 4}, {0, 1, 2, 4, 6, 7, 0, 1},
+    {3, 4, 6, 7, 3, 4, 6, 7}, {0, 3, 4, 6, 7, 0, 3, 4}, {1, 3, 4, 6, 7, 1, 3, 4}, {0, 1, 3, 4, 6, 7, 0, 1},
+    {2, 3, 4, 6, 7, 2, 3, 4}, {0, 2, 3, 4, 6, 7, 0, 2}, {1, 2, 3, 4, 6, 7, 1, 2}, {0, 1, 2, 3, 4, 6, 7, 0},
+    {5, 6, 7, 5, 6, 7, 5, 6}, {0, 5, 6, 7, 0, 5, 6, 7}, {1, 5, 6, 7, 1, 5, 6, 7}, {0, 1, 5, 6, 7, 0, 1, 5},
+    {2, 5, 6, 7, 2, 5, 6, 7}, {0, 2, 5, 6, 7, 0, 2, 5}, {1, 2, 5, 6, 7, 1, 2, 5}, {0, 1, 2, 5, 6, 7, 0, 1},
+    {3, 5, 6, 7, 3, 5, 6, 7}, {0, 3, 5, 6, 7, 0, 3, 5}, {1, 3, 5, 6, 7, 1, 3, 5}, {0, 1, 3, 5, 6, 7, 0, 1},
+    {2, 3, 5, 6, 7, 2, 3, 5}, {0, 2, 3, 5, 6, 7, 0, 2}, {1, 2, 3, 5, 6, 7, 1, 2}, {0, 1, 2, 3, 5, 6, 7, 0},
+    {4, 5, 6, 7, 4, 5, 6, 7}, {0, 4, 5, 6, 7, 0, 4, 5}, {1, 4, 5, 6, 7, 1, 4, 5}, {0, 1, 4, 5, 6, 7, 0, 1},
+    {2, 4, 5, 6, 7, 2, 4, 5}, {0, 2, 4, 5, 6, 7, 0, 2}, {1, 2, 4, 5, 6, 7, 1, 2}, {0, 1, 2, 4, 5, 6, 7, 0},
+    {3, 4, 5, 6, 7, 3, 4, 5}, {0, 3, 4, 5, 6, 7, 0, 3}, {1, 3, 4, 5, 6, 7, 1, 3}, {0, 1, 3, 4, 5, 6, 7, 0},
+    {2, 3, 4, 5, 6, 7, 2, 3}, {0, 2, 3, 4, 5, 6, 7, 0}, {1, 2, 3, 4, 5, 6, 7, 1}, {0, 1, 2, 3, 4, 5, 6, 7},
 };
 
 static inline int find_random_set_bit(W32 v, int randsource) {
@@ -1147,10 +1110,13 @@ int ReorderBufferEntry::select_cluster() {
   W32 executable_on_cluster = executable_on_cluster_mask;
 
   int cluster_operand_tally[MAX_CLUSTERS];
-  foreach (i, MAX_CLUSTERS) { cluster_operand_tally[i] = 0; }
+  foreach (i, MAX_CLUSTERS) {
+    cluster_operand_tally[i] = 0;
+  }
   foreach (i, MAX_OPERANDS) {
     PhysicalRegister& r = *operands[i];
-    if ((&r) && ((r.state == PHYSREG_WAITING) || (r.state == PHYSREG_BYPASS)) && (r.rob->cluster >= 0)) cluster_operand_tally[r.rob->cluster]++;
+    if ((&r) && ((r.state == PHYSREG_WAITING) || (r.state == PHYSREG_BYPASS)) && (r.rob->cluster >= 0))
+      cluster_operand_tally[r.rob->cluster]++;
   }
 
   assert(executable_on_cluster);
@@ -1170,11 +1136,13 @@ int ReorderBufferEntry::select_cluster() {
   if unlikely (config.event_log_enabled) {
     event = getcore().eventlog.add(EVENT_CLUSTER_OK, this);
     event->select_cluster.allowed_clusters = executable_on_cluster_mask;
-    foreach (i, MAX_CLUSTERS) event->select_cluster.iq_avail[i] = cluster_issue_queue_avail_count[i];
+    foreach (i, MAX_CLUSTERS)
+      event->select_cluster.iq_avail[i] = cluster_issue_queue_avail_count[i];
   }
 
   if unlikely (!executable_on_cluster) {
-    if unlikely (config.event_log_enabled) event->type = EVENT_CLUSTER_NO_CLUSTER;
+    if unlikely (config.event_log_enabled)
+      event->type = EVENT_CLUSTER_NO_CLUSTER;
     return -1;
   }
 
@@ -1190,7 +1158,8 @@ int ReorderBufferEntry::select_cluster() {
 
   per_context_ooocore_stats_update(threadid, dispatch.cluster[cluster]++);
 
-  if unlikely (config.event_log_enabled) event->cluster = cluster;
+  if unlikely (config.event_log_enabled)
+    event->cluster = cluster;
 
   return cluster;
 }
@@ -1204,7 +1173,8 @@ int ThreadContext::dispatch() {
   OutOfOrderCoreEvent* event;
   ReorderBufferEntry* rob;
   foreach_list_mutable(rob_ready_to_dispatch_list, rob, entry, nextentry) {
-    if unlikely (core.dispatchcount >= DISPATCH_WIDTH) break;
+    if unlikely (core.dispatchcount >= DISPATCH_WIDTH)
+      break;
 
     // All operands start out as valid, then get put on wait queues if they are not actually ready.
 
@@ -1219,7 +1189,8 @@ int ThreadContext::dispatch() {
     if unlikely (rob->cluster < 0) {
       if unlikely (config.event_log_enabled) {
         event = core.eventlog.add(EVENT_DISPATCH_NO_CLUSTER, rob);
-        foreach (i, MAX_OPERANDS) rob->operands[i]->fill_operand_info(event->dispatch.opinfo[i]);
+        foreach (i, MAX_OPERANDS)
+          rob->operands[i]->fill_operand_info(event->dispatch.opinfo[i]);
       }
 #if 0
 #ifdef MULTI_IQ
@@ -1260,7 +1231,8 @@ int ThreadContext::dispatch() {
 
     if unlikely (config.event_log_enabled) {
       event = core.eventlog.add(EVENT_DISPATCH_OK, rob);
-      foreach (i, MAX_OPERANDS) rob->operands[i]->fill_operand_info(event->dispatch.opinfo[i]);
+      foreach (i, MAX_OPERANDS)
+        rob->operands[i]->fill_operand_info(event->dispatch.opinfo[i]);
     }
 
     core.dispatchcount++;
@@ -1276,9 +1248,8 @@ int ThreadContext::dispatch() {
 
     /* SD: Give outstanding cache and tlb-misses a chance to tickle in first and
      * commit everything that is ready to do so! */
-    if ( !dispatch_deadlock_countdown &&
-         (rob_cache_miss_list.count || rob_tlb_miss_list.count ||
-          ( rob_ready_to_commit_queue.count && ROB.peekhead()->ready_to_commit())) )
+    if (!dispatch_deadlock_countdown && (rob_cache_miss_list.count || rob_tlb_miss_list.count ||
+                                         (rob_ready_to_commit_queue.count && ROB.peekhead()->ready_to_commit())))
       dispatch_deadlock_countdown = DISPATCH_DEADLOCK_COUNTDOWN_CYCLES;
 
     if (!dispatch_deadlock_countdown) {
@@ -1286,7 +1257,6 @@ int ThreadContext::dispatch() {
       dispatch_deadlock_countdown = DISPATCH_DEADLOCK_COUNTDOWN_CYCLES;
       return -1;
     }
-
   }
 
   return core.dispatchcount;
@@ -1321,7 +1291,8 @@ int ThreadContext::complete(int cluster) {
     rob->cycles_left--;
 
     if unlikely (rob->cycles_left <= 0) {
-      if unlikely (config.event_log_enabled) core.eventlog.add(EVENT_COMPLETE, rob);
+      if unlikely (config.event_log_enabled)
+        core.eventlog.add(EVENT_COMPLETE, rob);
       rob->changestate(rob_completed_list[cluster]);
       rob->physreg->complete();
       rob->forward_cycle = 0;
@@ -1365,7 +1336,8 @@ int ThreadContext::writeback(int cluster) {
   int wakeupcount = 0;
   ReorderBufferEntry* rob;
   foreach_list_mutable(rob_ready_to_writeback_list[cluster], rob, entry, nextentry) {
-    if unlikely (core.writecount >= WRITEBACK_WIDTH) break;
+    if unlikely (core.writecount >= WRITEBACK_WIDTH)
+      break;
 
     //
     // Gather statistics
@@ -1373,12 +1345,9 @@ int ThreadContext::writeback(int cluster) {
     bool transient = 0;
 
 #ifdef ENABLE_TRANSIENT_VALUE_TRACKING
-    if likely (!isclass(rob->uop.opcode, OPCLASS_STORE|OPCLASS_BRANCH)) {
-      transient =
-        (rob->dest_renamed_before_writeback) &&
-        (rob->consumer_count <= 1) &&
-        (rob->physreg->all_consumers_sourced_from_bypass) &&
-        (rob->no_branches_between_renamings);
+    if likely (!isclass(rob->uop.opcode, OPCLASS_STORE | OPCLASS_BRANCH)) {
+      transient = (rob->dest_renamed_before_writeback) && (rob->consumer_count <= 1) &&
+                  (rob->physreg->all_consumers_sourced_from_bypass) && (rob->no_branches_between_renamings);
 
       writeback_transient += transient;
       writeback_persistent += (!transient);
@@ -1387,7 +1356,7 @@ int ThreadContext::writeback(int cluster) {
     rob->transient = transient;
 #endif
 
-    if likely (!isclass(rob->uop.opcode, OPCLASS_STORE|OPCLASS_BRANCH)) {
+    if likely (!isclass(rob->uop.opcode, OPCLASS_STORE | OPCLASS_BRANCH)) {
       if unlikely (config.event_log_enabled) {
         OutOfOrderCoreEvent* event = core.eventlog.add(EVENT_WRITEBACK, rob);
         event->writeback.data = rob->physreg->data;
@@ -1519,7 +1488,8 @@ int ThreadContext::commit() {
   foreach_forward(ROB, i) {
     ReorderBufferEntry& rob = ROB[i];
 
-    if unlikely (core.commitcount >= COMMIT_WIDTH) break;
+    if unlikely (core.commitcount >= COMMIT_WIDTH)
+      break;
     rc = rob.commit();
     if likely (rc == COMMIT_RESULT_OK) {
       core.commitcount++;
@@ -1542,12 +1512,14 @@ void ThreadContext::flush_mem_lock_release_list(int start) {
     MemoryInterlockEntry* lock = interlocks.probe(lockaddr);
 
     if (!lock) {
-      logfile << "ERROR: thread ", ctx.vcpuid, ": attempted to release queued lock #", i, " for physaddr ", (void*)lockaddr, ": lock was ", lock, endl;
+      logfile << "ERROR: thread ", ctx.vcpuid, ": attempted to release queued lock #", i, " for physaddr ",
+          (void*)lockaddr, ": lock was ", lock, endl;
       assert(false);
     }
 
     if (lock->vcpuid != ctx.vcpuid) {
-      logfile << "ERROR: thread ", ctx.vcpuid, ": attempted to release queued lock #", i, " for physaddr ", (void*)lockaddr, ": lock vcpuid was ", lock->vcpuid, endl;
+      logfile << "ERROR: thread ", ctx.vcpuid, ": attempted to release queued lock #", i, " for physaddr ",
+          (void*)lockaddr, ": lock vcpuid was ", lock->vcpuid, endl;
       assert(false);
     }
 
@@ -1656,14 +1628,16 @@ int ReorderBufferEntry::commit() {
     }
 
 #ifdef PTLSIM_HYPERVISOR
-    bool force_fp_unavailable = (subrob.uop.is_sse|subrob.uop.is_x87) && (ctx.cr0.ts | (subrob.uop.is_x87 & ctx.cr0.em));
+    bool force_fp_unavailable =
+        (subrob.uop.is_sse | subrob.uop.is_x87) && (ctx.cr0.ts | (subrob.uop.is_x87 & ctx.cr0.em));
 #else
-    bool force_fp_unavailable = (subrob.uop.is_sse&ctx.no_sse)|(subrob.uop.is_x87&ctx.no_x87);
+    bool force_fp_unavailable = (subrob.uop.is_sse & ctx.no_sse) | (subrob.uop.is_x87 & ctx.no_x87);
 #endif
     if unlikely (force_fp_unavailable) {
       subrob.physreg->data = EXCEPTION_FloatingPointNotAvailable;
       subrob.physreg->flags = FLAG_INV;
-      if unlikely (subrob.lsq) subrob.lsq->invalid = 1;
+      if unlikely (subrob.lsq)
+        subrob.lsq->invalid = 1;
     }
 
     if unlikely (subrob.physreg->flags & FLAG_INV) {
@@ -1679,12 +1653,12 @@ int ReorderBufferEntry::commit() {
       ctx.error_code = HI32(subrob.physreg->data);
 
       // Capture the faulting virtual address for page faults
-      if ((ctx.exception == EXCEPTION_PageFaultOnRead) |
-          (ctx.exception == EXCEPTION_PageFaultOnWrite)) {
+      if ((ctx.exception == EXCEPTION_PageFaultOnRead) | (ctx.exception == EXCEPTION_PageFaultOnWrite)) {
         ctx.cr2 = subrob.origvirt;
       }
 
-      if unlikely (config.event_log_enabled) core.eventlog.add_commit(EVENT_COMMIT_EXCEPTION_DETECTED, &subrob);
+      if unlikely (config.event_log_enabled)
+        core.eventlog.add_commit(EVENT_COMMIT_EXCEPTION_DETECTED, &subrob);
 
       macro_op_has_exceptions = true;
       all_ready_to_commit = true;
@@ -1692,7 +1666,8 @@ int ReorderBufferEntry::commit() {
       break;
     }
 
-    if likely (subrob.uop.eom) break;
+    if likely (subrob.uop.eom)
+      break;
   }
 
   //
@@ -1713,7 +1688,7 @@ int ReorderBufferEntry::commit() {
    * to execute resides, if so we do not execute it but invalidate all bb caches immediately
    * because the store has happened before the macroop started execution and thus needs to be retranslated.
    */
-  const bool page_crossing = ((lowbits(uop.rip.rip, 12) + (uop.bytes-1)) >> 12);
+  const bool page_crossing = ((lowbits(uop.rip.rip, 12) + (uop.bytes - 1)) >> 12);
 
   if unlikely (uop.som && (smc_isdirty(uop.rip.mfnlo) | (page_crossing && smc_isdirty(uop.rip.mfnhi)))) {
     /* If we're at the start of a macroop and the macroop has already been invalidated
@@ -1739,12 +1714,14 @@ int ReorderBufferEntry::commit() {
   per_context_ooocore_stats_update(threadid, commit.opclass[opclassof(uop.opcode)]++);
 
   if unlikely (macro_op_has_exceptions) {
-    if unlikely (config.event_log_enabled) event = core.eventlog.add_commit(EVENT_COMMIT_EXCEPTION_ACKNOWLEDGED, this);
+    if unlikely (config.event_log_enabled)
+      event = core.eventlog.add_commit(EVENT_COMMIT_EXCEPTION_ACKNOWLEDGED, this);
 
     // See notes in handle_exception():
     if likely (isclass(uop.opcode, OPCLASS_CHECK) & (ctx.exception == EXCEPTION_SkipBlock)) {
       thread.chk_recovery_rip = ctx.commitarf[REG_rip] + uop.bytes;
-      if unlikely (config.event_log_enabled) event->type = EVENT_COMMIT_SKIPBLOCK;
+      if unlikely (config.event_log_enabled)
+        event->type = EVENT_COMMIT_SKIPBLOCK;
       per_context_ooocore_stats_update(threadid, commit.result.skipblock++);
     } else {
       per_context_ooocore_stats_update(threadid, commit.result.exception++);
@@ -1761,7 +1738,8 @@ int ReorderBufferEntry::commit() {
   // becomes visible after the store has committed.
   //
   if unlikely (uop.eom && (smc_isdirty(uop.rip.mfnlo) | (page_crossing && smc_isdirty(uop.rip.mfnhi)))) {
-    if unlikely (config.event_log_enabled) core.eventlog.add_commit(EVENT_COMMIT_SMC_DETECTED, this);
+    if unlikely (config.event_log_enabled)
+      core.eventlog.add_commit(EVENT_COMMIT_SMC_DETECTED, this);
     //
     // Invalidate the pages only after the pipeline is flushed: we may still
     // hold refs to the affected basic blocks in the pipeline. Queue the
@@ -1801,7 +1779,8 @@ int ReorderBufferEntry::commit() {
     MemoryInterlockEntry* lock = interlocks.probe(lockaddr);
 
     if unlikely (lock && (lock->vcpuid != thread.ctx.vcpuid)) {
-      if unlikely (config.event_log_enabled) core.eventlog.add_commit(EVENT_COMMIT_MEM_LOCKED, this);
+      if unlikely (config.event_log_enabled)
+        core.eventlog.add_commit(EVENT_COMMIT_MEM_LOCKED, this);
 
       per_context_ooocore_stats_update(threadid, commit.result.memlocked++);
       return COMMIT_RESULT_NONE;
@@ -1865,22 +1844,26 @@ int ReorderBufferEntry::commit() {
 #endif
 #endif
 
-  if (st) assert(lsq->addrvalid && lsq->datavalid);
+  if (st)
+    assert(lsq->addrvalid && lsq->datavalid);
 
   W64 result = physreg->data;
 
   assert(ctx.commitarf[REG_rip] == uop.rip);
 
-  if likely (uop.som) assert(ctx.commitarf[REG_rip] == uop.rip);
+  if likely (uop.som)
+    assert(ctx.commitarf[REG_rip] == uop.rip);
 
   //
   // The commit of all uops in the x86 macro-op is guaranteed to happen after this point
   //
-  if unlikely (config.event_log_enabled) event = core.eventlog.add_commit(EVENT_COMMIT_OK, this);
+  if unlikely (config.event_log_enabled)
+    event = core.eventlog.add_commit(EVENT_COMMIT_OK, this);
 
   if unlikely (config.event_log_enabled) {
     if unlikely ((uop.rip.rip == config.log_backwards_from_trigger_rip) && (uop.som)) {
-      logfile << "Hit trigger rip ", (void*)(Waddr)config.log_backwards_from_trigger_rip, "; printing event ring buffer:", endl, flush;
+      logfile << "Hit trigger rip ", (void*)(Waddr)config.log_backwards_from_trigger_rip,
+          "; printing event ring buffer:", endl, flush;
       core.eventlog.print(logfile);
       logfile << "End of triggered event dump", endl, flush;
     }
@@ -1891,7 +1874,8 @@ int ReorderBufferEntry::commit() {
     thread.commitrrt[uop.rd] = physreg;
     thread.commitrrt[uop.rd]->addcommitref(uop.rd, thread.threadid);
 
-    if likely (uop.rd < ARCHREG_COUNT) ctx.commitarf[uop.rd] = physreg->data;
+    if likely (uop.rd < ARCHREG_COUNT)
+      ctx.commitarf[uop.rd] = physreg->data;
 
     physreg->rob = null;
   }
@@ -1904,7 +1888,8 @@ int ReorderBufferEntry::commit() {
       assert(!isbranch(uop.opcode));
       ctx.commitarf[REG_rip] += uop.bytes;
     }
-    if unlikely (config.event_log_enabled) event->commit.target_rip = ctx.commitarf[REG_rip];
+    if unlikely (config.event_log_enabled)
+      event->commit.target_rip = ctx.commitarf[REG_rip];
   }
 
   if likely ((!ld) & (!st) & (!uop.nouserflags)) {
@@ -1914,7 +1899,8 @@ int ReorderBufferEntry::commit() {
     per_context_ooocore_stats_update(threadid, commit.setflags.no += (uop.setflags == 0));
     per_context_ooocore_stats_update(threadid, commit.setflags.yes += (uop.setflags != 0));
 
-    if unlikely (config.event_log_enabled) event->commit.state.reg.rdflags = ctx.commitarf[REG_flags];
+    if unlikely (config.event_log_enabled)
+      event->commit.state.reg.rdflags = ctx.commitarf[REG_flags];
 
     if likely (uop.setflags & SETFLAG_ZF) {
       thread.commitrrt[REG_zf]->uncommitref(REG_zf, thread.threadid);
@@ -1941,7 +1927,8 @@ int ReorderBufferEntry::commit() {
      */
     smc_setdirty(lsq->smc_mfn);
 
-    if (lsq->bytemask) assert(core.caches.commitstore(*lsq, thread.threadid) == 0);
+    if (lsq->bytemask)
+      assert(core.caches.commitstore(*lsq, thread.threadid) == 0);
   }
 
   if unlikely (pteupdate) {
@@ -1951,7 +1938,7 @@ int ReorderBufferEntry::commit() {
   //
   // Free physical registers, load/store queue entries, etc.
   //
-  if unlikely (ld|st) {
+  if unlikely (ld | st) {
     thread.loads_in_flight -= (lsq->store == 0);
     thread.stores_in_flight -= (lsq->store == 1);
     lsq->reset();
@@ -1962,7 +1949,8 @@ int ReorderBufferEntry::commit() {
   assert(archdest_can_commit[uop.rd]);
   assert(oldphysreg->state == PHYSREG_ARCH);
 
-  if unlikely (config.event_log_enabled) event->commit.oldphysreg = -1;
+  if unlikely (config.event_log_enabled)
+    event->commit.oldphysreg = -1;
   if likely (oldphysreg->nonnull()) {
     if unlikely (config.event_log_enabled) {
       event->commit.oldphysreg = oldphysreg->index();
@@ -1972,13 +1960,13 @@ int ReorderBufferEntry::commit() {
     if unlikely (oldphysreg->referenced()) {
       oldphysreg->changestate(PHYSREG_PENDINGFREE);
       stats.ooocore.commit.freereg.pending++;
-    } else  {
+    } else {
       oldphysreg->free();
       stats.ooocore.commit.freereg.free++;
     }
   }
 
-  if likely (!(br|st)) {
+  if likely (!(br | st)) {
     int k = clipto((int)consumer_count, 0, (int)lengthof(stats.ooocore.total.frontend.consumer_count) - 1);
     per_context_ooocore_stats_update(threadid, frontend.consumer_count[k]++);
   }
@@ -2053,7 +2041,8 @@ int ReorderBufferEntry::commit() {
   }
 
   if unlikely (uop_is_eom & thread.stop_at_next_eom) {
-    logfile << "[vcpu ", thread.ctx.vcpuid, "] Stopping at cycle ", sim_cycle, " (", total_user_insns_committed, " commits)", endl;
+    logfile << "[vcpu ", thread.ctx.vcpuid, "] Stopping at cycle ", sim_cycle, " (", total_user_insns_committed,
+        " commits)", endl;
     return COMMIT_RESULT_STOP;
   }
 
@@ -2067,39 +2056,179 @@ int ReorderBufferEntry::commit() {
 }
 
 namespace OutOfOrderModel {
-  const byte archdest_is_visible[TRANSREG_COUNT] = {
+const byte archdest_is_visible[TRANSREG_COUNT] = {
     // Integer registers
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
     // SSE registers, low 64 bits
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
     // SSE registers, high 64 bits
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
     // x87 FP / MMX / special
-    1, 1, 1, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
     // The following are ONLY used during the translation and renaming process:
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-  };
-
-  const byte archdest_can_commit[TRANSREG_COUNT] = {
-    // Integer registers
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1,
-    // SSE registers, low 64 bits
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1,
-    // SSE registers, high 64 bits
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1,
-    // x87 FP / MMX / special
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 0,
-    // The following are ONLY used during the translation and renaming process:
-    1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1,
-  };
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
 };
+
+const byte archdest_can_commit[TRANSREG_COUNT] = {
+    // Integer registers
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    // SSE registers, low 64 bits
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    // SSE registers, high 64 bits
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    // x87 FP / MMX / special
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    // The following are ONLY used during the translation and renaming process:
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+};
+}; // namespace OutOfOrderModel

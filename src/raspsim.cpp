@@ -24,17 +24,18 @@ extern PTLsimConfig config;
 extern ConfigurationParser<PTLsimConfig> configparser;
 
 
-
-extern "C" void assert_fail(const char *__assertion, const char *__file, unsigned int __line, const char *__function) {
+extern "C" void assert_fail(const char* __assertion, const char* __file, unsigned int __line, const char* __function) {
   stringbuf sb;
-  sb << "Assert ", __assertion, " failed in ", __file, ":", __line, " (", __function, ") at ", sim_cycle, " cycles, ", iterations, " iterations, ", total_user_insns_committed, " user commits", endl;
+  sb << "Assert ", __assertion, " failed in ", __file, ":", __line, " (", __function, ") at ", sim_cycle, " cycles, ",
+      iterations, " iterations, ", total_user_insns_committed, " user commits", endl;
 
   cerr << sb, flush;
 
   if (logfile) {
     logfile << sb, flush;
     PTLsimMachine* machine = PTLsimMachine::getcurrent();
-    if (machine) machine->dump_state(logfile);
+    if (machine)
+      machine->dump_state(logfile);
     logfile.close();
   }
 
@@ -88,14 +89,17 @@ void Raspsim::handle_syscall_64bit() {
   W64 arg6 = ctx.commitarf[REG_r9];
 
   if (DEBUG)
-    logfile << "handle_syscall -> (#", syscallid, " ", ((syscallid < lengthofSyscallNames()) ? syscall_names_64bit[syscallid] : "???"),
-      ") from ", (void*)ctx.commitarf[REG_rcx], " args ", " (", (void*)arg1, ", ", (void*)arg2, ", ", (void*)arg3, ", ", (void*)arg4, ", ",
-      (void*)arg5, ", ", (void*)arg6, ") at iteration ", iterations, endl, flush;
+    logfile << "handle_syscall -> (#", syscallid, " ",
+        ((syscallid < lengthofSyscallNames()) ? syscall_names_64bit[syscallid] : "???"), ") from ",
+        (void*)ctx.commitarf[REG_rcx], " args ", " (", (void*)arg1, ", ", (void*)arg2, ", ", (void*)arg3, ", ",
+        (void*)arg4, ", ", (void*)arg5, ", ", (void*)arg6, ") at iteration ", iterations, endl, flush;
 
   ctx.commitarf[REG_rax] = -ENOSYS;
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_rcx];
 
-  if (DEBUG) logfile << "handle_syscall: result ", ctx.commitarf[REG_rax], " (", (void*)ctx.commitarf[REG_rax], "); returning to ", (void*)ctx.commitarf[REG_rip], endl, flush;
+  if (DEBUG)
+    logfile << "handle_syscall: result ", ctx.commitarf[REG_rax], " (", (void*)ctx.commitarf[REG_rax],
+        "); returning to ", (void*)ctx.commitarf[REG_rip], endl, flush;
 }
 
 #endif // __x86_64__
@@ -121,7 +125,8 @@ void Raspsim::handle_syscall_32bit(int semantics) {
 
 
 bool handle_config_arg(Raspsim& sim, char* line, dynarray<Waddr>* dump_pages) {
-  if (*line == '\0') return false;
+  if (*line == '\0')
+    return false;
   dynarray<char*> toks;
   toks.tokenize(line, " ");
   if (toks.empty())
@@ -143,10 +148,14 @@ bool handle_config_arg(Raspsim& sim, char* line, dynarray<Waddr>* dump_pages) {
       return true;
     }
     int prot = 0;
-    if (!strcmp(toks[1], "ro")) prot = PROT_READ;
-    else if (!strcmp(toks[1], "rw")) prot = PROT_READ | PROT_WRITE;
-    else if (!strcmp(toks[1], "rx")) prot = PROT_READ | PROT_EXEC;
-    else if (!strcmp(toks[1], "rwx")) prot = PROT_READ | PROT_WRITE | PROT_EXEC;
+    if (!strcmp(toks[1], "ro"))
+      prot = PROT_READ;
+    else if (!strcmp(toks[1], "rw"))
+      prot = PROT_READ | PROT_WRITE;
+    else if (!strcmp(toks[1], "rx"))
+      prot = PROT_READ | PROT_EXEC;
+    else if (!strcmp(toks[1], "rwx"))
+      prot = PROT_READ | PROT_WRITE | PROT_EXEC;
     else {
       cerr << "Error: invalid mem prot ", toks[1], endl;
       return true;
@@ -165,17 +174,17 @@ bool handle_config_arg(Raspsim& sim, char* line, dynarray<Waddr>* dump_pages) {
     }
     byte* mapped = sim.getMappedPage(addr);
     if (!mapped) {
-      cerr << "Error: page not mapped ", (void*) addr, endl;
+      cerr << "Error: page not mapped ", (void*)addr, endl;
       return true;
     }
     Waddr arglen = strlen(toks[1]);
-    if ((arglen & 1) || arglen/2 > 4096-lowbits(addr, 12)) {
-      cerr << "Error: arg has odd size or crosses page boundary", (void*) addr, endl;
+    if ((arglen & 1) || arglen / 2 > 4096 - lowbits(addr, 12)) {
+      cerr << "Error: arg has odd size or crosses page boundary", (void*)addr, endl;
       return true;
     }
-    unsigned n = min((Waddr)(4096 - lowbits(addr, 12)), arglen/2);
+    unsigned n = min((Waddr)(4096 - lowbits(addr, 12)), arglen / 2);
     foreach (i, n) {
-      char hex_byte[3] = {toks[1][i*2],toks[1][i*2+1], 0};
+      char hex_byte[3] = {toks[1][i * 2], toks[1][i * 2 + 1], 0};
       mapped[i] = strtoul(hex_byte, NULL, 16);
     }
   } else if (toks[0][0] == 'D') { // dump page D<page>
@@ -223,74 +232,79 @@ bool handle_config_arg(Raspsim& sim, char* line, dynarray<Waddr>* dump_pages) {
 //
 // PTLsim main: called after ptlsim_preinit() brings up boot subsystems
 //
-int main(int argc, char** argv) {    
- configparser.setup();
- config.reset();
+int main(int argc, char** argv) {
+  configparser.setup();
+  config.reset();
 
- int ptlsim_arg_count = 1 + configparser.parse(config, argc-1, argv+1);
- if (ptlsim_arg_count == 0) ptlsim_arg_count = argc;
- handle_config_change(config, ptlsim_arg_count - 1, argv+1);
+  int ptlsim_arg_count = 1 + configparser.parse(config, argc - 1, argv + 1);
+  if (ptlsim_arg_count == 0)
+    ptlsim_arg_count = argc;
+  handle_config_change(config, ptlsim_arg_count - 1, argv + 1);
 
- Raspsim sim{};
- dynarray<Waddr> dump_pages;
- // TODO(AE): set seccomp filter before parsing arguments
- bool parse_err = false;
- for (unsigned i = ptlsim_arg_count; i < argc; i++) {
-  if (argv[i][0] == '@') {
-    stringbuf line;
-    istream is(argv[i] + 1);
-    if (!is) {
-      cerr << "Warning: cannot open command list file '", argv[i], "'", endl;
-      continue;
-    }  
-    for (;;) {
-      line.reset();
-      if (!is) break;
-      is >> line;  
-      char* p = strchr(line, '#');
-      if (p) *p = 0;
-      parse_err |= handle_config_arg(sim, line, &dump_pages);
+  Raspsim sim{};
+  dynarray<Waddr> dump_pages;
+  // TODO(AE): set seccomp filter before parsing arguments
+  bool parse_err = false;
+  for (unsigned i = ptlsim_arg_count; i < argc; i++) {
+    if (argv[i][0] == '@') {
+      stringbuf line;
+      istream is(argv[i] + 1);
+      if (!is) {
+        cerr << "Warning: cannot open command list file '", argv[i], "'", endl;
+        continue;
+      }
+      for (;;) {
+        line.reset();
+        if (!is)
+          break;
+        is >> line;
+        char* p = strchr(line, '#');
+        if (p)
+          *p = 0;
+        parse_err |= handle_config_arg(sim, line, &dump_pages);
+      }
+    } else {
+      parse_err |= handle_config_arg(sim, argv[i], &dump_pages);
     }
-  } else {
-    parse_err |= handle_config_arg(sim, argv[i], &dump_pages);
   }
-}  
- if (parse_err) {
-   cerr << "Error: could not parse all arguments", endl, flush;
-   sys_exit(1);
- }
+  if (parse_err) {
+    cerr << "Error: could not parse all arguments", endl, flush;
+    sys_exit(1);
+  }
 
- logfile << endl,  "=== Switching to simulation mode at rip ", (void*)(Waddr) sim.getRegisterValue(REG_rip), " ===", endl, endl, flush;
- logfile << "Baseline state:", endl;
- logfile << sim.getContext();
+  logfile << endl, "=== Switching to simulation mode at rip ", (void*)(Waddr)sim.getRegisterValue(REG_rip),
+      " ===", endl, endl, flush;
+  logfile << "Baseline state:", endl;
+  logfile << sim.getContext();
 
- sim.run();
+  sim.run();
 
- cerr << "End state:", endl;
- cerr << sim.getContext(), endl;
+  cerr << "End state:", endl;
+  cerr << sim.getContext(), endl;
 
- foreach (i, dump_pages.length) {
-   Waddr addr = dump_pages[i];
-   byte* mapped = sim.getMappedPage(addr);
-   if (!mapped) {
-     cerr << "Error dumping memory: page not mapped ", (void*) addr, endl;
-   } else {
-     cerr << "Dump of memory at ", (void*) addr, ": ", endl;
-     cerr << bytestring(mapped, PAGE_SIZE), endl;
-   }
- }
- 
- cerr << "Decoder stats:";
- foreach(i, DECODE_TYPE_COUNT) {
-   cerr << " ", decode_type_names[i], "=", stats.decoder.x86_decode_type[i];
- }
- cerr << endl;
- cerr << flush;
+  foreach (i, dump_pages.length) {
+    Waddr addr = dump_pages[i];
+    byte* mapped = sim.getMappedPage(addr);
+    if (!mapped) {
+      cerr << "Error dumping memory: page not mapped ", (void*)addr, endl;
+    } else {
+      cerr << "Dump of memory at ", (void*)addr, ": ", endl;
+      cerr << bytestring(mapped, PAGE_SIZE), endl;
+    }
+  }
 
- cerr << endl, "=== Exiting after full simulation on tid ", sys_gettid(), " at rip ", (void*)(Waddr) sim.getRegisterValue(REG_rip), " (",
-   sim_cycle, " cycles, ", total_user_insns_committed, " user commits, ", iterations, " iterations) ===", endl, endl;
+  cerr << "Decoder stats:";
+  foreach (i, DECODE_TYPE_COUNT) {
+    cerr << " ", decode_type_names[i], "=", stats.decoder.x86_decode_type[i];
+  }
+  cerr << endl;
+  cerr << flush;
 
- Raspsim::stutdown();
+  cerr << endl, "=== Exiting after full simulation on tid ", sys_gettid(), " at rip ",
+      (void*)(Waddr)sim.getRegisterValue(REG_rip), " (", sim_cycle, " cycles, ", total_user_insns_committed,
+      " user commits, ", iterations, " iterations) ===", endl, endl;
 
- sys_exit(0);
+  Raspsim::stutdown();
+
+  sys_exit(0);
 }

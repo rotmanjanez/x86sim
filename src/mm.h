@@ -11,7 +11,7 @@
 
 #include <globals.h>
 
-void* ptl_mm_alloc_private_pages(Waddr bytecount, int prot = PROT_READ|PROT_WRITE, Waddr base = 0);
+void* ptl_mm_alloc_private_pages(Waddr bytecount, int prot = PROT_READ | PROT_WRITE, Waddr base = 0);
 void ptl_mm_free_private_pages(void* addr, Waddr bytecount);
 
 #endif // _MM_H_

@@ -32,12 +32,17 @@ void AddressSpace::make_accessible(void* p, Waddr size, spat_t top) {
   Waddr lastpage = ((Waddr)address + size - 1) >> log2(PAGE_SIZE);
   if (logable(1)) {
     logfile << "SPT: Making byte range ", (void*)(firstpage << log2(PAGE_SIZE)), " to ",
-      (void*)(lastpage << log2(PAGE_SIZE)), " (size ", size, ") accessible for ",
-    ((top == readmap) ? "read" : (top == writemap) ? "write" : (top == execmap) ? "exec" : "UNKNOWN"),
-      endl, flush;
+        (void*)(lastpage << log2(PAGE_SIZE)), " (size ", size, ") accessible for ",
+        ((top == readmap)    ? "read"
+         : (top == writemap) ? "write"
+         : (top == execmap)  ? "exec"
+                             : "UNKNOWN"),
+        endl, flush;
   }
   assert(ceil((W64)address + size, PAGE_SIZE) <= ADDRESS_SPACE_SIZE);
-  for (W64 i = firstpage; i <= lastpage; i++) { setbit(pageid_to_map_byte(top, i), lowbits(i, 3)); }
+  for (W64 i = firstpage; i <= lastpage; i++) {
+    setbit(pageid_to_map_byte(top, i), lowbits(i, 3));
+  }
 }
 
 void AddressSpace::make_inaccessible(void* p, Waddr size, spat_t top) {
@@ -46,12 +51,17 @@ void AddressSpace::make_inaccessible(void* p, Waddr size, spat_t top) {
   Waddr lastpage = ((Waddr)address + size - 1) >> log2(PAGE_SIZE);
   if (logable(1)) {
     logfile << "SPT: Making byte range ", (void*)(firstpage << log2(PAGE_SIZE)), " to ",
-      (void*)(lastpage << log2(PAGE_SIZE)), " (size ", size, ") inaccessible for ",
-    ((top == readmap) ? "read" : (top == writemap) ? "write" : (top == execmap) ? "exec" : "UNKNOWN"),
-      endl, flush;
+        (void*)(lastpage << log2(PAGE_SIZE)), " (size ", size, ") inaccessible for ",
+        ((top == readmap)    ? "read"
+         : (top == writemap) ? "write"
+         : (top == execmap)  ? "exec"
+                             : "UNKNOWN"),
+        endl, flush;
   }
   assert(ceil((W64)address + size, PAGE_SIZE) <= ADDRESS_SPACE_SIZE);
-  for (Waddr i = firstpage; i <= lastpage; i++) { clearbit(pageid_to_map_byte(top, i), lowbits(i, 3)); }
+  for (Waddr i = firstpage; i <= lastpage; i++) {
+    clearbit(pageid_to_map_byte(top, i), lowbits(i, 3));
+  }
 }
 
 
@@ -66,7 +76,8 @@ void AddressSpace::freemap(AddressSpace::spat_t top) {
 #ifdef __x86_64__
   if (top) {
     foreach (i, SPAT_TOPLEVEL_CHUNKS) {
-      if (top[i]) ptl_mm_free_private_pages(top[i], SPAT_BYTES_PER_CHUNK);
+      if (top[i])
+        ptl_mm_free_private_pages(top[i], SPAT_BYTES_PER_CHUNK);
     }
     ptl_mm_free_private_pages(top, SPAT_TOPLEVEL_CHUNKS * sizeof(SPATChunk*));
   }
@@ -84,9 +95,9 @@ void AddressSpace::reset() {
   freemap(dirtymap);
   mapped_mem.clear();
 
-  readmap  = allocmap();
+  readmap = allocmap();
   writemap = allocmap();
-  execmap  = allocmap();
+  execmap = allocmap();
   dirtymap = allocmap();
 }
 
@@ -97,21 +108,25 @@ void AddressSpace::setattr(void* start, Waddr length, int prot) {
   // have been set up.
   //
   if (logfile.filehandle() > 0) {
-    logfile << "setattr: region ", start, " to ", (void*)((char*)start + length), " (", length >> 10, " KB) has user-visible attributes ",
-      ((prot & PROT_READ) ? 'r' : '-'), ((prot & PROT_WRITE) ? 'w' : '-'), ((prot & PROT_EXEC) ? 'x' : '-'), endl;
+    logfile << "setattr: region ", start, " to ", (void*)((char*)start + length), " (", length >> 10,
+        " KB) has user-visible attributes ", ((prot & PROT_READ) ? 'r' : '-'), ((prot & PROT_WRITE) ? 'w' : '-'),
+        ((prot & PROT_EXEC) ? 'x' : '-'), endl;
   }
 
   if (prot & PROT_READ)
     allow_read(start, length);
-  else disallow_read(start, length);
+  else
+    disallow_read(start, length);
 
   if (prot & PROT_WRITE)
     allow_write(start, length);
-  else disallow_write(start, length);
+  else
+    disallow_write(start, length);
 
   if (prot & PROT_EXEC)
     allow_exec(start, length);
-  else disallow_exec(start, length);
+  else
+    disallow_exec(start, length);
 }
 
 int AddressSpace::getattr(void* addr) {
@@ -119,10 +134,9 @@ int AddressSpace::getattr(void* addr) {
 
   Waddr page = pageid(address);
 
-  int prot =
-    (bit(pageid_to_map_byte(readmap, page), lowbits(page, 3)) ? PROT_READ : 0) |
-    (bit(pageid_to_map_byte(writemap, page), lowbits(page, 3)) ? PROT_WRITE : 0) |
-    (bit(pageid_to_map_byte(execmap, page), lowbits(page, 3)) ? PROT_EXEC : 0);
+  int prot = (bit(pageid_to_map_byte(readmap, page), lowbits(page, 3)) ? PROT_READ : 0) |
+             (bit(pageid_to_map_byte(writemap, page), lowbits(page, 3)) ? PROT_WRITE : 0) |
+             (bit(pageid_to_map_byte(execmap, page), lowbits(page, 3)) ? PROT_EXEC : 0);
 
   return prot;
 }

@@ -14,64 +14,148 @@
 
 struct RexByte {
   // a.k.a., b, x, r, w
-  byte extbase:1, extindex:1, extreg:1, mode64:1, insnbits:4;
-  RexByte() { }
+  byte extbase : 1, extindex : 1, extreg : 1, mode64 : 1, insnbits : 4;
+  RexByte() {}
   RexByte(const byte& b) { *((byte*)this) = b; }
   operator byte() const { return (*((byte*)this)); }
 };
 
 struct ModRMByte {
-  byte rm:3, reg:3, mod:2;
-  ModRMByte() { }
+  byte rm : 3, reg : 3, mod : 2;
+  ModRMByte() {}
   ModRMByte(const byte& b) { *((byte*)this) = b; }
   //operator bool() { return (*((byte*)this)) != 0; }
   operator byte() const { return (*((byte*)this)); }
 };
 
 struct SIBByte {
-  byte base:3, index:3, scale:2;
-  SIBByte() { }
+  byte base : 3, index : 3, scale : 2;
+  SIBByte() {}
   SIBByte(const byte& b) { *((byte*)this) = b; }
   operator byte() const { return (*((byte*)this)); }
 };
 
-static const int PFX_REPZ      = (1 << 0);
-static const int PFX_REPNZ     = (1 << 1);
-static const int PFX_LOCK      = (1 << 2);
-static const int PFX_CS        = (1 << 3);
-static const int PFX_SS        = (1 << 4);
-static const int PFX_DS        = (1 << 5);
-static const int PFX_ES        = (1 << 6);
-static const int PFX_FS        = (1 << 7);
-static const int PFX_GS        = (1 << 8);
-static const int PFX_DATA      = (1 << 9);
-static const int PFX_ADDR      = (1 << 10);
-static const int PFX_REX       = (1 << 11);
-static const int PFX_FWAIT     = (1 << 12);
-static const int PFX_count     = 13;
+static const int PFX_REPZ = (1 << 0);
+static const int PFX_REPNZ = (1 << 1);
+static const int PFX_LOCK = (1 << 2);
+static const int PFX_CS = (1 << 3);
+static const int PFX_SS = (1 << 4);
+static const int PFX_DS = (1 << 5);
+static const int PFX_ES = (1 << 6);
+static const int PFX_FS = (1 << 7);
+static const int PFX_GS = (1 << 8);
+static const int PFX_DATA = (1 << 9);
+static const int PFX_ADDR = (1 << 10);
+static const int PFX_REX = (1 << 11);
+static const int PFX_FWAIT = (1 << 12);
+static const int PFX_count = 13;
 
 extern const char* prefix_names[PFX_count];
 
-#define FLAGS_DEFAULT_ALU (SETFLAG_ZF|SETFLAG_CF|SETFLAG_OF)
+#define FLAGS_DEFAULT_ALU (SETFLAG_ZF | SETFLAG_CF | SETFLAG_OF)
 
 enum {
   // 64-bit
-  APR_rax, APR_rcx, APR_rdx, APR_rbx, APR_rsp, APR_rbp, APR_rsi, APR_rdi, APR_r8, APR_r9, APR_r10, APR_r11, APR_r12, APR_r13, APR_r14, APR_r15,
+  APR_rax,
+  APR_rcx,
+  APR_rdx,
+  APR_rbx,
+  APR_rsp,
+  APR_rbp,
+  APR_rsi,
+  APR_rdi,
+  APR_r8,
+  APR_r9,
+  APR_r10,
+  APR_r11,
+  APR_r12,
+  APR_r13,
+  APR_r14,
+  APR_r15,
   // 32-bit
-  APR_eax, APR_ecx, APR_edx, APR_ebx, APR_esp, APR_ebp, APR_esi, APR_edi, APR_r8d, APR_r9d, APR_r10d, APR_r11d, APR_r12d, APR_r13d, APR_r14d, APR_r15d,
+  APR_eax,
+  APR_ecx,
+  APR_edx,
+  APR_ebx,
+  APR_esp,
+  APR_ebp,
+  APR_esi,
+  APR_edi,
+  APR_r8d,
+  APR_r9d,
+  APR_r10d,
+  APR_r11d,
+  APR_r12d,
+  APR_r13d,
+  APR_r14d,
+  APR_r15d,
   // 16-bit
-  APR_ax, APR_cx, APR_dx, APR_bx, APR_sp, APR_bp, APR_si, APR_di, APR_r8w, APR_r9w, APR_r10w, APR_r11w, APR_r12w, APR_r13w, APR_r14w, APR_r15w,
+  APR_ax,
+  APR_cx,
+  APR_dx,
+  APR_bx,
+  APR_sp,
+  APR_bp,
+  APR_si,
+  APR_di,
+  APR_r8w,
+  APR_r9w,
+  APR_r10w,
+  APR_r11w,
+  APR_r12w,
+  APR_r13w,
+  APR_r14w,
+  APR_r15w,
   // 8-bit
-  APR_al, APR_cl, APR_dl, APR_bl, APR_ah, APR_ch, APR_dh, APR_bh,
+  APR_al,
+  APR_cl,
+  APR_dl,
+  APR_bl,
+  APR_ah,
+  APR_ch,
+  APR_dh,
+  APR_bh,
   // 8-bit with REX, not double-counting the regular 8-bit regs:
-  APR_spl, APR_bpl, APR_sil, APR_dil,
-  APR_r8b, APR_r9b, APR_r10b, APR_r11b, APR_r12b, APR_r13b, APR_r14b, APR_r15b,
+  APR_spl,
+  APR_bpl,
+  APR_sil,
+  APR_dil,
+  APR_r8b,
+  APR_r9b,
+  APR_r10b,
+  APR_r11b,
+  APR_r12b,
+  APR_r13b,
+  APR_r14b,
+  APR_r15b,
   // SSE registers
-  APR_xmm0, APR_xmm1, APR_xmm2, APR_xmm3, APR_xmm4, APR_xmm5, APR_xmm6, APR_xmm7, APR_xmm8, APR_xmm9, APR_xmm10, APR_xmm11, APR_xmm12, APR_xmm13, APR_xmm14, APR_xmm15,
+  APR_xmm0,
+  APR_xmm1,
+  APR_xmm2,
+  APR_xmm3,
+  APR_xmm4,
+  APR_xmm5,
+  APR_xmm6,
+  APR_xmm7,
+  APR_xmm8,
+  APR_xmm9,
+  APR_xmm10,
+  APR_xmm11,
+  APR_xmm12,
+  APR_xmm13,
+  APR_xmm14,
+  APR_xmm15,
   // segments:
-  APR_es, APR_cs, APR_ss, APR_ds, APR_fs, APR_gs,
+  APR_es,
+  APR_cs,
+  APR_ss,
+  APR_ds,
+  APR_fs,
+  APR_gs,
   // special:
-  APR_rip, APR_zero, APR_COUNT,
+  APR_rip,
+  APR_zero,
+  APR_COUNT,
 };
 
 extern const char* uniform_arch_reg_names[APR_COUNT];
@@ -81,7 +165,7 @@ extern const byte arch_pseudo_reg_to_arch_reg[APR_COUNT];
 enum { b_mode, v_mode, w_mode, d_mode, q_mode, x_mode, dq_mode };
 
 struct ArchPseudoRegInfo {
-  W32 sizeshift:3, hibyte:1;
+  W32 sizeshift : 3, hibyte : 1;
 };
 
 extern const ArchPseudoRegInfo reginfo[APR_COUNT];
@@ -136,16 +220,16 @@ struct DecodedOperand {
   ostream& print(ostream& os) const;
 };
 
-static inline ostream& operator <<(ostream& os, const DecodedOperand& decop) {
+static inline ostream& operator<<(ostream& os, const DecodedOperand& decop) {
   return decop.print(os);
 }
 
 enum {
-  DECODE_OUTCOME_OK                 = 0,
-  DECODE_OUTCOME_ENTRY_PAGE_FAULT   = 1,
+  DECODE_OUTCOME_OK = 0,
+  DECODE_OUTCOME_ENTRY_PAGE_FAULT = 1,
   DECODE_OUTCOME_OVERLAP_PAGE_FAULT = 2,
-  DECODE_OUTCOME_INVALID_OPCODE     = 3,
-  DECODE_OUTCOME_GP_FAULT           = 4,
+  DECODE_OUTCOME_INVALID_OPCODE = 3,
+  DECODE_OUTCOME_GP_FAULT = 4,
 };
 
 struct TraceDecoder {
@@ -201,26 +285,56 @@ struct TraceDecoder {
   void immediate(int rdreg, int sizeshift, W64s imm, bool issigned = true);
   void abs_code_addr_immediate(int rdreg, int sizeshift, W64 imm);
   int bias_by_segreg(int basereg);
-  void address_generate_and_load_or_store(int destreg, int srcreg, const DecodedOperand& memref, int opcode, int datatype = DATATYPE_INT, int cachelevel = 0, bool force_seg_bias = false, bool rmw = false);
-  void operand_load(int destreg, const DecodedOperand& memref, int loadop = OP_ld, int datatype = 0, int cachelevel = 0, bool rmw = false);
-  void result_store(int srcreg, int tempreg, const DecodedOperand& memref, int opcode = OP_st, int datatype = 0, bool rmw = false);
+  void address_generate_and_load_or_store(int destreg, int srcreg, const DecodedOperand& memref, int opcode,
+                                          int datatype = DATATYPE_INT, int cachelevel = 0, bool force_seg_bias = false,
+                                          bool rmw = false);
+  void operand_load(int destreg, const DecodedOperand& memref, int loadop = OP_ld, int datatype = 0, int cachelevel = 0,
+                    bool rmw = false);
+  void result_store(int srcreg, int tempreg, const DecodedOperand& memref, int opcode = OP_st, int datatype = 0,
+                    bool rmw = false);
   void alu_reg_or_mem(int opcode, const DecodedOperand& rd, const DecodedOperand& ra, W32 setflags, int rcreg,
-                      bool flagsonly = false, bool isnegop = false, bool ra_rb_imm_form = false, W64s ra_rb_imm_form_rbimm = 0);
+                      bool flagsonly = false, bool isnegop = false, bool ra_rb_imm_form = false,
+                      W64s ra_rb_imm_form_rbimm = 0);
 
   void move_reg_or_mem(const DecodedOperand& rd, const DecodedOperand& ra, int force_rd = REG_zero);
   void signext_reg_or_mem(const DecodedOperand& rd, DecodedOperand& ra, int rasize, bool zeroext = false);
   void microcode_assist(int assistid, Waddr selfrip, Waddr nextrip);
-  bool memory_fence_if_locked(bool end_of_x86_insn = 0, int type = MF_TYPE_LFENCE|MF_TYPE_SFENCE);
+  bool memory_fence_if_locked(bool end_of_x86_insn = 0, int type = MF_TYPE_LFENCE | MF_TYPE_SFENCE);
 
   int fillbuf(Context& ctx, byte* insnbytes_, int insnbytes_bufsize_);
 #ifdef PTLSIM_HYPERVISOR
   int fillbuf_phys_prechecked(byte* insnbytes_, int insnbytes_bufsize_, Level1PTE ptelo, Level1PTE ptehi);
 #endif
-  inline W64 fetch(int n) { W64 r = lowbits(*((W64*)&insnbytes[byteoffset]), n*8); rip += n; byteoffset += n; return r; }
-  inline byte fetch1() { byte r = *((byte*)&insnbytes[byteoffset]); rip += 1; byteoffset += 1; return r; }
-  inline W16 fetch2() { W16 r = *((W16*)&insnbytes[byteoffset]); rip += 2; byteoffset += 2; return r; }
-  inline W32 fetch4() { W32 r = *((W32*)&insnbytes[byteoffset]); rip += 4; byteoffset += 4; return r; }
-  inline W64 fetch8() { W64 r = *((W64*)&insnbytes[byteoffset]); rip += 8; byteoffset += 8; return r; }
+  inline W64 fetch(int n) {
+    W64 r = lowbits(*((W64*)&insnbytes[byteoffset]), n * 8);
+    rip += n;
+    byteoffset += n;
+    return r;
+  }
+  inline byte fetch1() {
+    byte r = *((byte*)&insnbytes[byteoffset]);
+    rip += 1;
+    byteoffset += 1;
+    return r;
+  }
+  inline W16 fetch2() {
+    W16 r = *((W16*)&insnbytes[byteoffset]);
+    rip += 2;
+    byteoffset += 2;
+    return r;
+  }
+  inline W32 fetch4() {
+    W32 r = *((W32*)&insnbytes[byteoffset]);
+    rip += 4;
+    byteoffset += 4;
+    return r;
+  }
+  inline W64 fetch8() {
+    W64 r = *((W64*)&insnbytes[byteoffset]);
+    rip += 8;
+    byteoffset += 8;
+    return r;
+  }
 
   bool invalidate();
   bool decode_fast();
@@ -239,31 +353,43 @@ struct TraceDecoder {
   bool first_insn_in_bb() { return (Waddr(ripstart) == Waddr(bb.rip)); }
 };
 
-static inline TraceDecoder* operator <<(TraceDecoder* dec, const TransOp& transop) {
+static inline TraceDecoder* operator<<(TraceDecoder* dec, const TransOp& transop) {
   dec->put(transop);
   return dec;
 }
 
-static inline TraceDecoder& operator <<(TraceDecoder& dec, const TransOp& transop) {
+static inline TraceDecoder& operator<<(TraceDecoder& dec, const TransOp& transop) {
   dec.put(transop);
   return dec;
 }
 
 enum {
-  DECODE_TYPE_FAST, DECODE_TYPE_COMPLEX, DECODE_TYPE_X87, DECODE_TYPE_SSE, DECODE_TYPE_ASSIST, DECODE_TYPE_COUNT,
+  DECODE_TYPE_FAST,
+  DECODE_TYPE_COMPLEX,
+  DECODE_TYPE_X87,
+  DECODE_TYPE_SSE,
+  DECODE_TYPE_ASSIST,
+  DECODE_TYPE_COUNT,
 };
 
 #define DECODE(form, decbuf, mode) invalid |= (!decbuf.form(*this, mode));
-#define EndOfDecode() { \
-  invalid |= ((rip - (Waddr)bb.rip) > valid_byte_count); \
-  if unlikely (invalid) { \
-    if (invalidate()) return false; \
-    break; \
-  } \
-  if unlikely (fast_length_decode_only) break; \
-}
+#define EndOfDecode()                                                                                                  \
+  {                                                                                                                    \
+    invalid |= ((rip - (Waddr)bb.rip) > valid_byte_count);                                                             \
+    if unlikely (invalid) {                                                                                            \
+      if (invalidate())                                                                                                \
+        return false;                                                                                                  \
+      break;                                                                                                           \
+    }                                                                                                                  \
+    if unlikely (fast_length_decode_only)                                                                              \
+      break;                                                                                                           \
+  }
 
-#define MakeInvalid() { invalid |= true; EndOfDecode(); }
+#define MakeInvalid()                                                                                                  \
+  {                                                                                                                    \
+    invalid |= true;                                                                                                   \
+    EndOfDecode();                                                                                                     \
+  }
 
 enum {
   // Forced assists based on decode context
@@ -346,73 +472,73 @@ extern const assist_func_t assistid_to_func[ASSIST_COUNT];
 // eliminate duplicates.
 //
 static const char* assist_names[ASSIST_COUNT] = {
-  // Forced assists based on decode context
-  "invalid_opcode",
-  "exec_page_fault",
-  "gp_fault",
-  // Integer arithmetic
-  "div<byte>",
-  "div<W16>",
-  "div<W32>",
-  "div<W64>",
-  "idiv<byte>",
-  "idiv<W16>",
-  "idiv<W32>",
-  "idiv<W64>",
-  // x87
-  "x87_fist",
-  "x87_fldcw",
-  "x87_fprem",
-  "x87_fyl2xp1",
-  "x87_fsqrt",
-  "x87_fsincos",
-  "x87_frndint",
-  "x87_fscale",
-  "x87_fsin",
-  "x87_fcos",
-  "x87_fxam",
-  "x87_f2xm1",
-  "x87_fyl2x",
-  "x87_fptan",
-  "x87_fpatan",
-  "x87_fxtract",
-  "x87_fprem1",
-  "x87_fld80",
-  "x87_fstp80",
-  "x87_fsave",
-  "x87_frstor",
-  "x87_finit",
-  "x87_fclex",
-  // SSE save/restore
-  "ldmxcsr",
-  "fxsave",
-  "fxrstor",
-  // Interrupts", system calls", etc.
-  "int",
-  "syscall",
-  "hypercall",
-  "ptlcall",
-  "sysenter",
-  "iret16",
-  "iret32",
-  "iret64",
-  // Control register updates
-  "cpuid",
-  "rdtsc",
-  "cld",
-  "std",
-  "popf",
-  "write_segreg",
-  "wrmsr",
-  "rdmsr",
-  "write_cr0",
-  "write_cr2",
-  "write_cr3",
-  "write_cr4",
-  "write_debug_reg",
-  // I/O and legacy
-  "ioport_in",
-  "ioport_out",
+    // Forced assists based on decode context
+    "invalid_opcode",
+    "exec_page_fault",
+    "gp_fault",
+    // Integer arithmetic
+    "div<byte>",
+    "div<W16>",
+    "div<W32>",
+    "div<W64>",
+    "idiv<byte>",
+    "idiv<W16>",
+    "idiv<W32>",
+    "idiv<W64>",
+    // x87
+    "x87_fist",
+    "x87_fldcw",
+    "x87_fprem",
+    "x87_fyl2xp1",
+    "x87_fsqrt",
+    "x87_fsincos",
+    "x87_frndint",
+    "x87_fscale",
+    "x87_fsin",
+    "x87_fcos",
+    "x87_fxam",
+    "x87_f2xm1",
+    "x87_fyl2x",
+    "x87_fptan",
+    "x87_fpatan",
+    "x87_fxtract",
+    "x87_fprem1",
+    "x87_fld80",
+    "x87_fstp80",
+    "x87_fsave",
+    "x87_frstor",
+    "x87_finit",
+    "x87_fclex",
+    // SSE save/restore
+    "ldmxcsr",
+    "fxsave",
+    "fxrstor",
+    // Interrupts", system calls", etc.
+    "int",
+    "syscall",
+    "hypercall",
+    "ptlcall",
+    "sysenter",
+    "iret16",
+    "iret32",
+    "iret64",
+    // Control register updates
+    "cpuid",
+    "rdtsc",
+    "cld",
+    "std",
+    "popf",
+    "write_segreg",
+    "wrmsr",
+    "rdmsr",
+    "write_cr0",
+    "write_cr2",
+    "write_cr3",
+    "write_cr4",
+    "write_debug_reg",
+    // I/O and legacy
+    "ioport_in",
+    "ioport_out",
 };
 
 int propagate_exception_during_assist(Context& ctx, byte exception, W32 errorcode, Waddr virtaddr = 0, bool intN = 0);
@@ -429,8 +555,10 @@ void assist_invalid_opcode(Context& ctx);
 void assist_exec_page_fault(Context& ctx);
 void assist_gp_fault(Context& ctx);
 // Integer arithmetic
-template <typename T> void assist_div(Context& ctx);
-template <typename T> void assist_idiv(Context& ctx);
+template<typename T>
+void assist_div(Context& ctx);
+template<typename T>
+void assist_idiv(Context& ctx);
 // x87
 void assist_x87_fist(Context& ctx);
 void assist_x87_fldcw(Context& ctx);
@@ -495,35 +623,29 @@ void shutdown_decode();
 static const int BB_CACHE_SIZE = 16384;
 
 namespace superstl {
-  template <int setcount>
-  struct HashtableKeyManager<RIPVirtPhys, setcount> {
-    static inline int hash(const RIPVirtPhys& key) {
-      W64 rip = key.rip;
-      W64 slot = foldbits<log2(setcount)>(rip);
+template<int setcount>
+struct HashtableKeyManager<RIPVirtPhys, setcount> {
+  static inline int hash(const RIPVirtPhys& key) {
+    W64 rip = key.rip;
+    W64 slot = foldbits<log2(setcount)>(rip);
 #ifdef PTLSIM_HYPERVISOR
-      slot ^= key.mfnlo;
+    slot ^= key.mfnlo;
 #endif
-      return slot;
-    }
+    return slot;
+  }
 
-    static inline bool equal(const RIPVirtPhys& a, const RIPVirtPhys& b) { return (a == b); }
-    static inline RIPVirtPhys dup(const RIPVirtPhys& key) { return key; }
-    static inline void free(RIPVirtPhys& key) { }
-  };
+  static inline bool equal(const RIPVirtPhys& a, const RIPVirtPhys& b) { return (a == b); }
+  static inline RIPVirtPhys dup(const RIPVirtPhys& key) { return key; }
+  static inline void free(RIPVirtPhys& key) {}
 };
+}; // namespace superstl
 
 struct BasicBlockHashtableLinkManager {
-  static inline BasicBlock* objof(selflistlink* link) {
-    return baseof(BasicBlock, hashlink, link);
-  }
+  static inline BasicBlock* objof(selflistlink* link) { return baseof(BasicBlock, hashlink, link); }
 
-  static inline RIPVirtPhys& keyof(BasicBlock* obj) {
-    return obj->rip;
-  }
+  static inline RIPVirtPhys& keyof(BasicBlock* obj) { return obj->rip; }
 
-  static inline selflistlink* linkof(BasicBlock* obj) {
-    return &obj->hashlink;
-  }
+  static inline selflistlink* linkof(BasicBlock* obj) { return &obj->hashlink; }
 };
 
 enum {
@@ -536,8 +658,8 @@ enum {
   INVALIDATE_REASON_COUNT
 };
 
-struct BasicBlockCache: public SelfHashtable<RIPVirtPhys, BasicBlock, BB_CACHE_SIZE, BasicBlockHashtableLinkManager> {
-  BasicBlockCache(): SelfHashtable<RIPVirtPhys, BasicBlock, BB_CACHE_SIZE, BasicBlockHashtableLinkManager>() { }
+struct BasicBlockCache : public SelfHashtable<RIPVirtPhys, BasicBlock, BB_CACHE_SIZE, BasicBlockHashtableLinkManager> {
+  BasicBlockCache() : SelfHashtable<RIPVirtPhys, BasicBlock, BB_CACHE_SIZE, BasicBlockHashtableLinkManager>() {}
 
   BasicBlock* translate(Context& ctx, const RIPVirtPhys& rvp);
   void translate_in_place(BasicBlock& targetbb, Context& ctx, Waddr rip);
@@ -561,12 +683,9 @@ extern odstream bbcache_dump_file;
 // data store template; these must be in sync with the
 // corresponding definitions elsewhere.
 //
-static const char* decode_type_names[DECODE_TYPE_COUNT] = {
-  "fast", "complex", "x87", "sse", "assist"
-};
+static const char* decode_type_names[DECODE_TYPE_COUNT] = {"fast", "complex", "x87", "sse", "assist"};
 
-static const char* invalidate_reason_names[INVALIDATE_REASON_COUNT] = {
-  "smc", "dma", "spurious", "reclaim", "dirty", "empty"
-};
+static const char* invalidate_reason_names[INVALIDATE_REASON_COUNT] = {"smc",     "dma",   "spurious",
+                                                                       "reclaim", "dirty", "empty"};
 
 #endif // _DECODE_H_

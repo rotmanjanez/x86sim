@@ -13,11 +13,11 @@
 
 #include <ptlsim.h>
 
-#define BRANCH_HINT_UNCOND      0
-#define BRANCH_HINT_COND        (1 << 0)
-#define BRANCH_HINT_INDIRECT    (1 << 1)
-#define BRANCH_HINT_CALL        (1 << 2)
-#define BRANCH_HINT_RET         (1 << 3)
+#define BRANCH_HINT_UNCOND 0
+#define BRANCH_HINT_COND (1 << 0)
+#define BRANCH_HINT_INDIRECT (1 << 1)
+#define BRANCH_HINT_CALL (1 << 2)
+#define BRANCH_HINT_RET (1 << 3)
 
 struct ReturnAddressStackEntry {
   int idx;
@@ -25,7 +25,7 @@ struct ReturnAddressStackEntry {
   W64 rip;
   operator W64() const { return rip; }
 
-  ReturnAddressStackEntry() { }
+  ReturnAddressStackEntry() {}
   ReturnAddressStackEntry(W64 uuid, W64 rip) {
     this->uuid = uuid;
     this->rip = rip;
@@ -34,11 +34,11 @@ struct ReturnAddressStackEntry {
 
   // Required by Queue<> template class:
   void init(int i) { idx = i; }
-  void validate() { }
+  void validate() {}
   int index() const { return idx; }
 };
 
-ostream& operator <<(ostream& os, const ReturnAddressStackEntry& e);
+ostream& operator<<(ostream& os, const ReturnAddressStackEntry& e);
 
 struct PredictorUpdate {
   W64 uuid;
@@ -46,7 +46,7 @@ struct PredictorUpdate {
   byte* cp2;
   byte* cpmeta;
   // predicted directions:
-  W32 ctxid:8, flags:8, bimodal:1, twolevel:1, meta:1, ras_push:1;
+  W32 ctxid : 8, flags : 8, bimodal : 1, twolevel : 1, meta : 1, ras_push : 1;
   ReturnAddressStackEntry ras_old;
 };
 
@@ -73,7 +73,7 @@ struct BranchPredictorInterface {
   void flush();
 };
 
-ostream& operator <<(ostream& os, const BranchPredictorInterface& branchpred);
+ostream& operator<<(ostream& os, const BranchPredictorInterface& branchpred);
 
 extern BranchPredictorInterface branchpred;
 

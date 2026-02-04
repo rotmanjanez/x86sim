@@ -10,7 +10,7 @@
 #include <mm.h>
 
 void* ptl_mm_try_alloc_private_pages(Waddr bytecount, int prot, Waddr base, void* caller) {
-  int flags = MAP_ANONYMOUS|MAP_NORESERVE|MAP_PRIVATE | (base ? MAP_FIXED : 0);
+  int flags = MAP_ANONYMOUS | MAP_NORESERVE | MAP_PRIVATE | (base ? MAP_FIXED : 0);
   return sys_mmap((void*)base, ceil(bytecount, PAGE_SIZE), prot, flags, 0, 0);
 }
 

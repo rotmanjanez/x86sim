@@ -12,7 +12,8 @@ ostream& ConfigurationParserBase::printusage(const void* baseptr, ostream& os) c
   ConfigurationOption* option = options;
   int maxlength = 0;
   while (option) {
-    if likely (option->type != OPTION_TYPE_SECTION) maxlength = max(maxlength, int(strlen(option->name)));
+    if likely (option->type != OPTION_TYPE_SECTION)
+      maxlength = max(maxlength, int(strlen(option->name)));
     option = option->next;
   }
 
@@ -33,7 +34,10 @@ ostream& ConfigurationParserBase::printusage(const void* baseptr, ostream& os) c
       break;
     case OPTION_TYPE_W64: {
       W64 v = *((W64*)(variable));
-      if (v == infinity) os << "inf"; else os << v;
+      if (v == infinity)
+        os << "inf";
+      else
+        os << v;
       break;
     }
     case OPTION_TYPE_FLOAT:
@@ -77,8 +81,8 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
         if (strequal(name, option->name)) {
           found = true;
           void* variable = (void*)((Waddr)baseptr + option->offset);
-          if ((option->type != OPTION_TYPE_NONE) && (option->type != OPTION_TYPE_BOOL) && (i == (argc+1))) {
-            cerr << "Warning: missing value for option '", argv[i-1], "'", endl;
+          if ((option->type != OPTION_TYPE_NONE) && (option->type != OPTION_TYPE_BOOL) && (i == (argc + 1))) {
+            cerr << "Warning: missing value for option '", argv[i - 1], "'", endl;
             break;
           }
           switch (option->type) {
@@ -88,7 +92,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             char* p = (i < argc) ? argv[i] : null;
             int len = (p) ? strlen(p) : 0;
             if (!len) {
-              cerr << "Warning: option ", argv[i-1], " had no argument; ignoring", endl;
+              cerr << "Warning: option ", argv[i - 1], " had no argument; ignoring", endl;
               break;
             }
 
@@ -100,21 +104,33 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             char* endp = p;
             bool isinf = (strncmp(p, "inf", 3) == 0);
             if (len > 1) {
-              char& c = p[len-1];
+              char& c = p[len - 1];
               switch (c) {
-              case 'k': case 'K':
-                multiplier = 1000LL; c = 0; break;
-              case 'm': case 'M':
-                multiplier = 1000000LL; c = 0; break;
-              case 'g': case 'G':
-                multiplier = 1000000000LL; c = 0; break;
-              case 't': case 'T':
-                multiplier = 1000000000000LL; c = 0; break;
+              case 'k':
+              case 'K':
+                multiplier = 1000LL;
+                c = 0;
+                break;
+              case 'm':
+              case 'M':
+                multiplier = 1000000LL;
+                c = 0;
+                break;
+              case 'g':
+              case 'G':
+                multiplier = 1000000000LL;
+                c = 0;
+                break;
+              case 't':
+              case 'T':
+                multiplier = 1000000000000LL;
+                c = 0;
+                break;
               }
             }
             W64 v = (isinf) ? infinity : strtoull(p, &endp, 0);
             if ((!isinf) && (endp[0] != 0)) {
-              cerr << "Warning: invalid value '", p, "' for option ", argv[i-1], "; ignoring", endl;
+              cerr << "Warning: invalid value '", p, "' for option ", argv[i - 1], "; ignoring", endl;
             }
             v *= multiplier;
             *((W64*)variable) = v;
@@ -124,7 +140,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
           }
           case OPTION_TYPE_FLOAT:
             if (i >= argc) {
-              cerr << "Warning: option ", argv[i-1], " had no argument; ignoring", endl;
+              cerr << "Warning: option ", argv[i - 1], " had no argument; ignoring", endl;
               break;
             }
             *((double*)variable) = atof(argv[i++]);
@@ -134,7 +150,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             break;
           case OPTION_TYPE_STRING: {
             if (i >= argc) {
-              cerr << "Warning: option ", argv[i-1], " had no argument; ignoring", endl;
+              cerr << "Warning: option ", argv[i - 1], " had no argument; ignoring", endl;
               break;
             }
             stringbuf& sb = *((stringbuf*)variable);
@@ -151,7 +167,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
         option = option->next;
       }
       if (!found) {
-        cerr << "Warning: invalid option '", (inrange(i-1, 0, argc-1) ? argv[i-1] : "<missing>"), "'", endl;
+        cerr << "Warning: invalid option '", (inrange(i - 1, 0, argc - 1) ? argv[i - 1] : "<missing>"), "'", endl;
         i++;
       }
     } else {
@@ -241,13 +257,14 @@ void expand_command_list(dynarray<char*>& list, int argc, char** argv, int depth
   foreach (i, argc) {
     char* arg = argv[i];
     if (arg[0] == '@') {
-      includes.push(arg+1);
+      includes.push(arg + 1);
     } else if (arg[0] == ':') {
       list.push(strdup(line));
       line.reset();
     } else {
       line << argv[i];
-      if (i != (argc-1)) line << " ";
+      if (i != (argc - 1))
+        line << " ";
     }
   }
 
@@ -266,16 +283,19 @@ void expand_command_list(dynarray<char*>& list, int argc, char** argv, int depth
     for (;;) {
       line.reset();
       is >> line;
-      if (!is) break;
+      if (!is)
+        break;
 
       char* p = strchr(line, '#');
-      if (p) *p = 0;
+      if (p)
+        *p = 0;
       int length = strlen(line);
       bool empty = 1;
       foreach (j, length) {
         empty &= ((line[j] == ' ') | (line[j] == '\t'));
       }
-      if (empty) continue;
+      if (empty)
+        continue;
 
       expand_command_list(list, line, depth + 1);
     }

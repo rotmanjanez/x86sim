@@ -37,7 +37,7 @@ extern const char* seqexec_result_names[SEQEXEC_RESULT_COUNT];
 //
 static const int MAX_STORES_IN_COMMIT_RECORD = 4096;
 
-struct CommitRecord: public Context {
+struct CommitRecord : public Context {
   int exit_reason;
 
   int store_count;

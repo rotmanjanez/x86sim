@@ -51,11 +51,15 @@ struct TransOpBuffer {
   int count;
 
   bool get(TransOp& uop, uopimpl_func_t& synthop) {
-    if (!count) return false;
+    if (!count)
+      return false;
     uop = uops[index];
     synthop = synthops[index];
     index++;
-    if (index >= count) { count = 0; index = 0; }
+    if (index >= count) {
+      count = 0;
+      index = 0;
+    }
     return true;
   }
 
@@ -64,13 +68,9 @@ struct TransOpBuffer {
     count = 0;
   }
 
-  int put() {
-    return count++;
-  }
+  int put() { return count++; }
 
-  bool empty() const {
-    return (count == 0);
-  }
+  bool empty() const { return (count == 0); }
 
   TransOpBuffer() { reset(); }
 };
@@ -102,7 +102,8 @@ struct AddrPair {
 
 void init_uops();
 void shutdown_uops();
-uopimpl_func_t get_synthcode_for_uop(int op, int size, bool setflags, int cond, int extshift, bool except, bool internal);
+uopimpl_func_t get_synthcode_for_uop(int op, int size, bool setflags, int cond, int extshift, bool except,
+                                     bool internal);
 uopimpl_func_t get_synthcode_for_cond_branch(int opcode, int cond, int size, bool except);
 void synth_uops_for_bb(BasicBlock& bb);
 struct PTLsimStats;
@@ -206,10 +207,10 @@ extern PTLsimConfig config;
 
 extern ConfigurationParser<PTLsimConfig> configparser;
 
-ostream& operator <<(ostream& os, const PTLsimConfig& config);
+ostream& operator<<(ostream& os, const PTLsimConfig& config);
 
 extern bool logenable;
-#define logable(level) (unlikely (logenable && (config.loglevel >= level)))
+#define logable(level) (unlikely(logenable && (config.loglevel >= level)))
 void force_logging_enabled();
 
 #endif // _PTLSIM_H_

@@ -103,96 +103,98 @@ void PTLsimConfig::reset() {
 #endif
 }
 
-template <>
+template<>
 void ConfigurationParser<PTLsimConfig>::setup() {
 #ifdef PTLSIM_HYPERVISOR
   // Full system only
   section("PTLmon Control");
-  add(domain,                       "domain",               "Domain to access");
+  add(domain, "domain", "Domain to access");
 
   section("Action (specify only one)");
-  add(run,                          "run",                  "Run under simulation");
-  add(stop,                         "stop",                 "Stop current simulation run and wait for command");
-  add(native,                       "native",               "Switch to native mode");
-  add(kill,                         "kill",                 "Kill PTLsim inside domain (and ptlmon), then shutdown domain");
-  add(flush_command_queue,          "flush",                "Flush all queued commands, stop the current simulation run and wait");
-  add(simswitch,                    "switch",               "Switch back to PTLsim while in native mode");
+  add(run, "run", "Run under simulation");
+  add(stop, "stop", "Stop current simulation run and wait for command");
+  add(native, "native", "Switch to native mode");
+  add(kill, "kill", "Kill PTLsim inside domain (and ptlmon), then shutdown domain");
+  add(flush_command_queue, "flush", "Flush all queued commands, stop the current simulation run and wait");
+  add(simswitch, "switch", "Switch back to PTLsim while in native mode");
 #endif
 
   section("Simulation Control");
 
-  add(core_name,                    "core",                 "Run using specified core (-core <corename>)");
+  add(core_name, "core", "Run using specified core (-core <corename>)");
 
   section("General Logging Control");
-  add(quiet,                        "quiet",                "Do not print PTLsim system information banner");
-  add(log_filename,                 "logfile",              "Log filename (use /dev/fd/1 for stdout, /dev/fd/2 for stderr)");
-  add(loglevel,                     "loglevel",             "Log level (0 to 99)");
-  add(start_log_at_iteration,       "startlog",             "Start logging after iteration <startlog>");
-  add(start_log_at_rip,             "startlogrip",          "Start logging after first translation of basic block starting at rip");
-  add(log_on_console,               "consolelog",           "Replicate log file messages to console");
-  add(log_ptlsim_boot,              "bootlog",              "Log PTLsim early boot and injection process (for debugging)");
-  add(log_buffer_size,              "logbufsize",           "Size of PTLsim logfile buffer (not related to -ringbuf)");
-  add(dump_state_now,               "dump-state-now",       "Dump the event log ring buffer and internal state of the active core");
-  add(abort_at_end,                 "abort-at-end",         "Abort current simulation after next command (don't wait for next x86 boundary)");
-  add(mm_logfile,                   "mm-logfile",           "Log PTLsim memory manager requests (alloc, free) to this file (use with ptlmmlog)");
-  add(mm_log_buffer_size,           "mm-logbuf-size",       "Size of PTLsim memory manager log buffer (in events, not bytes)");
-  add(enable_inline_mm_logging,     "mm-log-inline",        "Print every memory manager request in the main log file");
-  add(enable_mm_validate,           "mm-validate",          "Validate every memory manager request against internal structures (slow)");
+  add(quiet, "quiet", "Do not print PTLsim system information banner");
+  add(log_filename, "logfile", "Log filename (use /dev/fd/1 for stdout, /dev/fd/2 for stderr)");
+  add(loglevel, "loglevel", "Log level (0 to 99)");
+  add(start_log_at_iteration, "startlog", "Start logging after iteration <startlog>");
+  add(start_log_at_rip, "startlogrip", "Start logging after first translation of basic block starting at rip");
+  add(log_on_console, "consolelog", "Replicate log file messages to console");
+  add(log_ptlsim_boot, "bootlog", "Log PTLsim early boot and injection process (for debugging)");
+  add(log_buffer_size, "logbufsize", "Size of PTLsim logfile buffer (not related to -ringbuf)");
+  add(dump_state_now, "dump-state-now", "Dump the event log ring buffer and internal state of the active core");
+  add(abort_at_end, "abort-at-end", "Abort current simulation after next command (don't wait for next x86 boundary)");
+  add(mm_logfile, "mm-logfile", "Log PTLsim memory manager requests (alloc, free) to this file (use with ptlmmlog)");
+  add(mm_log_buffer_size, "mm-logbuf-size", "Size of PTLsim memory manager log buffer (in events, not bytes)");
+  add(enable_inline_mm_logging, "mm-log-inline", "Print every memory manager request in the main log file");
+  add(enable_mm_validate, "mm-validate", "Validate every memory manager request against internal structures (slow)");
 
   section("Event Ring Buffer Logging Control");
-  add(event_log_enabled,            "ringbuf",              "Log all core events to the ring buffer for backwards-in-time debugging");
-  add(event_log_ring_buffer_size,   "ringbuf-size",         "Core event log ring buffer size: only save last <ringbuf> entries");
-  add(flush_event_log_every_cycle,  "flush-events",         "Flush event log ring buffer to logfile after every cycle");
-  add(log_backwards_from_trigger_rip,"ringbuf-trigger-rip", "Print event ring buffer when first uop in this rip is committed");
+  add(event_log_enabled, "ringbuf", "Log all core events to the ring buffer for backwards-in-time debugging");
+  add(event_log_ring_buffer_size, "ringbuf-size", "Core event log ring buffer size: only save last <ringbuf> entries");
+  add(flush_event_log_every_cycle, "flush-events", "Flush event log ring buffer to logfile after every cycle");
+  add(log_backwards_from_trigger_rip, "ringbuf-trigger-rip",
+      "Print event ring buffer when first uop in this rip is committed");
 
 #ifndef PTLSIM_HYPERVISOR
   // Userspace only
   section("Start Point");
-  add(start_at_rip,                 "startrip",             "Start at rip <startrip>");
-  add(include_dyn_linker,           "excludeld",            "Exclude dynamic linker execution");
-  add(trigger_mode,                 "trigger",              "Trigger mode: wait for user process to do simcall before entering PTL mode");
-  add(pause_at_startup,             "pause-at-startup",     "Pause for N seconds after starting up (to allow debugger to attach)");
+  add(start_at_rip, "startrip", "Start at rip <startrip>");
+  add(include_dyn_linker, "excludeld", "Exclude dynamic linker execution");
+  add(trigger_mode, "trigger", "Trigger mode: wait for user process to do simcall before entering PTL mode");
+  add(pause_at_startup, "pause-at-startup", "Pause for N seconds after starting up (to allow debugger to attach)");
 #endif
 
   section("Trace Stop Point");
-  add(stop_at_user_insns,           "stopinsns",            "Stop after executing <stopinsns> user instructions");
-  add(stop_at_iteration,            "stopiter",             "Stop after <stop> iterations (does not apply to cycle-accurate cores)");
-  add(stop_at_rip,                  "stoprip",              "Stop before rip <stoprip> is translated for the first time");
+  add(stop_at_user_insns, "stopinsns", "Stop after executing <stopinsns> user instructions");
+  add(stop_at_iteration, "stopiter", "Stop after <stop> iterations (does not apply to cycle-accurate cores)");
+  add(stop_at_rip, "stoprip", "Stop before rip <stoprip> is translated for the first time");
 
 #ifdef PTLSIM_HYPERVISOR
   // Full system only
   section("Event Trace Recording");
-  add(event_trace_record_filename,  "event-record",         "Save replayable events (interrupts, DMAs, etc) to this file");
-  add(event_trace_record_stop,      "event-record-stop",    "Stop recording events");
-  add(event_trace_replay_filename,  "event-replay",         "Replay events (interrupts, DMAs, etc) to this file, starting at checkpoint");
+  add(event_trace_record_filename, "event-record", "Save replayable events (interrupts, DMAs, etc) to this file");
+  add(event_trace_record_stop, "event-record-stop", "Stop recording events");
+  add(event_trace_replay_filename, "event-replay",
+      "Replay events (interrupts, DMAs, etc) to this file, starting at checkpoint");
 
   section("Timers and Interrupts");
-  add(core_freq_hz,                 "corefreq",             "Core clock frequency in Hz (default uses host system frequency)");
-  add(timer_interrupt_freq_hz,      "timerfreq",            "Timer interrupt frequency in Hz");
-  add(pseudo_real_time_clock,       "pseudo-rtc",           "Real time clock always starts at time saved in checkpoint");
-  add(realtime,                     "realtime",             "Operate in real time: no time dilation (not accurate for I/O intensive workloads!)");
-  add(mask_interrupts,              "maskints",             "Mask all interrupts (required for guaranteed deterministic behavior)");
-  add(console_mfn,                  "console-mfn",          "Track the specified Xen console MFN");
-  add(pause,                        "pause",                "Pause domain after using -native");
-  add(perfctr_name,                 "perfctr",              "Performance counter generic name for hardware profiling during native mode");
-  add(force_native,                 "force-native",         "Force native mode: ignore attempts to switch to simulation");
+  add(core_freq_hz, "corefreq", "Core clock frequency in Hz (default uses host system frequency)");
+  add(timer_interrupt_freq_hz, "timerfreq", "Timer interrupt frequency in Hz");
+  add(pseudo_real_time_clock, "pseudo-rtc", "Real time clock always starts at time saved in checkpoint");
+  add(realtime, "realtime", "Operate in real time: no time dilation (not accurate for I/O intensive workloads!)");
+  add(mask_interrupts, "maskints", "Mask all interrupts (required for guaranteed deterministic behavior)");
+  add(console_mfn, "console-mfn", "Track the specified Xen console MFN");
+  add(pause, "pause", "Pause domain after using -native");
+  add(perfctr_name, "perfctr", "Performance counter generic name for hardware profiling during native mode");
+  add(force_native, "force-native", "Force native mode: ignore attempts to switch to simulation");
 #endif
 
   section("Out of Order Core (ooocore)");
-  add(perfect_cache,                "perfect-cache",        "Perfect cache performance: all loads and stores hit in L1");
+  add(perfect_cache, "perfect-cache", "Perfect cache performance: all loads and stores hit in L1");
 
   section("Miscellaneous");
-  add(bbcache_dump_filename,        "bbdump",               "Basic block cache dump filename");
+  add(bbcache_dump_filename, "bbdump", "Basic block cache dump filename");
 #ifndef PTLSIM_HYPERVISOR
   // Userspace only
-  add(sequential_mode_insns,        "seq",                  "Run in sequential mode for <seq> instructions before switching to out of order");
-  add(exit_after_fullsim,           "exitend",              "Kill the thread after full simulation completes rather than going native");
+  add(sequential_mode_insns, "seq", "Run in sequential mode for <seq> instructions before switching to out of order");
+  add(exit_after_fullsim, "exitend", "Kill the thread after full simulation completes rather than going native");
 #endif
 };
 
 #ifndef CONFIG_ONLY
 
-ostream& operator <<(ostream& os, const PTLsimConfig& config) {
+ostream& operator<<(ostream& os, const PTLsimConfig& config) {
   return configparser.print(os, config);
 }
 
@@ -213,15 +215,16 @@ void print_banner(ostream& os, const PTLsimStats& stats, int argc, char** argv) 
   os << "//  Copyright 1999-2007 Matt T. Yourst <yourst@yourst.com>", endl;
   os << "// ", endl;
   os << "//  Revision ", stringify(SVNREV), " (", stringify(SVNDATE), ")", endl;
-  os << "//  Built ", __DATE__, " ", __TIME__, " on ", stringify(BUILDHOST), " using gcc-",
-    stringify(__GNUC__), ".", stringify(__GNUC_MINOR__), endl;
+  os << "//  Built ", __DATE__, " ", __TIME__, " on ", stringify(BUILDHOST), " using gcc-", stringify(__GNUC__), ".",
+      stringify(__GNUC_MINOR__), endl;
   os << "//  Running on ", hostinfo.nodename, ".", hostinfo.domainname, endl;
   os << "//  ", endl;
 #ifndef PTLSIM_HYPERVISOR
   os << "//  Arguments: ";
   foreach (i, argc) {
     os << argv[i];
-    if (i != (argc-1)) os << ' ';
+    if (i != (argc - 1))
+      os << ' ';
   }
   os << endl;
 #endif
@@ -236,16 +239,19 @@ void collect_common_sysinfo(PTLsimStats& stats) {
   stringbuf sb;
 #define strput(x, y) (strncpy((x), (y), sizeof(x)))
 
-  sb.reset(); sb << __DATE__, " ", __TIME__;
+  sb.reset();
+  sb << __DATE__, " ", __TIME__;
   strput(stats.simulator.version.build_timestamp, sb);
   stats.simulator.version.svn_revision = SVNREV;
   strput(stats.simulator.version.svn_timestamp, stringify(SVNDATE));
   strput(stats.simulator.version.build_hostname, stringify(BUILDHOST));
-  sb.reset(); sb << "gcc-", __GNUC__, ".", __GNUC_MINOR__;
+  sb.reset();
+  sb << "gcc-", __GNUC__, ".", __GNUC_MINOR__;
   strput(stats.simulator.version.build_compiler, sb);
 
   stats.simulator.run.timestamp = sys_time(0);
-  sb.reset(); sb << hostinfo.nodename, ".", hostinfo.domainname;
+  sb.reset();
+  sb << hostinfo.nodename, ".", hostinfo.domainname;
   strput(stats.simulator.run.hostname, sb);
   strput(stats.simulator.run.kernel_version, hostinfo.release);
 }
@@ -263,7 +269,8 @@ stringbuf current_bbcache_dump_filename;
 
 void backup_and_reopen_logfile() {
   if (config.log_filename) {
-    if (logfile) logfile.close();
+    if (logfile)
+      logfile.close();
     stringbuf oldname;
     oldname << config.log_filename, ".backup";
     sys_unlink(oldname);
@@ -367,16 +374,28 @@ Hashtable<const char*, PTLsimMachine*, 1>* machinetable = null;
 // Make sure the vtable gets compiled:
 PTLsimMachine dummymachine;
 
-bool PTLsimMachine::init(PTLsimConfig& config) { return false; }
-int PTLsimMachine::run(PTLsimConfig& config) { return 0; }
+bool PTLsimMachine::init(PTLsimConfig& config) {
+  return false;
+}
+int PTLsimMachine::run(PTLsimConfig& config) {
+  return 0;
+}
 void PTLsimMachine::reset() {
   bbcache.reset();
   initialized = 0;
 }
-void PTLsimMachine::update_stats(PTLsimStats& stats) { return; }
-void PTLsimMachine::dump_state(ostream& os) { return; }
-void PTLsimMachine::flush_tlb(Context& ctx) { return; }
-void PTLsimMachine::flush_tlb_virt(Context& ctx, Waddr virtaddr) { return; }
+void PTLsimMachine::update_stats(PTLsimStats& stats) {
+  return;
+}
+void PTLsimMachine::dump_state(ostream& os) {
+  return;
+}
+void PTLsimMachine::flush_tlb(Context& ctx) {
+  return;
+}
+void PTLsimMachine::flush_tlb_virt(Context& ctx, Waddr virtaddr) {
+  return;
+}
 
 void PTLsimMachine::addmachine(const char* name, PTLsimMachine* machine) {
   if unlikely (!machinetable) {
@@ -386,9 +405,11 @@ void PTLsimMachine::addmachine(const char* name, PTLsimMachine* machine) {
 }
 
 PTLsimMachine* PTLsimMachine::getmachine(const char* name) {
-  if unlikely (!machinetable) return null;
+  if unlikely (!machinetable)
+    return null;
   PTLsimMachine** p = machinetable->get(name);
-  if (!p) return null;
+  if (!p)
+    return null;
   return *p;
 }
 
@@ -435,7 +456,7 @@ bool simulate(const char* machinename) {
   }
 
   logfile << "Switching to simulation core '", machinename, "'...", endl, flush;
-  cerr <<  "Switching to simulation core '", machinename, "'...", endl, flush;
+  cerr << "Switching to simulation core '", machinename, "'...", endl, flush;
   logfile << "Stopping after ", config.stop_at_user_insns, " commits", endl, flush;
   cerr << "Stopping after ", config.stop_at_user_insns, " commits", endl, flush;
 

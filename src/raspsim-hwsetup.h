@@ -17,7 +17,6 @@ W64 lengthofSyscallNames();
 // TODO: (JR) add lock so only a single instance of raspsim can be used at a time
 class Raspsim {
 public:
-
   Raspsim();
   ~Raspsim();
 
@@ -26,12 +25,12 @@ public:
 protected:
   PTLsimMachine* getMachine();
   const char* getCoreName();
-public:
 
+public:
   int getRegisterIndex(const char* regname);
   void setRegisterValue(int reg, W64 value);
   W64 getRegisterValue(int reg);
-  
+
   byte* getMappedPage(Waddr addr);
   int getPageProtection(void* addr);
 
@@ -54,10 +53,10 @@ public:
   static void stutdown();
   static AddressSpace& getAddrspace();
   static Context& getContext();
-  
+
   static char* formatException(byte exception, W32 errorcode, Waddr virtaddr);
   static char* formatContext(const Context& ctx);
-  
+
 
   // Implement as desired depending on the bindings
   static void propagate_x86_exception(byte exception, W32 errorcode, Waddr virtaddr);

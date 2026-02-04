@@ -23,7 +23,7 @@ struct ConfigurationOption {
 
   ConfigurationOption* next;
 
-  ConfigurationOption() { }
+  ConfigurationOption() {}
 
   ConfigurationOption(const char* name, const char* description, int type, Waddr offset, int fieldsize = 0) {
     this->name = name;
@@ -36,12 +36,12 @@ struct ConfigurationOption {
 };
 
 enum {
-  OPTION_TYPE_NONE    = 0,
-  OPTION_TYPE_W64     = 1,
-  OPTION_TYPE_FLOAT   = 2,
-  OPTION_TYPE_STRING  = 3,
+  OPTION_TYPE_NONE = 0,
+  OPTION_TYPE_W64 = 1,
+  OPTION_TYPE_FLOAT = 2,
+  OPTION_TYPE_STRING = 3,
   OPTION_TYPE_TRAILER = 4,
-  OPTION_TYPE_BOOL    = 5,
+  OPTION_TYPE_BOOL = 5,
   OPTION_TYPE_SECTION = -1
 };
 
@@ -52,12 +52,17 @@ struct ConfigurationParserBase {
   void addentry(void* baseptr, void* field, int type, const char* name, const char* description) {
     Waddr offset = ((Waddr)field) - ((Waddr)baseptr);
     ConfigurationOption* option = new ConfigurationOption(name, description, type, offset);
-    if (lastoption) lastoption->next = option;
-    if (!options) options = option;
+    if (lastoption)
+      lastoption->next = option;
+    if (!options)
+      options = option;
     lastoption = option;
   }
 
-  ConfigurationParserBase() { options = null; lastoption = null; }
+  ConfigurationParserBase() {
+    options = null;
+    lastoption = null;
+  }
 
   int parse(void* baseptr, int argc, char* argv[]);
   int parse(void* baseptr, char* argstr);
@@ -65,11 +70,11 @@ struct ConfigurationParserBase {
   ostream& print(const void* baseptr, ostream& os) const;
 };
 
-template <typename T>
-struct ConfigurationParser: public T {
+template<typename T>
+struct ConfigurationParser : public T {
   ConfigurationParserBase options;
 
-  ConfigurationParser() { }
+  ConfigurationParser() {}
 
   void add(W64& field, const char* name, const char* description) {
     options.addentry(this, &field, OPTION_TYPE_W64, name, description);
@@ -87,25 +92,15 @@ struct ConfigurationParser: public T {
     options.addentry(this, field, OPTION_TYPE_STRING, name, description);
   }
 
-  void section(const char* name) {
-    options.addentry(this, null, OPTION_TYPE_SECTION, name, name);
-  }
+  void section(const char* name) { options.addentry(this, null, OPTION_TYPE_SECTION, name, name); }
 
-  int parse(T& config, int argc, char* argv[]) {
-    return options.parse(&config, argc, argv);
-  }
+  int parse(T& config, int argc, char* argv[]) { return options.parse(&config, argc, argv); }
 
-  int parse(T& config, char* argstr) {
-    return options.parse(&config, argstr);
-  }
+  int parse(T& config, char* argstr) { return options.parse(&config, argstr); }
 
-  ostream& print(ostream& os, const T& config) {
-    return options.print(&config, os);
-  }
+  ostream& print(ostream& os, const T& config) { return options.print(&config, os); }
 
-  ostream& printusage(ostream& os, const T& config) {
-    return options.printusage(&config, os);
-  }
+  ostream& printusage(ostream& os, const T& config) { return options.printusage(&config, os); }
 
   // Provided by user:
   void setup();

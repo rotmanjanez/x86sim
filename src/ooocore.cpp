@@ -32,9 +32,9 @@
 using namespace OutOfOrderModel;
 
 namespace OutOfOrderModel {
-  byte uop_executable_on_cluster[OP_MAX_OPCODE];
-  W32 forward_at_cycle_lut[MAX_CLUSTERS][MAX_FORWARDING_LATENCY+1];
-};
+byte uop_executable_on_cluster[OP_MAX_OPCODE];
+W32 forward_at_cycle_lut[MAX_CLUSTERS][MAX_FORWARDING_LATENCY + 1];
+}; // namespace OutOfOrderModel
 
 void StateList::init(const char* name, ListOfStateLists& lol, W32 flags) {
   this->name = strdup(name);
@@ -71,7 +71,8 @@ static void init_luts() {
     W32 allowedfu = fuinfo[i].fu;
     W32 allowedcl = 0;
     foreach (cl, MAX_CLUSTERS) {
-      if (clusters[cl].fu_mask & allowedfu) setbit(allowedcl, cl);
+      if (clusters[cl].fu_mask & allowedfu)
+        setbit(allowedcl, cl);
     }
     uop_executable_on_cluster[i] = allowedcl;
   }
@@ -79,7 +80,7 @@ static void init_luts() {
   // Initialize forward-at-cycle LUTs
   foreach (srcc, MAX_CLUSTERS) {
     foreach (destc, MAX_CLUSTERS) {
-      foreach (lat, MAX_FORWARDING_LATENCY+1) {
+      foreach (lat, MAX_FORWARDING_LATENCY + 1) {
         if (lat == intercluster_latency_map[srcc][destc]) {
           setbit(forward_at_cycle_lut[srcc][lat], destc);
         }
@@ -153,7 +154,7 @@ void OutOfOrderCore::reset() {
   setzero(robs_on_fu);
   foreach_issueq(reset(coreid));
 
-  reserved_iq_entries = (int)std::sqrt((double) ISSUE_QUEUE_SIZE / MAX_THREADS_PER_CORE);
+  reserved_iq_entries = (int)std::sqrt((double)ISSUE_QUEUE_SIZE / MAX_THREADS_PER_CORE);
   assert(reserved_iq_entries && reserved_iq_entries < ISSUE_QUEUE_SIZE);
 
   foreach_issueq(set_reserved_entries(reserved_iq_entries * MAX_THREADS_PER_CORE));
@@ -161,14 +162,15 @@ void OutOfOrderCore::reset() {
 
   unaligned_predictor.reset();
 
-  foreach (i, threadcount) threads[i]->reset();
+  foreach (i, threadcount)
+    threads[i]->reset();
 }
 
 void OutOfOrderCore::init_generic() {
   reset();
 }
 
-template <typename T>
+template<typename T>
 static void OutOfOrderModel::print_list_of_state_lists(ostream& os, const ListOfStateLists& lol, const char* title) {
   os << title, ":", endl;
   foreach (i, lol.count) {
@@ -177,9 +179,11 @@ static void OutOfOrderModel::print_list_of_state_lists(ostream& os, const ListOf
     int n = 0;
     T* obj;
     foreach_list_mutable(list, obj, entry, nextentry) {
-      if ((n % 16) == 0) os << " ";
+      if ((n % 16) == 0)
+        os << " ";
       os << " ", intstring(obj->index(), -3);
-      if (((n % 16) == 15) || (n == list.count-1)) os << endl;
+      if (((n % 16) == 15) || (n == list.count - 1))
+        os << endl;
       n++;
     }
     assert(n == list.count);
@@ -222,7 +226,8 @@ void PhysicalRegisterFile::init(const char* name, int coreid, int rfid, int size
 
 PhysicalRegister* PhysicalRegisterFile::alloc(W8 threadid, int r) {
   PhysicalRegister* physreg = (PhysicalRegister*)((r == 0) ? &(*this)[r] : states[PHYSREG_FREE].peek());
-  if unlikely (!physreg) return null;
+  if unlikely (!physreg)
+    return null;
   physreg->changestate(PHYSREG_WAITING);
   physreg->flags = FLAG_WAIT;
   physreg->threadid = threadid;
@@ -256,7 +261,6 @@ void PhysicalRegisterFile::reset() {
   foreach (i, size) {
     (*this)[i].reset(0, false);
   }
-
 }
 
 StateList& PhysicalRegister::get_state_list(int s) const {
@@ -264,23 +268,26 @@ StateList& PhysicalRegister::get_state_list(int s) const {
 }
 
 namespace OutOfOrderModel {
-  ostream& operator <<(ostream& os, const PhysicalRegister& physreg) {
-    stringbuf sb;
-    print_value_and_flags(sb, physreg.data, physreg.flags);
-    os << "TH ", physreg.threadid, " rfid ", physreg.rfid;
-    os << "  r", intstring(physreg.index(), -3), " state ", padstring(physreg.get_state_list().name, -12), " ", sb;
-    if (physreg.rob) os << " rob ", physreg.rob->index(), " (uuid ", physreg.rob->uop.uuid, ")";
-    os << " refcount ", physreg.refcount;
+ostream& operator<<(ostream& os, const PhysicalRegister& physreg) {
+  stringbuf sb;
+  print_value_and_flags(sb, physreg.data, physreg.flags);
+  os << "TH ", physreg.threadid, " rfid ", physreg.rfid;
+  os << "  r", intstring(physreg.index(), -3), " state ", padstring(physreg.get_state_list().name, -12), " ", sb;
+  if (physreg.rob)
+    os << " rob ", physreg.rob->index(), " (uuid ", physreg.rob->uop.uuid, ")";
+  os << " refcount ", physreg.refcount;
 
-    return os;
-  }
-};
+  return os;
+}
+}; // namespace OutOfOrderModel
 
 ostream& RegisterRenameTable::print(ostream& os) const {
   foreach (i, TRANSREG_COUNT) {
-    if ((i % 8) == 0) os << " ";
+    if ((i % 8) == 0)
+      os << " ";
     os << " ", padstring(arch_reg_names[i], -6), " r", intstring((*this)[i]->index(), -3), " | ";
-    if (((i % 8) == 7) || (i == TRANSREG_COUNT-1)) os << endl;
+    if (((i % 8) == 7) || (i == TRANSREG_COUNT - 1))
+      os << endl;
   }
   return os;
 }
@@ -296,17 +303,11 @@ ostream& RegisterRenameTable::print(ostream& os) const {
 // uops through very quickly and can make more progress.
 //
 int ThreadContext::get_priority() const {
-  int priority =
-    fetchq.count +
-    rob_frontend_list.count +
-    rob_ready_to_dispatch_list.count;
+  int priority = fetchq.count + rob_frontend_list.count + rob_ready_to_dispatch_list.count;
 
-  for_each_cluster (cluster) {
-    priority +=
-      rob_dispatched_list[cluster].count +
-      rob_ready_to_issue_list[cluster].count +
-      rob_ready_to_store_list[cluster].count +
-      rob_ready_to_load_list[cluster].count;
+  for_each_cluster(cluster) {
+    priority += rob_dispatched_list[cluster].count + rob_ready_to_issue_list[cluster].count +
+                rob_ready_to_store_list[cluster].count + rob_ready_to_load_list[cluster].count;
   }
 
   return priority;
@@ -348,7 +349,7 @@ bool OutOfOrderCore::runcycle() {
       total_issueq_reserved_free += reserved_iq_entries;
     } else {
       total_issueq_count += thread->issueq_count;
-      if(thread->issueq_count < reserved_iq_entries){
+      if (thread->issueq_count < reserved_iq_entries) {
         total_issueq_reserved_free += reserved_iq_entries - thread->issueq_count;
       }
     }
@@ -358,7 +359,8 @@ bool OutOfOrderCore::runcycle() {
   // assert((ISSUE_QUEUE_SIZE - issueq_all.count) == (issueq_all.shared_entries + total_issueq_reserved_free));
 #endif
 
-  foreach (i, threadcount) threads[i]->loads_in_this_cycle = 0;
+  foreach (i, threadcount)
+    threads[i]->loads_in_this_cycle = 0;
 
   fu_avail = bitmask(FU_COUNT);
   caches.clock();
@@ -373,7 +375,8 @@ bool OutOfOrderCore::runcycle() {
   foreach (permute, threadcount) {
     int tid = add_index_modulo(round_robin_tid, +permute, threadcount);
     ThreadContext* thread = threads[tid];
-    if unlikely (!thread->ctx.running) continue;
+    if unlikely (!thread->ctx.running)
+      continue;
 
     commitrc[tid] = thread->commit();
     for_each_cluster(j) thread->writeback(j);
@@ -400,7 +403,9 @@ bool OutOfOrderCore::runcycle() {
   //
   // Issue whatever is ready
   //
-  for_each_cluster(i) { issue(i); }
+  for_each_cluster(i) {
+    issue(i);
+  }
 
   //
   // Most of the frontend (except fetch!) also works with round robin priority
@@ -410,11 +415,14 @@ bool OutOfOrderCore::runcycle() {
   foreach (permute, threadcount) {
     int tid = add_index_modulo(round_robin_tid, +permute, threadcount);
     ThreadContext* thread = threads[tid];
-    if unlikely (!thread->ctx.running) continue;
+    if unlikely (!thread->ctx.running)
+      continue;
 
     dispatchrc[tid] = thread->dispatch();
 
-    for_each_cluster(j) { thread->complete(j); }
+    for_each_cluster(j) {
+      thread->complete(j);
+    }
 
     if likely (dispatchrc[tid] >= 0) {
       thread->frontend();
@@ -440,7 +448,8 @@ bool OutOfOrderCore::runcycle() {
       priority_index[i] = i;
       ThreadContext* thread = threads[i];
       priority_value[i] = thread->get_priority();
-      if unlikely (!thread->ctx.running) priority_value[i] = limits<int>::max;
+      if unlikely (!thread->ctx.running)
+        priority_value[i] = limits<int>::max;
     }
 
     sort(priority_index, threadcount, SortPrecomputedIndexListComparator<int, false>(priority_value));
@@ -490,13 +499,17 @@ bool OutOfOrderCore::runcycle() {
 
   foreach (i, threadcount) {
     ThreadContext* thread = threads[i];
-    if unlikely (!thread->ctx.running) continue;
+    if unlikely (!thread->ctx.running)
+      continue;
     int rc = commitrc[i];
-    if likely ((rc == COMMIT_RESULT_OK) | (rc == COMMIT_RESULT_NONE)) continue;
+    if likely ((rc == COMMIT_RESULT_OK) | (rc == COMMIT_RESULT_NONE))
+      continue;
 
     switch (rc) {
     case COMMIT_RESULT_SMC: {
-      if (logable(3)) logfile << "Potentially cross-modifying SMC detected: global flush required (cycle ", sim_cycle, ", ", total_user_insns_committed, " commits)", endl, flush;
+      if (logable(3))
+        logfile << "Potentially cross-modifying SMC detected: global flush required (cycle ", sim_cycle, ", ",
+            total_user_insns_committed, " commits)", endl, flush;
       //
       // DO NOT GLOBALLY FLUSH! It will cut off the other thread(s) in the
       // middle of their currently committing x86 instruction, causing massive
@@ -516,10 +529,13 @@ bool OutOfOrderCore::runcycle() {
       //
       foreach (i, threadcount) {
         ThreadContext* t = threads[i];
-        if unlikely (!t) continue;
+        if unlikely (!t)
+          continue;
         if (logable(3)) {
-          logfile << "  [vcpu ", i, "] current_basic_block = ", t->current_basic_block;  ": ";
-          if (t->current_basic_block) logfile << t->current_basic_block->rip;
+          logfile << "  [vcpu ", i, "] current_basic_block = ", t->current_basic_block;
+          ": ";
+          if (t->current_basic_block)
+            logfile << t->current_basic_block->rip;
           logfile << endl;
         }
       }
@@ -555,7 +571,8 @@ bool OutOfOrderCore::runcycle() {
     vcpu_online_map_changed = 0;
     foreach (i, contextcount) {
       Context& vctx = contextof(i);
-      if likely (!vctx.dirty) continue;
+      if likely (!vctx.dirty)
+        continue;
       //
       // The VCPU is coming up for the first time after booting or being
       // taken offline by the user.
@@ -579,13 +596,14 @@ bool OutOfOrderCore::runcycle() {
 
   foreach (i, threadcount) {
     ThreadContext* thread = threads[i];
-    if unlikely (!thread->ctx.running) break;
+    if unlikely (!thread->ctx.running)
+      break;
 
     if unlikely ((sim_cycle - thread->last_commit_at_cycle) > 4096) {
       stringbuf sb;
-      sb << "[vcpu ", thread->ctx.vcpuid, "] thread ", thread->threadid, ": WARNING: At cycle ",
-        sim_cycle, ", ", total_user_insns_committed,  " user commits: no instructions have committed for ",
-        (sim_cycle - thread->last_commit_at_cycle), " cycles; the pipeline could be deadlocked", endl;
+      sb << "[vcpu ", thread->ctx.vcpuid, "] thread ", thread->threadid, ": WARNING: At cycle ", sim_cycle, ", ",
+          total_user_insns_committed, " user commits: no instructions have committed for ",
+          (sim_cycle - thread->last_commit_at_cycle), " cycles; the pipeline could be deadlocked", endl;
       logfile << sb, flush;
       cerr << sb, flush;
       exiting = 1;
@@ -653,10 +671,9 @@ bool ReorderBufferEntry::ready_to_commit() const {
 StateList& ReorderBufferEntry::get_ready_to_issue_list() const {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
-  return
-    isload(uop.opcode) ? thread.rob_ready_to_load_list[cluster] :
-    isstore(uop.opcode) ? thread.rob_ready_to_store_list[cluster] :
-    thread.rob_ready_to_issue_list[cluster];
+  return isload(uop.opcode)    ? thread.rob_ready_to_load_list[cluster]
+         : isstore(uop.opcode) ? thread.rob_ready_to_store_list[cluster]
+                               : thread.rob_ready_to_issue_list[cluster];
 }
 
 //
@@ -667,38 +684,53 @@ stringbuf& ReorderBufferEntry::get_operand_info(stringbuf& sb, int operand) cons
   ReorderBufferEntry& sourcerob = *physreg.rob;
 
   sb << "r", physreg.index();
-  if (PHYS_REG_FILE_COUNT > 1) sb << "@", getcore().physregfiles[physreg.rfid].name;
+  if (PHYS_REG_FILE_COUNT > 1)
+    sb << "@", getcore().physregfiles[physreg.rfid].name;
 
   switch (physreg.state) {
   case PHYSREG_WRITTEN:
-    sb << " (written)"; break;
+    sb << " (written)";
+    break;
   case PHYSREG_BYPASS:
-    sb << " (ready)"; break;
+    sb << " (ready)";
+    break;
   case PHYSREG_WAITING:
-    sb << " (wait rob ", sourcerob.index(), " uuid ", sourcerob.uop.uuid, ")"; break;
-  case PHYSREG_ARCH: break;
-    if (physreg.index() == PHYS_REG_NULL)  sb << " (zero)"; else sb << " (arch ", arch_reg_names[physreg.archreg], ")"; break;
+    sb << " (wait rob ", sourcerob.index(), " uuid ", sourcerob.uop.uuid, ")";
+    break;
+  case PHYSREG_ARCH:
+    break;
+    if (physreg.index() == PHYS_REG_NULL)
+      sb << " (zero)";
+    else
+      sb << " (arch ", arch_reg_names[physreg.archreg], ")";
+    break;
   case PHYSREG_PENDINGFREE:
-    sb << " (pending free for ", arch_reg_names[physreg.archreg], ")"; break;
+    sb << " (pending free for ", arch_reg_names[physreg.archreg], ")";
+    break;
   default:
     // Cannot be in free state!
-    sb << " (FREE)"; break;
+    sb << " (FREE)";
+    break;
   }
 
   return sb;
 }
 
-ThreadContext& ReorderBufferEntry::getthread() const { return *getcore().threads[threadid]; }
+ThreadContext& ReorderBufferEntry::getthread() const {
+  return *getcore().threads[threadid];
+}
 
 issueq_tag_t ReorderBufferEntry::get_tag() {
   int mask = ((1 << MAX_THREADS_BIT) - 1) << MAX_ROB_IDX_BIT;
-  if (logable(100)) logfile << " get_tag() thread ", (void*) threadid, " rob idx ", (void*)idx, " mask ", (void*)mask, endl;
+  if (logable(100))
+    logfile << " get_tag() thread ", (void*)threadid, " rob idx ", (void*)idx, " mask ", (void*)mask, endl;
 
   assert(!(idx & mask));
   assert(!(threadid >> MAX_THREADS_BIT));
   //  int threadid = 1;
   issueq_tag_t rc = (idx | (threadid << MAX_ROB_IDX_BIT));
-  if (logable(100)) logfile <<  " tag ", (void*) rc, endl;
+  if (logable(100))
+    logfile << " tag ", (void*)rc, endl;
   return rc;
 }
 
@@ -717,14 +749,15 @@ ostream& ReorderBufferEntry::print(ostream& os) const {
   get_operand_info(rcinfo, 2);
 
   os << "rob ", intstring(index(), -3), " uuid ", intstring(uop.uuid, 16), " rip 0x", hexstring(uop.rip, 48), " ",
-    padstring(current_state_list->name, -24), " ", (uop.som ? "SOM" : "   "), " ", (uop.eom ? "EOM" : "   "),
-    " @ ", padstring((cluster >= 0) ? clusters[cluster].name : "???", -4), " ",
-    padstring(name, -12), " r", intstring(physreg->index(), -3), " ", padstring(arch_reg_names[uop.rd], -6);
+      padstring(current_state_list->name, -24), " ", (uop.som ? "SOM" : "   "), " ", (uop.eom ? "EOM" : "   "), " @ ",
+      padstring((cluster >= 0) ? clusters[cluster].name : "???", -4), " ", padstring(name, -12), " r",
+      intstring(physreg->index(), -3), " ", padstring(arch_reg_names[uop.rd], -6);
   if (isload(uop.opcode))
     os << " ld", intstring(lsq->index(), -3);
   else if (isstore(uop.opcode))
     os << " st", intstring(lsq->index(), -3);
-  else os << "      ";
+  else
+    os << "      ";
 
   os << " = ";
   os << padstring(rainfo, -30);
@@ -762,11 +795,9 @@ void OutOfOrderCore::print_smt_state(ostream& os) {
 
   foreach (i, threadcount) {
     ThreadContext* thread = threads[i];
-    os << "Thread ", i, ":", endl,
-      "  total_uops_committed ", thread->total_uops_committed, endl,
-      "  uipc ", double(thread->total_uops_committed) / double(iterations), endl,
-      "  total_insns_committed ",  thread->total_insns_committed,
-      "  ipc ", double(thread->total_insns_committed) / double(iterations), endl;
+    os << "Thread ", i, ":", endl, "  total_uops_committed ", thread->total_uops_committed, endl, "  uipc ",
+        double(thread->total_uops_committed) / double(iterations), endl, "  total_insns_committed ",
+        thread->total_insns_committed, "  ipc ", double(thread->total_insns_committed) / double(iterations), endl;
   }
 }
 
@@ -847,13 +878,16 @@ void OutOfOrderCore::check_refcounts() {
         foreach_forward(ROB, r) {
           ReorderBufferEntry& rob = ROB[r];
           foreach (j, MAX_OPERANDS) {
-            if ((rob.operands[j]->index() == i) & (rob.operands[j]->rfid == rfid)) logfile << "  ROB ", r, " operand ", j, endl;
+            if ((rob.operands[j]->index() == i) & (rob.operands[j]->rfid == rfid))
+              logfile << "  ROB ", r, " operand ", j, endl;
           }
         }
 
         foreach (j, TRANSREG_COUNT) {
-          if ((commitrrt[j]->index() == i) & (commitrrt[j]->rfid == rfid)) logfile << "  CommitRRT ", arch_reg_names[j], endl;
-          if ((specrrt[j]->index() == i) & (specrrt[j]->rfid == rfid)) logfile << "  SpecRRT ", arch_reg_names[j], endl;
+          if ((commitrrt[j]->index() == i) & (commitrrt[j]->rfid == rfid))
+            logfile << "  CommitRRT ", arch_reg_names[j], endl;
+          if ((specrrt[j]->index() == i) & (specrrt[j]->rfid == rfid))
+            logfile << "  SpecRRT ", arch_reg_names[j], endl;
         }
 
         errors = 1;
@@ -861,7 +895,8 @@ void OutOfOrderCore::check_refcounts() {
     }
   }
 
-  if (errors) assert(false);
+  if (errors)
+    assert(false);
 }
 
 void OutOfOrderCore::check_rob() {
@@ -872,8 +907,9 @@ void OutOfOrderCore::check_rob() {
 
   foreach (i, ROB_SIZE) {
     ReorderBufferEntry& rob = ROB[i];
-    if (!rob.entry_valid) continue;
-    assert(inrange((int)rob.forward_cycle, 0, (MAX_FORWARDING_LATENCY+1)-1));
+    if (!rob.entry_valid)
+      continue;
+    assert(inrange((int)rob.forward_cycle, 0, (MAX_FORWARDING_LATENCY + 1) - 1));
   }
 
   foreach (i, threadcount) {
@@ -882,12 +918,13 @@ void OutOfOrderCore::check_rob() {
       StateList& list = *(thread->rob_states[i]);
       ReorderBufferEntry* rob;
       foreach_list_mutable(list, rob, entry, nextentry) {
-        assert(inrange(rob->index(), 0, ROB_SIZE-1));
+        assert(inrange(rob->index(), 0, ROB_SIZE - 1));
         assert(rob->current_state_list == &list);
         if (!((rob->current_state_list != &thread->rob_free_list) ? rob->entry_valid : (!rob->entry_valid))) {
-          logfile << "ROB ", rob->index(), " list = ", rob->current_state_list->name, " entry_valid ", rob->entry_valid, endl, flush;
+          logfile << "ROB ", rob->index(), " list = ", rob->current_state_list->name, " entry_valid ", rob->entry_valid,
+              endl, flush;
           dump_smt_state(logfile);
-        assert(false);
+          assert(false);
         }
       }
     }
@@ -899,18 +936,21 @@ ostream& LoadStoreQueueEntry::print(ostream& os) const {
   os << "uuid ", intstring(rob->uop.uuid, 10), " ";
   os << "rob ", intstring(rob->index(), -3), " ";
   os << "r", intstring(rob->physreg->index(), -3);
-  if (PHYS_REG_FILE_COUNT > 1) os << "@", getcore().physregfiles[rob->physreg->rfid].name;
+  if (PHYS_REG_FILE_COUNT > 1)
+    os << "@", getcore().physregfiles[rob->physreg->rfid].name;
   os << " ";
   if (invalid) {
     os << "< Invalid: fault 0x", hexstring(data, 8), " > ";
   } else {
     if (datavalid)
       os << bytemaskstring((const byte*)&data, bytemask, 8);
-    else os << "<    Data Invalid     >";
+    else
+      os << "<    Data Invalid     >";
     os << " @ ";
     if (addrvalid)
       os << "0x", hexstring(physaddr << 3, 48);
-    else os << "< Addr Inval >";
+    else
+      os << "< Addr Inval >";
   }
   return os;
 }
@@ -931,12 +971,14 @@ bool ThreadContext::handle_barrier() {
   assist_func_t assist = (assist_func_t)(Waddr)assistid_to_func[assistid];
 
   if (logable(4)) {
-    logfile << "[vcpu ", ctx.vcpuid, "] Barrier (#", assistid, " -> ", (void*)assist, " ", assist_name(assist), " called from ",
-      (RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx)), "; return to ", (void*)(Waddr)ctx.commitarf[REG_nextrip],
-      ") at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits", endl, flush;
+    logfile << "[vcpu ", ctx.vcpuid, "] Barrier (#", assistid, " -> ", (void*)assist, " ", assist_name(assist),
+        " called from ", (RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx)), "; return to ",
+        (void*)(Waddr)ctx.commitarf[REG_nextrip], ") at ", sim_cycle, " cycles, ", total_user_insns_committed,
+        " commits", endl, flush;
   }
 
-  if (logable(6)) logfile << "Calling assist function at ", (void*)assist, "...", endl, flush;
+  if (logable(6))
+    logfile << "Calling assist function at ", (void*)assist, "...", endl, flush;
 
   update_assist_stats(assist);
   if (logable(6)) {
@@ -975,8 +1017,9 @@ bool ThreadContext::handle_exception() {
   flush_pipeline();
 
   if (logable(4)) {
-    logfile << "[vcpu ", ctx.vcpuid, "] Exception ", exception_name(ctx.exception), " called from rip ", (void*)(Waddr)ctx.commitarf[REG_rip],
-      " at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits", endl, flush;
+    logfile << "[vcpu ", ctx.vcpuid, "] Exception ", exception_name(ctx.exception), " called from rip ",
+        (void*)(Waddr)ctx.commitarf[REG_rip], " at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits",
+        endl, flush;
   }
 
   //
@@ -999,7 +1042,8 @@ bool ThreadContext::handle_exception() {
   //
   if (ctx.exception == EXCEPTION_SkipBlock) {
     ctx.commitarf[REG_rip] = chk_recovery_rip;
-    if (logable(6)) logfile << "SkipBlock pseudo-exception: skipping to ", (void*)(Waddr)ctx.commitarf[REG_rip], endl, flush;
+    if (logable(6))
+      logfile << "SkipBlock pseudo-exception: skipping to ", (void*)(Waddr)ctx.commitarf[REG_rip], endl, flush;
     flush_pipeline();
     return true;
   }
@@ -1016,15 +1060,20 @@ bool ThreadContext::handle_exception() {
   case EXCEPTION_PageFaultOnRead:
   case EXCEPTION_PageFaultOnWrite:
   case EXCEPTION_PageFaultOnExec:
-    ctx.x86_exception = EXCEPTION_x86_page_fault; break;
+    ctx.x86_exception = EXCEPTION_x86_page_fault;
+    break;
   case EXCEPTION_FloatingPointNotAvailable:
-    ctx.x86_exception = EXCEPTION_x86_fpu_not_avail; break;
+    ctx.x86_exception = EXCEPTION_x86_fpu_not_avail;
+    break;
   case EXCEPTION_FloatingPoint:
-    ctx.x86_exception = EXCEPTION_x86_fpu; break;
+    ctx.x86_exception = EXCEPTION_x86_fpu;
+    break;
   case EXCEPTION_DivideOverflow:
-    ctx.x86_exception = EXCEPTION_x86_divide; break;
+    ctx.x86_exception = EXCEPTION_x86_divide;
+    break;
   case EXCEPTION_InvalidAddr:
-    ctx.x86_exception = EXCEPTION_x86_gp_fault; break;
+    ctx.x86_exception = EXCEPTION_x86_gp_fault;
+    break;
   default:
     logfile << "Unsupported internal exception type ", exception_name(ctx.exception), endl, flush;
     assert(false);
@@ -1052,7 +1101,8 @@ bool ThreadContext::handle_interrupt() {
   flush_pipeline();
 
   if (logable(6)) {
-    logfile << "[vcpu ", threadid, "] interrupts pending at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits", endl, flush;
+    logfile << "[vcpu ", threadid, "] interrupts pending at ", sim_cycle, " cycles, ", total_user_insns_committed,
+        " commits", endl, flush;
     logfile << "Context at interrupt:", endl;
     logfile << ctx;
     logfile << sshinfo;
@@ -1062,7 +1112,7 @@ bool ThreadContext::handle_interrupt() {
   ctx.event_upcall();
 
   if (logable(6)) {
-    logfile <<  "[vcpu ", threadid, "] after interrupt redirect:", endl;
+    logfile << "[vcpu ", threadid, "] after interrupt redirect:", endl;
     logfile << ctx;
     logfile << sshinfo;
     logfile.flush();
@@ -1088,16 +1138,18 @@ void PhysicalRegister::fill_operand_info(PhysicalRegisterOperandInfo& opinfo) {
   }
 }
 
-ostream& OutOfOrderModel::operator <<(ostream& os, const PhysicalRegisterOperandInfo& opinfo) {
+ostream& OutOfOrderModel::operator<<(ostream& os, const PhysicalRegisterOperandInfo& opinfo) {
   os << "[r", opinfo.physreg, " ", short_physreg_state_names[opinfo.state], " ";
   switch (opinfo.state) {
   case PHYSREG_WAITING:
   case PHYSREG_BYPASS:
   case PHYSREG_WRITTEN:
-    os << "rob ", opinfo.rob, " uuid ", opinfo.uuid; break;
+    os << "rob ", opinfo.rob, " uuid ", opinfo.uuid;
+    break;
   case PHYSREG_ARCH:
   case PHYSREG_PENDINGFREE:
-    os << arch_reg_names[opinfo.archreg]; break;
+    os << arch_reg_names[opinfo.archreg];
+    break;
   };
   os << "]";
   return os;
@@ -1107,16 +1159,19 @@ bool EventLog::init(size_t bufsize) {
   reset();
   size_t bytes = bufsize * sizeof(OutOfOrderCoreEvent);
   start = (OutOfOrderCoreEvent*)ptl_mm_alloc_private_pages(bytes);
-  if unlikely (!start) return false;
+  if unlikely (!start)
+    return false;
   end = start + bufsize;
   tail = start;
 
-  foreach (i, bufsize) start[i].type = EVENT_INVALID;
+  foreach (i, bufsize)
+    start[i].type = EVENT_INVALID;
   return true;
 }
 
 void EventLog::reset() {
-  if (!start) return;
+  if (!start)
+    return;
 
   size_t bytes = (end - start) * sizeof(OutOfOrderCoreEvent);
   ptl_mm_free_private_pages(start, bytes);
@@ -1126,26 +1181,33 @@ void EventLog::reset() {
 }
 
 void EventLog::flush(bool only_to_tail) {
-  if unlikely (!logfile) return;
-  if unlikely (!logfile->ok()) return;
+  if unlikely (!logfile)
+    return;
+  if unlikely (!logfile->ok())
+    return;
   print(*logfile, only_to_tail);
   tail = start;
 }
 
 ostream& EventLog::print(ostream& os, bool only_to_tail) {
-  if (tail >= end) tail = start;
-  if (tail < start) tail = end;
+  if (tail >= end)
+    tail = start;
+  if (tail < start)
+    tail = end;
 
   OutOfOrderCoreEvent* p = (only_to_tail) ? start : tail;
 
   W64 cycle = limits<W64>::max;
   size_t bufsize = end - start;
 
-  if (!config.flush_event_log_every_cycle) os << "#-------- Start of event log --------", endl;
+  if (!config.flush_event_log_every_cycle)
+    os << "#-------- Start of event log --------", endl;
 
   foreach (i, (only_to_tail ? (tail - start) : bufsize)) {
-    if unlikely (p >= end) p = start;
-    if unlikely (p < start) p = end-1;
+    if unlikely (p >= end)
+      p = start;
+    if unlikely (p < start)
+      p = end - 1;
     if unlikely (p->type == EVENT_INVALID) {
       p++;
       continue;
@@ -1160,7 +1222,8 @@ ostream& EventLog::print(ostream& os, bool only_to_tail) {
     p++;
   }
 
-  if (!config.flush_event_log_every_cycle) os << "#-------- End of event log --------", endl;
+  if (!config.flush_event_log_every_cycle)
+    os << "#-------- End of event log --------", endl;
 
   return os;
 }
@@ -1179,30 +1242,42 @@ ostream& OutOfOrderCoreEvent::print(ostream& os) const {
     // Fetch Events
     //
   case EVENT_FETCH_STALLED:
-    os <<  "fetch  frontend stalled"; break;
+    os << "fetch  frontend stalled";
+    break;
   case EVENT_FETCH_ICACHE_WAIT:
-    os <<  "fetch  rip ", rip, ": wait for icache fill"; break;
+    os << "fetch  rip ", rip, ": wait for icache fill";
+    break;
   case EVENT_FETCH_FETCHQ_FULL:
-    os <<  "fetch  rip ", rip, ": fetchq full"; break;
+    os << "fetch  rip ", rip, ": fetchq full";
+    break;
   case EVENT_FETCH_IQ_QUOTA_FULL:
-    os <<  "fetch  rip ", rip, ": issue queue quota full = ", issueq_count, " "; break;
+    os << "fetch  rip ", rip, ": issue queue quota full = ", issueq_count, " ";
+    break;
   case EVENT_FETCH_BOGUS_RIP:
-    os <<  "fetch  rip ", rip, ": bogus RIP or decode failed"; break;
+    os << "fetch  rip ", rip, ": bogus RIP or decode failed";
+    break;
   case EVENT_FETCH_ICACHE_MISS:
-    os <<  "fetch  rip ", rip, ": wait for icache fill of phys ", (void*)(Waddr)((rip.mfnlo << 12) + lowbits(rip.rip, 12)), " on missbuf ", fetch.missbuf; break;
+    os << "fetch  rip ", rip, ": wait for icache fill of phys ",
+        (void*)(Waddr)((rip.mfnlo << 12) + lowbits(rip.rip, 12)), " on missbuf ", fetch.missbuf;
+    break;
   case EVENT_FETCH_SPLIT:
-    os <<  "fetch  rip ", rip, ": split unaligned load or store ", uop; break;
+    os << "fetch  rip ", rip, ": split unaligned load or store ", uop;
+    break;
   case EVENT_FETCH_ASSIST:
-    os <<  "fetch  rip ", rip, ": branch into assist microcode: ", uop; break;
+    os << "fetch  rip ", rip, ": branch into assist microcode: ", uop;
+    break;
   case EVENT_FETCH_TRANSLATE:
-    os <<  "xlate  rip ", rip, ": ", fetch.bb_uop_count, " uops"; break;
+    os << "xlate  rip ", rip, ": ", fetch.bb_uop_count, " uops";
+    break;
   case EVENT_FETCH_OK: {
-    os <<  "fetch  rip ", rip, ": ", uop,
-      " (uopid ", uop.bbindex;
-    if (uop.som) os << "; SOM";
-    if (uop.eom) os << "; EOM ", uop.bytes, " bytes";
+    os << "fetch  rip ", rip, ": ", uop, " (uopid ", uop.bbindex;
+    if (uop.som)
+      os << "; SOM";
+    if (uop.eom)
+      os << "; EOM ", uop.bytes, " bytes";
     os << ")";
-    if (uop.eom && fetch.predrip) os << " -> pred ", (void*)fetch.predrip;
+    if (uop.eom && fetch.predrip)
+      os << " -> pred ", (void*)fetch.predrip;
     if (isload(uop.opcode) | isstore(uop.opcode)) {
       os << "; unaligned pred slot ", OutOfOrderCore::hash_unaligned_predictor_slot(rip), " -> ", uop.unaligned;
     }
@@ -1212,391 +1287,494 @@ ostream& OutOfOrderCoreEvent::print(ostream& os) const {
     // Rename Events
     //
   case EVENT_RENAME_FETCHQ_EMPTY:
-    os << "rename fetchq empty"; break;
+    os << "rename fetchq empty";
+    break;
   case EVENT_RENAME_ROB_FULL:
-    os <<  "rename ROB full"; break;
+    os << "rename ROB full";
+    break;
   case EVENT_RENAME_PHYSREGS_FULL:
-    os <<  "rename physical register file full"; break;
+    os << "rename physical register file full";
+    break;
   case EVENT_RENAME_LDQ_FULL:
-    os <<  "rename load queue full"; break;
+    os << "rename load queue full";
+    break;
   case EVENT_RENAME_STQ_FULL:
-    os <<  "rename store queue full"; break;
+    os << "rename store queue full";
+    break;
   case EVENT_RENAME_MEMQ_FULL:
-    os <<  "rename memory queue full"; break;
+    os << "rename memory queue full";
+    break;
   case EVENT_RENAME_OK: {
-    os <<  "rename rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " r", intstring(physreg, -3), "@", phys_reg_file_names[rfid];
-    if (ld|st) os << " lsq", lsq;
+    os << "rename rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " r", intstring(physreg, -3), "@",
+        phys_reg_file_names[rfid];
+    if (ld | st)
+      os << " lsq", lsq;
     os << " = ";
-    foreach (i, MAX_OPERANDS) os << rename.opinfo[i], ((i < MAX_OPERANDS-1) ? " " : "");
+    foreach (i, MAX_OPERANDS)
+      os << rename.opinfo[i], ((i < MAX_OPERANDS - 1) ? " " : "");
     os << "; renamed";
     os << " ", arch_reg_names[uop.rd], " (old r", rename.oldphys, ")";
     if unlikely (!uop.nouserflags) {
-      if likely (uop.setflags & SETFLAG_ZF) os << " zf (old r", rename.oldzf, ")";
-      if likely (uop.setflags & SETFLAG_CF) os << " cf (old r", rename.oldcf, ")";
-      if likely (uop.setflags & SETFLAG_OF) os << " of (old r", rename.oldof, ")";
+      if likely (uop.setflags & SETFLAG_ZF)
+        os << " zf (old r", rename.oldzf, ")";
+      if likely (uop.setflags & SETFLAG_CF)
+        os << " cf (old r", rename.oldcf, ")";
+      if likely (uop.setflags & SETFLAG_OF)
+        os << " of (old r", rename.oldof, ")";
     }
     break;
   }
   case EVENT_FRONTEND:
-    os <<  "front  rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " frontend stage ", (FRONTEND_STAGES - frontend.cycles_left), " of ", FRONTEND_STAGES;
+    os << "front  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " frontend stage ",
+        (FRONTEND_STAGES - frontend.cycles_left), " of ", FRONTEND_STAGES;
     break;
   case EVENT_CLUSTER_NO_CLUSTER:
   case EVENT_CLUSTER_OK: {
-    os << ((type == EVENT_CLUSTER_OK) ? "clustr" : "noclus"), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " allowed FUs = ",
-      bitstring(fuinfo[uop.opcode].fu, FU_COUNT, true), " -> clusters ",
-      bitstring(select_cluster.allowed_clusters, MAX_CLUSTERS, true), " avail";
-    foreach (i, MAX_CLUSTERS) os << " ", select_cluster.iq_avail[i];
+    os << ((type == EVENT_CLUSTER_OK) ? "clustr" : "noclus"), " rob ", intstring(rob, -3), "(", padstring(uopname, -5),
+        ")", " allowed FUs = ", bitstring(fuinfo[uop.opcode].fu, FU_COUNT, true), " -> clusters ",
+        bitstring(select_cluster.allowed_clusters, MAX_CLUSTERS, true), " avail";
+    foreach (i, MAX_CLUSTERS)
+      os << " ", select_cluster.iq_avail[i];
     os << "-> ";
-    if (type == EVENT_CLUSTER_OK) os << "cluster ", clusters[cluster].name; else os << "-> none"; break;
+    if (type == EVENT_CLUSTER_OK)
+      os << "cluster ", clusters[cluster].name;
+    else
+      os << "-> none";
+    break;
     break;
   }
   case EVENT_DISPATCH_NO_CLUSTER:
   case EVENT_DISPATCH_OK: {
-    os << ((type == EVENT_DISPATCH_OK) ? "disptc" : "nodisp"),  " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " operands ";
-    foreach (i, MAX_OPERANDS) os << dispatch.opinfo[i], ((i < MAX_OPERANDS-1) ? " " : "");
-    if (type == EVENT_DISPATCH_OK) os << " -> cluster ", clusters[cluster].name; else os << " -> none";
+    os << ((type == EVENT_DISPATCH_OK) ? "disptc" : "nodisp"), " rob ", intstring(rob, -3), "(", padstring(uopname, -5),
+        ")", " operands ";
+    foreach (i, MAX_OPERANDS)
+      os << dispatch.opinfo[i], ((i < MAX_OPERANDS - 1) ? " " : "");
+    if (type == EVENT_DISPATCH_OK)
+      os << " -> cluster ", clusters[cluster].name;
+    else
+      os << " -> none";
     break;
   }
   case EVENT_ISSUE_NO_FU: {
-    os << "issue  rob ", intstring(rob, -3), "(",padstring(uopname,-5),")";
+    os << "issue  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")";
     os << "no FUs available in cluster ", clusters[cluster].name, ": ",
-      "fu_avail = ", bitstring(issue.fu_avail, FU_COUNT, true), ", ",
-      "op_fu = ", bitstring(fuinfo[uop.opcode].fu, FU_COUNT, true), ", "
-      "fu_cl_mask = ", bitstring(clusters[cluster].fu_mask, FU_COUNT, true);
+        "fu_avail = ", bitstring(issue.fu_avail, FU_COUNT, true), ", ",
+        "op_fu = ", bitstring(fuinfo[uop.opcode].fu, FU_COUNT, true),
+        ", "
+        "fu_cl_mask = ",
+        bitstring(clusters[cluster].fu_mask, FU_COUNT, true);
     break;
   }
   case EVENT_ISSUE_OK: {
     stringbuf sb;
-    sb << "issue  rob ", intstring(rob, -3), "(",padstring(uopname,-5),")";
-    sb << " on ", padstring(fu_names[fu], -4), " in ", padstring(cluster_names[cluster], -4), ": r", intstring(physreg, -3), "@", phys_reg_file_names[rfid];
-    sb << " "; print_value_and_flags(sb, issue.state.reg.rddata, issue.state.reg.rdflags); sb << " =";
-    sb << " "; print_value_and_flags(sb, issue.operand_data[RA], issue.operand_flags[RA]); sb << ", ";
-    sb << " "; print_value_and_flags(sb, issue.operand_data[RB], issue.operand_flags[RB]); sb << ", ";
-    sb << " "; print_value_and_flags(sb, issue.operand_data[RC], issue.operand_flags[RC]);
+    sb << "issue  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")";
+    sb << " on ", padstring(fu_names[fu], -4), " in ", padstring(cluster_names[cluster], -4), ": r",
+        intstring(physreg, -3), "@", phys_reg_file_names[rfid];
+    sb << " ";
+    print_value_and_flags(sb, issue.state.reg.rddata, issue.state.reg.rdflags);
+    sb << " =";
+    sb << " ";
+    print_value_and_flags(sb, issue.operand_data[RA], issue.operand_flags[RA]);
+    sb << ", ";
+    sb << " ";
+    print_value_and_flags(sb, issue.operand_data[RB], issue.operand_flags[RB]);
+    sb << ", ";
+    sb << " ";
+    print_value_and_flags(sb, issue.operand_data[RC], issue.operand_flags[RC]);
     sb << " (", issue.cycles_left, " cycles left)";
-    if (issue.mispredicted) sb << "; mispredicted (real ", (void*)(Waddr)issue.state.reg.rddata, " vs expected ", (void*)(Waddr)issue.predrip, ")";
+    if (issue.mispredicted)
+      sb << "; mispredicted (real ", (void*)(Waddr)issue.state.reg.rddata, " vs expected ", (void*)(Waddr)issue.predrip,
+          ")";
     os << sb;
     break;
   }
   case EVENT_REPLAY: {
-    os << "replay rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " r", intstring(physreg, -3), "@", phys_reg_file_names[rfid],
-      " on cluster ", clusters[cluster].name, ": waiting on";
+    os << "replay rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " r", intstring(physreg, -3), "@",
+        phys_reg_file_names[rfid], " on cluster ", clusters[cluster].name, ": waiting on";
     foreach (i, MAX_OPERANDS) {
-      if (!bit(replay.ready, i)) os << " ", replay.opinfo[i];
+      if (!bit(replay.ready, i))
+        os << " ", replay.opinfo[i];
     }
     break;
   }
   case EVENT_STORE_WAIT: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " stq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
+    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
     os << "wait on ";
-    if (!loadstore.rcready) os << " rc";
+    if (!loadstore.rcready)
+      os << " rc";
     if (loadstore.inherit_sfr_used) {
-      os << ((loadstore.rcready) ? "" : " and "), loadstore.inherit_sfr,
-        " (uuid ", loadstore.inherit_sfr_uuid, ", stq ", loadstore.inherit_sfr_lsq,
-        ", rob ", loadstore.inherit_sfr_rob, ", r", loadstore.inherit_sfr_physreg, ")";
+      os << ((loadstore.rcready) ? "" : " and "), loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid,
+          ", stq ", loadstore.inherit_sfr_lsq, ", rob ", loadstore.inherit_sfr_rob, ", r",
+          loadstore.inherit_sfr_physreg, ")";
     }
     break;
   }
   case EVENT_STORE_PARALLEL_FORWARDING_MATCH: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " stq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    os << "ignored parallel forwarding match with ldq ", loadstore.inherit_sfr_lsq,
-      " (uuid ", loadstore.inherit_sfr_uuid, " rob", loadstore.inherit_sfr_rob,
-      " r", loadstore.inherit_sfr_physreg, ")";
+    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
+    os << "ignored parallel forwarding match with ldq ", loadstore.inherit_sfr_lsq, " (uuid ",
+        loadstore.inherit_sfr_uuid, " rob", loadstore.inherit_sfr_rob, " r", loadstore.inherit_sfr_physreg, ")";
     break;
   }
   case EVENT_STORE_ALIASED_LOAD: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " stq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    os << "aliased with ldbuf ", loadstore.inherit_sfr_lsq, " (uuid ", loadstore.inherit_sfr_uuid,
-      " rob", loadstore.inherit_sfr_rob, " r", loadstore.inherit_sfr_physreg, ");",
-      " (add colliding load rip ", (void*)(Waddr)loadstore.inherit_sfr_rip, "; replay from rip ", rip, ")";
+    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
+    os << "aliased with ldbuf ", loadstore.inherit_sfr_lsq, " (uuid ", loadstore.inherit_sfr_uuid, " rob",
+        loadstore.inherit_sfr_rob, " r", loadstore.inherit_sfr_physreg, ");", " (add colliding load rip ",
+        (void*)(Waddr)loadstore.inherit_sfr_rip, "; replay from rip ", rip, ")";
     break;
   }
   case EVENT_STORE_ISSUED: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " stq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
+    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
     if (loadstore.inherit_sfr_used) {
-      os << "inherit from ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid,
-        ", rob", loadstore.inherit_sfr_rob, ", lsq ", loadstore.inherit_sfr_lsq,
-        ", r", loadstore.inherit_sfr_physreg, ");";
+      os << "inherit from ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid, ", rob",
+          loadstore.inherit_sfr_rob, ", lsq ", loadstore.inherit_sfr_lsq, ", r", loadstore.inherit_sfr_physreg, ");";
     }
-    os << " <= ", hexstring(loadstore.data_to_store, 8*(1<<uop.size)), " = ", loadstore.sfr;
+    os << " <= ", hexstring(loadstore.data_to_store, 8 * (1 << uop.size)), " = ", loadstore.sfr;
     break;
   }
   case EVENT_STORE_LOCK_RELEASED: {
-    os << "lk-rel", " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " stq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ",
-      "lock released (original ld.acq uuid ", loadstore.locking_uuid, " rob ", loadstore.locking_rob, " on vcpu ", loadstore.locking_vcpuid, ")";
+    os << "lk-rel", " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " stq ", lsq, " r",
+        intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
+        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ", "lock released (original ld.acq uuid ",
+        loadstore.locking_uuid, " rob ", loadstore.locking_rob, " on vcpu ", loadstore.locking_vcpuid, ")";
     break;
   }
   case EVENT_STORE_LOCK_ANNULLED: {
-    os << "lk-anl", " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " stq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ",
-      "lock annulled (original ld.acq uuid ", loadstore.locking_uuid, " rob ", loadstore.locking_rob, " on vcpu ", loadstore.locking_vcpuid, ")";
+    os << "lk-anl", " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " stq ", lsq, " r",
+        intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
+        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ", "lock annulled (original ld.acq uuid ",
+        loadstore.locking_uuid, " rob ", loadstore.locking_rob, " on vcpu ", loadstore.locking_vcpuid, ")";
     break;
   }
   case EVENT_STORE_LOCK_REPLAY: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " stq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ",
-      "replay because vcpuid ", loadstore.locking_vcpuid, " uop uuid ", loadstore.locking_uuid, " has lock";
+    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3),
+        "): ", "replay because vcpuid ", loadstore.locking_vcpuid, " uop uuid ", loadstore.locking_uuid, " has lock";
     break;
   }
 
   case EVENT_LOAD_WAIT: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
-    os << "wait on sfr ", loadstore.inherit_sfr,
-      " (uuid ", loadstore.inherit_sfr_uuid, ", stq ", loadstore.inherit_sfr_lsq,
-      ", rob ", loadstore.inherit_sfr_rob, ", r", loadstore.inherit_sfr_physreg, ")";
-    if (loadstore.predicted_alias) os << "; stalled by predicted aliasing";
+    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
+    os << "wait on sfr ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid, ", stq ",
+        loadstore.inherit_sfr_lsq, ", rob ", loadstore.inherit_sfr_rob, ", r", loadstore.inherit_sfr_physreg, ")";
+    if (loadstore.predicted_alias)
+      os << "; stalled by predicted aliasing";
     break;
   }
   case EVENT_LOAD_HIT:
   case EVENT_LOAD_MISS: {
     if (type == EVENT_LOAD_HIT)
       os << (loadstore.load_store_second_phase ? "load2 " : "load  ");
-    else os << (loadstore.load_store_second_phase ? "ldmis2" : "ldmiss");
+    else
+      os << (loadstore.load_store_second_phase ? "ldmis2" : "ldmiss");
 
-    os << " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
+    os << " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3),
+        " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
+        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
     if (loadstore.inherit_sfr_used) {
-      os << "inherit from ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid,
-        ", rob", loadstore.inherit_sfr_rob, ", lsq ", loadstore.inherit_sfr_lsq,
-        ", r", loadstore.inherit_sfr_physreg, "); ";
+      os << "inherit from ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid, ", rob",
+          loadstore.inherit_sfr_rob, ", lsq ", loadstore.inherit_sfr_lsq, ", r", loadstore.inherit_sfr_physreg, "); ";
     }
     if (type == EVENT_LOAD_HIT)
       os << "hit L1: value 0x", hexstring(loadstore.sfr.data, 64);
-    else os << "missed L1 (lfrqslot ", lfrqslot, ") [value would be 0x", hexstring(loadstore.sfr.data, 64), "]";
+    else
+      os << "missed L1 (lfrqslot ", lfrqslot, ") [value would be 0x", hexstring(loadstore.sfr.data, 64), "]";
     break;
   }
   case EVENT_LOAD_BANK_CONFLICT: {
-    os << "ldbank", " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ",
-      "L1 bank conflict over bank ", lowbits(loadstore.sfr.physaddr, log2(CacheSubsystem::L1_DCACHE_BANKS));
+    os << "ldbank", " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
+        intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
+        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ", "L1 bank conflict over bank ",
+        lowbits(loadstore.sfr.physaddr, log2(CacheSubsystem::L1_DCACHE_BANKS));
     break;
   }
   case EVENT_LOAD_TLB_MISS: {
     os << (loadstore.load_store_second_phase ? "ldtlb2" : "ldtlb ");
-    os << " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
+    os << " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3),
+        " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
+        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
     if (loadstore.inherit_sfr_used) {
-      os << "inherit from ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid,
-        ", rob", loadstore.inherit_sfr_rob, ", lsq ", loadstore.inherit_sfr_lsq,
-        ", r", loadstore.inherit_sfr_physreg, "); ";
-    }
-    else os << "DTLB miss", " [value would be 0x", hexstring(loadstore.sfr.data, 64), "]";
+      os << "inherit from ", loadstore.inherit_sfr, " (uuid ", loadstore.inherit_sfr_uuid, ", rob",
+          loadstore.inherit_sfr_rob, ", lsq ", loadstore.inherit_sfr_lsq, ", r", loadstore.inherit_sfr_physreg, "); ";
+    } else
+      os << "DTLB miss", " [value would be 0x", hexstring(loadstore.sfr.data, 64), "]";
     break;
   }
   case EVENT_LOAD_LOCK_REPLAY: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ",
-      "replay because vcpuid ", loadstore.locking_vcpuid, " uop uuid ", loadstore.locking_uuid, " has lock";
+    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3),
+        "): ", "replay because vcpuid ", loadstore.locking_vcpuid, " uop uuid ", loadstore.locking_uuid, " has lock";
     break;
   }
   case EVENT_LOAD_LOCK_OVERFLOW: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ",
-      "replay because locking required but no free interlock buffers", endl;
+    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3),
+        "): ", "replay because locking required but no free interlock buffers", endl;
     break;
   }
   case EVENT_LOAD_LOCK_ACQUIRED: {
-    os << "lk-acq", " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ",
-      "lock acquired";
+    os << "lk-acq", " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
+        intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ",
+        (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ", "lock acquired";
     break;
   }
   case EVENT_LOAD_LFRQ_FULL:
-    os << "load   rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq, " r", intstring(physreg, -3), ": LFRQ or miss buffer full; replaying"; break;
+    os << "load   rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
+        intstring(physreg, -3), ": LFRQ or miss buffer full; replaying";
+    break;
   case EVENT_LOAD_HIGH_ANNULLED: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
+    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " ldq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, " (phys ", (void*)(Waddr)(loadstore.sfr.physaddr << 3), "): ";
     os << "load was annulled (high unaligned load)";
     break;
   }
   case EVENT_LOAD_WAKEUP:
-    os << "ldwake rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq, " r", intstring(physreg, -3), " wakeup load via lfrq slot ", lfrqslot; break;
+    os << "ldwake rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
+        intstring(physreg, -3), " wakeup load via lfrq slot ", lfrqslot;
+    break;
   case EVENT_TLBWALK_HIT: {
-    os << "wlkhit rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq, " r", intstring(physreg, -3), " page table walk (level ",
-      loadstore.tlb_walk_level, "): hit for PTE at phys ", (void*)loadstore.virtaddr; break;
+    os << "wlkhit rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
+        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level, "): hit for PTE at phys ",
+        (void*)loadstore.virtaddr;
+    break;
     break;
   }
   case EVENT_TLBWALK_MISS: {
-    os << "wlkmis rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq, " r", intstring(physreg, -3), " page table walk (level ",
-      loadstore.tlb_walk_level, "): miss for PTE at phys ", (void*)loadstore.virtaddr, ": lfrq ", lfrqslot; break;
+    os << "wlkmis rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
+        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level, "): miss for PTE at phys ",
+        (void*)loadstore.virtaddr, ": lfrq ", lfrqslot;
+    break;
     break;
   }
   case EVENT_TLBWALK_WAKEUP: {
-    os << "wlkwak rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq, " r", intstring(physreg, -3), " page table walk (level ",
-      loadstore.tlb_walk_level, "): wakeup from cache miss for phys ", (void*)loadstore.virtaddr, ": lfrq ", lfrqslot; break;
+    os << "wlkwak rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
+        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level,
+        "): wakeup from cache miss for phys ", (void*)loadstore.virtaddr, ": lfrq ", lfrqslot;
+    break;
     break;
   }
   case EVENT_TLBWALK_NO_LFRQ_MB: {
-    os << "wlknml rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq, " r", intstring(physreg, -3), " page table walk (level ",
-      loadstore.tlb_walk_level, "): no LFRQ or MB for PTE at phys ", (void*)loadstore.virtaddr, ": lfrq ", lfrqslot; break;
+    os << "wlknml rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
+        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level,
+        "): no LFRQ or MB for PTE at phys ", (void*)loadstore.virtaddr, ": lfrq ", lfrqslot;
+    break;
     break;
   }
   case EVENT_TLBWALK_COMPLETE: {
-    os << "wlkhit rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " ldq ", lsq, " r", intstring(physreg, -3), " page table walk (level ",
-      loadstore.tlb_walk_level, "): complete!"; break;
+    os << "wlkhit rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " ldq ", lsq, " r",
+        intstring(physreg, -3), " page table walk (level ", loadstore.tlb_walk_level, "): complete!";
+    break;
     break;
   }
   case EVENT_LOAD_EXCEPTION: {
-    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " stq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, ": exception ", exception_name(LO32(loadstore.sfr.data)), ", pfec ", PageFaultErrorCode(HI32(loadstore.sfr.data));
+    os << (loadstore.load_store_second_phase ? "load2 " : "load  "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, ": exception ", exception_name(LO32(loadstore.sfr.data)), ", pfec ",
+        PageFaultErrorCode(HI32(loadstore.sfr.data));
     break;
   }
   case EVENT_STORE_EXCEPTION: {
-    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " stq ", lsq,
-      " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4), " @ ",
-      (void*)(Waddr)loadstore.virtaddr, ": exception ", exception_name(LO32(loadstore.sfr.data)), ", pfec ", PageFaultErrorCode(HI32(loadstore.sfr.data));
+    os << "store", (loadstore.load_store_second_phase ? "2" : " "), " rob ", intstring(rob, -3), "(",
+        padstring(uopname, -5), ")", " stq ", lsq, " r", intstring(physreg, -3), " on ", padstring(fu_names[fu], -4),
+        " @ ", (void*)(Waddr)loadstore.virtaddr, ": exception ", exception_name(LO32(loadstore.sfr.data)), ", pfec ",
+        PageFaultErrorCode(HI32(loadstore.sfr.data));
     break;
   }
   case EVENT_ALIGNMENT_FIXUP:
-    os << "algnfx", " rip ", rip, ": set unaligned bit for uop ", uop.bbindex, " (unaligned predictor slot ", OutOfOrderCore::hash_unaligned_predictor_slot(rip), ") and refetch"; break;
+    os << "algnfx", " rip ", rip, ": set unaligned bit for uop ", uop.bbindex, " (unaligned predictor slot ",
+        OutOfOrderCore::hash_unaligned_predictor_slot(rip), ") and refetch";
+    break;
   case EVENT_FENCE_ISSUED:
-    os << "mfence rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " lsq ", lsq, " r", intstring(physreg, -3), ": memory fence (", uop, ")"; break;
+    os << "mfence rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " lsq ", lsq, " r",
+        intstring(physreg, -3), ": memory fence (", uop, ")";
+    break;
   case EVENT_ANNUL_NO_FUTURE_UOPS:
-    os << "misspc rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", ": SOM rob ", annul.somidx, ", EOM rob ", annul.eomidx, ": no future uops to annul"; break;
+    os << "misspc rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", ": SOM rob ", annul.somidx, ", EOM rob ",
+        annul.eomidx, ": no future uops to annul";
+    break;
   case EVENT_ANNUL_MISSPECULATION: {
-    os << "misspc rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", ": SOM rob ", annul.somidx,
-      ", EOM rob ", annul.eomidx, ": annul from rob ", annul.startidx, " to rob ", annul.endidx;
+    os << "misspc rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", ": SOM rob ", annul.somidx, ", EOM rob ",
+        annul.eomidx, ": annul from rob ", annul.startidx, " to rob ", annul.endidx;
     break;
   }
   case EVENT_ANNUL_EACH_ROB: {
-    os << "annul  rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", ": annul rip ", rip;
-    os << (uop.som ? " SOM" : "    "); os << (uop.eom ? " EOM" : "    ");
+    os << "annul  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", ": annul rip ", rip;
+    os << (uop.som ? " SOM" : "    ");
+    os << (uop.eom ? " EOM" : "    ");
     os << ": free";
     os << " r", physreg;
-    if (ld|st) os << " lsq", lsq;
-    if (lfrqslot >= 0) os << " lfrq", lfrqslot;
-    if (annul.annulras) os << " ras";
+    if (ld | st)
+      os << " lsq", lsq;
+    if (lfrqslot >= 0)
+      os << " lfrq", lfrqslot;
+    if (annul.annulras)
+      os << " ras";
     break;
   }
   case EVENT_ANNUL_PSEUDOCOMMIT: {
-    os << "pseucm rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", ": r", physreg, " rebuild rrt:";
+    os << "pseucm rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", ": r", physreg, " rebuild rrt:";
     os << " arch ", arch_reg_names[uop.rd];
     if likely (!uop.nouserflags) {
-      if (uop.setflags & SETFLAG_ZF) os << " zf";
-      if (uop.setflags & SETFLAG_CF) os << " cf";
-      if (uop.setflags & SETFLAG_OF) os << " of";
+      if (uop.setflags & SETFLAG_ZF)
+        os << " zf";
+      if (uop.setflags & SETFLAG_CF)
+        os << " cf";
+      if (uop.setflags & SETFLAG_OF)
+        os << " of";
     }
     os << " = r", physreg;
     break;
   }
   case EVENT_ANNUL_FETCHQ_RAS:
-    os << "anlras rip ", rip, ": annul RAS update still in fetchq"; break;
+    os << "anlras rip ", rip, ": annul RAS update still in fetchq";
+    break;
   case EVENT_ANNUL_FLUSH:
-    os << "flush  rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " rip ", rip; break;
+    os << "flush  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " rip ", rip;
+    break;
   case EVENT_REDISPATCH_DEPENDENTS:
-    os << "redisp rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " find all dependents"; break;
+    os << "redisp rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " find all dependents";
+    break;
   case EVENT_REDISPATCH_DEPENDENTS_DONE:
-    os << "redisp rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " redispatched ", (redispatch.count - 1), " dependent uops"; break;
+    os << "redisp rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " redispatched ", (redispatch.count - 1),
+        " dependent uops";
+    break;
   case EVENT_REDISPATCH_EACH_ROB: {
-    os << "redisp rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " from state ", redispatch.current_state_list->name, ": dep on ";
+    os << "redisp rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " from state ",
+        redispatch.current_state_list->name, ": dep on ";
     if (!redispatch.dependent_operands) {
       os << " [self]";
     } else {
       foreach (i, MAX_OPERANDS) {
-        if (bit(redispatch.dependent_operands, i)) os << " ", redispatch.opinfo[i];
+        if (bit(redispatch.dependent_operands, i))
+          os << " ", redispatch.opinfo[i];
       }
     }
 
     os << "; redispatch ";
     os << " [rob ", rob, "]";
     os << " [physreg ", physreg, "]";
-    if (ld|st) os << " [lsq ", lsq, "]";
-    if (redispatch.iqslot) os << " [iqslot]";
-    if (lfrqslot >= 0) os << " [lfrqslot ", lfrqslot, "]";
-    if (redispatch.opinfo[RS].physreg != PHYS_REG_NULL) os << " [inheritsfr ", redispatch.opinfo[RS], "]";
+    if (ld | st)
+      os << " [lsq ", lsq, "]";
+    if (redispatch.iqslot)
+      os << " [iqslot]";
+    if (lfrqslot >= 0)
+      os << " [lfrqslot ", lfrqslot, "]";
+    if (redispatch.opinfo[RS].physreg != PHYS_REG_NULL)
+      os << " [inheritsfr ", redispatch.opinfo[RS], "]";
 
     break;
   }
   case EVENT_COMPLETE:
-    os << "complt rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " on ", padstring(fu_names[fu], -4), ": r", intstring(physreg, -3); break;
+    os << "complt rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " on ", padstring(fu_names[fu], -4),
+        ": r", intstring(physreg, -3);
+    break;
   case EVENT_FORWARD: {
-    os << "forwd", forwarding.forward_cycle, " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")",
-      " (", clusters[cluster].name, ") r", intstring(physreg, -3),
-      " => ", "uuid ", forwarding.target_uuid, " rob ", forwarding.target_rob,
-      " (", clusters[forwarding.target_cluster].name, ") r", forwarding.target_physreg,
-      " operand ", forwarding.operand;
-    if (forwarding.target_st) os << " => st", forwarding.target_lsq;
+    os << "forwd", forwarding.forward_cycle, " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " (",
+        clusters[cluster].name, ") r", intstring(physreg, -3), " => ", "uuid ", forwarding.target_uuid, " rob ",
+        forwarding.target_rob, " (", clusters[forwarding.target_cluster].name, ") r", forwarding.target_physreg,
+        " operand ", forwarding.operand;
+    if (forwarding.target_st)
+      os << " => st", forwarding.target_lsq;
     os << " [still waiting?";
-    foreach (i, MAX_OPERANDS) { if (!bit(forwarding.target_operands_ready, i)) os << " r", (char)('a' + i); }
-    if (forwarding.target_all_operands_ready) os << " READY";
+    foreach (i, MAX_OPERANDS) {
+      if (!bit(forwarding.target_operands_ready, i))
+        os << " r", (char)('a' + i);
+    }
+    if (forwarding.target_all_operands_ready)
+      os << " READY";
     os << "]";
     break;
   }
   case EVENT_BROADCAST: {
-    os << "brcst", forwarding.forward_cycle, " rob ", intstring(rob, -3), "(",padstring(uopname,-5),")",
-      " from cluster ", clusters[cluster].name, " to cluster ", clusters[forwarding.target_cluster].name,
-      " on forwarding cycle ", forwarding.forward_cycle;
+    os << "brcst", forwarding.forward_cycle, " rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")",
+        " from cluster ", clusters[cluster].name, " to cluster ", clusters[forwarding.target_cluster].name,
+        " on forwarding cycle ", forwarding.forward_cycle;
     break;
   }
   case EVENT_WRITEBACK: {
-    os << "write  rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " (cluster ", clusters[cluster].name, ") r", intstring(physreg, -3), "@", phys_reg_file_names[rfid], " = 0x", hexstring(writeback.data, 64), " ", flagstring(writeback.flags);
-    if (writeback.transient) os << " (transient)";
+    os << "write  rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " (cluster ", clusters[cluster].name,
+        ") r", intstring(physreg, -3), "@", phys_reg_file_names[rfid], " = 0x", hexstring(writeback.data, 64), " ",
+        flagstring(writeback.flags);
+    if (writeback.transient)
+      os << " (transient)";
     os << " (", writeback.consumer_count, " consumers";
-    if (writeback.all_consumers_sourced_from_bypass) os << ", all from bypass";
-    if (writeback.no_branches_between_renamings) os << ", no intervening branches";
-    if (writeback.dest_renamed_before_writeback) os << ", dest renamed before writeback";
+    if (writeback.all_consumers_sourced_from_bypass)
+      os << ", all from bypass";
+    if (writeback.no_branches_between_renamings)
+      os << ", no intervening branches";
+    if (writeback.dest_renamed_before_writeback)
+      os << ", dest renamed before writeback";
     os << ")";
     break;
   }
   case EVENT_COMMIT_FENCE_COMPLETED:
-    os << "mfcmit rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " fence committed: wake up waiting memory uops"; break;
+    os << "mfcmit rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")",
+        " fence committed: wake up waiting memory uops";
+    break;
   case EVENT_COMMIT_EXCEPTION_DETECTED:
-    os << "detect rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " exception ", exception_name(LO32(commit.state.reg.rddata)), " (", LO32(commit.state.reg.rddata), "), error code ", hexstring(HI32(commit.state.reg.rddata), 16), ", origvirt ", (void*)(Waddr)commit.origvirt; break;
+    os << "detect rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " exception ",
+        exception_name(LO32(commit.state.reg.rddata)), " (", LO32(commit.state.reg.rddata), "), error code ",
+        hexstring(HI32(commit.state.reg.rddata), 16), ", origvirt ", (void*)(Waddr)commit.origvirt;
+    break;
   case EVENT_COMMIT_EXCEPTION_ACKNOWLEDGED:
-    os << "except rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " exception ", exception_name(LO32(commit.state.reg.rddata)), " [EOM #", commit.total_user_insns_committed, "]"; break;
+    os << "except rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " exception ",
+        exception_name(LO32(commit.state.reg.rddata)), " [EOM #", commit.total_user_insns_committed, "]";
+    break;
   case EVENT_COMMIT_SKIPBLOCK:
-    os << "skipbk rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " skip block: advance rip by ", uop.bytes, " to ", (void*)(Waddr)(rip.rip + uop.bytes), " [EOM #", commit.total_user_insns_committed, "]"; break;
+    os << "skipbk rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " skip block: advance rip by ",
+        uop.bytes, " to ", (void*)(Waddr)(rip.rip + uop.bytes), " [EOM #", commit.total_user_insns_committed, "]";
+    break;
   case EVENT_COMMIT_SMC_DETECTED:
-    os << "smcdet rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " self-modifying code at rip ", rip, " detected (mfn was dirty); invalidate and retry [EOM #", commit.total_user_insns_committed, "]"; break;
+    os << "smcdet rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " self-modifying code at rip ", rip,
+        " detected (mfn was dirty); invalidate and retry [EOM #", commit.total_user_insns_committed, "]";
+    break;
   case EVENT_COMMIT_MEM_LOCKED:
-    os << "waitlk rob ", intstring(rob, -3), "(",padstring(uopname,-5),")", " wait for lock on physaddr ", (void*)(commit.state.st.physaddr << 3), " to be released"; break;
+    os << "waitlk rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")", " wait for lock on physaddr ",
+        (void*)(commit.state.st.physaddr << 3), " to be released";
+    break;
   case EVENT_COMMIT_OK: {
-    os << "commit rob ", intstring(rob, -3), "(",padstring(uopname,-5),")";
+    os << "commit rob ", intstring(rob, -3), "(", padstring(uopname, -5), ")";
     if likely (archdest_can_commit[uop.rd])
-                os << " [rrt ", arch_reg_names[uop.rd], " = r", physreg, " 0x", hexstring(commit.state.reg.rddata, 64), "]";
+      os << " [rrt ", arch_reg_names[uop.rd], " = r", physreg, " 0x", hexstring(commit.state.reg.rddata, 64), "]";
 
     if ((!uop.nouserflags) && uop.setflags) {
-      os << " [flags ", ((uop.setflags & SETFLAG_ZF) ? "z" : ""),
-        ((uop.setflags & SETFLAG_CF) ? "c" : ""), ((uop.setflags & SETFLAG_OF) ? "o" : ""),
-        " -> ", flagstring(commit.state.reg.rdflags), "]";
+      os << " [flags ", ((uop.setflags & SETFLAG_ZF) ? "z" : ""), ((uop.setflags & SETFLAG_CF) ? "c" : ""),
+          ((uop.setflags & SETFLAG_OF) ? "o" : ""), " -> ", flagstring(commit.state.reg.rdflags), "]";
     }
 
-    if (uop.eom) os << " [rip = ", (void*)(Waddr)commit.target_rip, "]";
+    if (uop.eom)
+      os << " [rip = ", (void*)(Waddr)commit.target_rip, "]";
 
     if unlikely (st && (commit.state.st.bytemask != 0))
-                  os << " [mem ", (void*)(Waddr)(commit.state.st.physaddr << 3), " = ", bytemaskstring((const byte*)&commit.state.st.data, commit.state.st.bytemask, 8), " mask ", bitstring(commit.state.st.bytemask, 8, true), "]";
+      os << " [mem ", (void*)(Waddr)(commit.state.st.physaddr << 3), " = ",
+          bytemaskstring((const byte*)&commit.state.st.data, commit.state.st.bytemask, 8), " mask ",
+          bitstring(commit.state.st.bytemask, 8, true), "]";
 
     if unlikely (commit.pteupdate.a | commit.pteupdate.d | commit.pteupdate.ptwrite) {
       os << " [pte:";
-      if (commit.pteupdate.a) os << " a";
-      if (commit.pteupdate.d) os << " d";
-      if (commit.pteupdate.ptwrite) os << " w";
+      if (commit.pteupdate.a)
+        os << " a";
+      if (commit.pteupdate.d)
+        os << " d";
+      if (commit.pteupdate.ptwrite)
+        os << " w";
       os << "]";
     }
 
-    if unlikely (ld|st) {
+    if unlikely (ld | st) {
       os << " [lsq ", lsq, "]";
       os << " [upslot ", OutOfOrderCore::hash_unaligned_predictor_slot(rip), " = ", commit.ld_st_truly_unaligned, "]";
     }
@@ -1614,23 +1792,27 @@ ostream& OutOfOrderCoreEvent::print(ostream& os) const {
     os << " [commit r", physreg, "]";
 
     foreach (i, MAX_OPERANDS) {
-      if unlikely (commit.operand_physregs[i] != PHYS_REG_NULL) os << " [unref r", commit.operand_physregs[i], "]";
+      if unlikely (commit.operand_physregs[i] != PHYS_REG_NULL)
+        os << " [unref r", commit.operand_physregs[i], "]";
     }
 
     if unlikely (br) {
-      os << " [brupdate", (commit.taken ? " tk" : " nt"), (commit.predtaken ? " pt" : " np"), ((commit.taken == commit.predtaken) ? " ok" : " MP"), "]";
+      os << " [brupdate", (commit.taken ? " tk" : " nt"), (commit.predtaken ? " pt" : " np"),
+          ((commit.taken == commit.predtaken) ? " ok" : " MP"), "]";
     }
 
-    if (uop.eom) os << " [EOM #", commit.total_user_insns_committed, "]";
+    if (uop.eom)
+      os << " [EOM #", commit.total_user_insns_committed, "]";
     break;
   }
   case EVENT_COMMIT_ASSIST: {
     os << "assist rob ", intstring(rob, -3), " calling assist ", (void*)rip.rip, " (#",
-      assist_index((assist_func_t)rip.rip), ": ", assist_name((assist_func_t)rip.rip), ")";
+        assist_index((assist_func_t)rip.rip), ": ", assist_name((assist_func_t)rip.rip), ")";
     break;
   }
   case EVENT_RECLAIM_PHYSREG:
-    os << "free   r", physreg, " no longer referenced; moving to free state"; break;
+    os << "free   r", physreg, " no longer referenced; moving to free state";
+    break;
   case EVENT_RELEASE_MEM_LOCK: {
     os << "unlkcm", " phys ", (void*)(loadstore.sfr.physaddr << 3), ": lock release committed";
     break;
@@ -1691,7 +1873,8 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
   stopped = 0;
 
   if unlikely (iterations >= config.start_log_at_iteration) {
-    if unlikely (!logenable) logfile << "Start logging at level ", config.loglevel, " in cycle ", iterations, endl, flush;
+    if unlikely (!logenable)
+      logfile << "Start logging at level ", config.loglevel, " in cycle ", iterations, endl, flush;
     logenable = 1;
   }
 
@@ -1710,13 +1893,14 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
 
   for (;;) {
     if unlikely (iterations >= config.start_log_at_iteration) {
-      if unlikely (!logenable) logfile << "Start logging at level ", config.loglevel, " in cycle ", iterations, endl, flush;
+      if unlikely (!logenable)
+        logfile << "Start logging at level ", config.loglevel, " in cycle ", iterations, endl, flush;
       logenable = 1;
     }
 
     inject_events();
 
-    OutOfOrderCore& core =* cores[0]; // only one core for now
+    OutOfOrderCore& core = *cores[0]; // only one core for now
     int running_thread_count = 0;
     foreach (i, core.threadcount) {
       ThreadContext* thread = core.threads[i];
@@ -1728,7 +1912,8 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
           logfile << "[vcpu ", thread->ctx.vcpuid, "] Already stopped at cycle ", sim_cycle, endl;
           stopped[thread->ctx.vcpuid] = 1;
         } else {
-          if (thread->ctx.check_events()) thread->handle_interrupt();
+          if (thread->ctx.check_events())
+            thread->handle_interrupt();
         }
         continue;
       }
@@ -1740,8 +1925,9 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
     if unlikely (check_for_async_sim_break() && (!stopping)) {
       logfile << "Waiting for all VCPUs to reach stopping point, starting at cycle ", sim_cycle, endl;
       // force_logging_enabled();
-      OutOfOrderCore& core =* cores[0];
-      foreach (i, core.threadcount) core.threads[i]->stop_at_next_eom = 1;
+      OutOfOrderCore& core = *cores[0];
+      foreach (i, core.threadcount)
+        core.threads[i]->stop_at_next_eom = 1;
       if (config.abort_at_end) {
         config.abort_at_end = 0;
         logfile << "Abort immediately: do not wait for next x86 boundary nor flush pipelines", endl;
@@ -1762,12 +1948,14 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
       exiting |= (stopped.integer() == bitmask(contextcount));
     }
 
-    if unlikely (exiting) break;
+    if unlikely (exiting)
+      break;
   }
 
-  logfile << "Exiting out-of-order core at ", total_user_insns_committed, " commits, ", total_uops_committed, " uops and ", iterations, " iterations (cycles)", endl;
+  logfile << "Exiting out-of-order core at ", total_user_insns_committed, " commits, ", total_uops_committed,
+      " uops and ", iterations, " iterations (cycles)", endl;
 
-  OutOfOrderCore& core =* cores[0]; /// only one core for now.
+  OutOfOrderCore& core = *cores[0]; /// only one core for now.
 
   foreach (i, core.threadcount) {
     ThreadContext* thread = core.threads[i];
@@ -1794,20 +1982,23 @@ void OutOfOrderMachine::reset() {
   PTLsimMachine::reset();
   stopped.reset();
   foreach (i, MAX_SMT_CORES) {
-    if (cores[i]) cores[i]->reset();
+    if (cores[i])
+      cores[i]->reset();
   }
 }
 
 void OutOfOrderCore::flush_tlb(Context& ctx, int threadid, bool selective, Waddr virtaddr) {
-  ThreadContext& thread =* threads[threadid];
+  ThreadContext& thread = *threads[threadid];
   if (logable(5)) {
     logfile << "[vcpu ", ctx.vcpuid, "] core ", coreid, ", thread ", threadid, ": Flush TLBs";
-    if (selective) logfile << " for virtaddr ", (void*)virtaddr, endl;
+    if (selective)
+      logfile << " for virtaddr ", (void*)virtaddr, endl;
     logfile << endl;
     //logfile << "DTLB before: ", endl, caches.dtlb, endl;
     //logfile << "ITLB before: ", endl, caches.itlb, endl;
   }
-  int dn; int in;
+  int dn;
+  int in;
 
   if unlikely (selective) {
     dn = caches.dtlb.flush_virt(virtaddr, threadid);
@@ -1838,15 +2029,16 @@ void OutOfOrderMachine::flush_tlb_virt(Context& ctx, Waddr virtaddr) {
 }
 
 void OutOfOrderMachine::dump_state(ostream& os) {
-  os << " dump_state include event if -ringbuf enabled: ",endl;
+  os << " dump_state include event if -ringbuf enabled: ", endl;
   //  foreach (i, contextcount) {
   foreach (i, MAX_SMT_CORES) {
-    os << " dump_state for core ", i,endl,flush;
-    if (!cores[i]) continue;
-    OutOfOrderCore& core =* cores[i];
+    os << " dump_state for core ", i, endl, flush;
+    if (!cores[i])
+      continue;
+    OutOfOrderCore& core = *cores[i];
     Context& ctx = contextof(i);
     if unlikely (config.event_log_enabled)
-                  core.eventlog.print(logfile);
+      core.eventlog.print(logfile);
     else
       os << " config.event_log_enabled is not enabled ", config.event_log_enabled, endl;
 

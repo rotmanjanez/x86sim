@@ -25,78 +25,54 @@
 #include <stdint.h>
 
 int64_t zero_sub8(int64_t in) {
-	int64_t out;
-	asm (
-		"sub %%al, %%bl"
-		:"=b"(out)
-		:"a"(in), "0"(0));
-	return out;
+  int64_t out;
+  asm("sub %%al, %%bl" : "=b"(out) : "a"(in), "0"(0));
+  return out;
 }
 int64_t zero_sub16(int64_t in) {
-	int64_t out;
-	asm (
-		"sub %%ax, %%bx"
-		:"=b"(out)
-		:"a"(in), "0"(0));
-	return out;
+  int64_t out;
+  asm("sub %%ax, %%bx" : "=b"(out) : "a"(in), "0"(0));
+  return out;
 }
 int64_t zero_sub32(int64_t in) {
-	int64_t out;
-	asm (
-		"sub %%eax, %%ebx"
-		:"=b"(out)
-		:"a"(in), "0"(0));
-	return out;
+  int64_t out;
+  asm("sub %%eax, %%ebx" : "=b"(out) : "a"(in), "0"(0));
+  return out;
 }
 int64_t zero_sub64(int64_t in) {
-	int64_t out;
-	asm (
-		"sub %%rax, %%rbx"
-		:"=b"(out)
-		:"a"(in), "0"(0));
-	return out;
+  int64_t out;
+  asm("sub %%rax, %%rbx" : "=b"(out) : "a"(in), "0"(0));
+  return out;
 }
 int64_t neg8(int64_t in) {
-	int64_t out;
-	asm (
-		"neg %%al"
-		:"=a"(out)
-		:"0"(in));
-	return out;
+  int64_t out;
+  asm("neg %%al" : "=a"(out) : "0"(in));
+  return out;
 }
 int64_t neg16(int64_t in) {
-	int64_t out;
-	asm (
-		"neg %%ax"
-		:"=a"(out)
-		:"0"(in));
-	return out;
+  int64_t out;
+  asm("neg %%ax" : "=a"(out) : "0"(in));
+  return out;
 }
 int64_t neg32(int64_t in) {
-	int64_t out;
-	asm (
-		"neg %%eax"
-		:"=a"(out)
-		:"0"(in));
-	return out;
+  int64_t out;
+  asm("neg %%eax" : "=a"(out) : "0"(in));
+  return out;
 }
 int64_t neg64(int64_t in) {
-	int64_t out;
-	asm (
-		"neg %%rax"
-		:"=a"(out)
-		:"0"(in));
-	return out;
+  int64_t out;
+  asm("neg %%rax" : "=a"(out) : "0"(in));
+  return out;
 }
 int main() {
-	int64_t data = 0xDEADBEEFFEEDBACC;
-	printf(" NEG8: %lx -> %lx\n", data,  neg8(data));
-	printf("NEG16: %lx -> %lx\n", data, neg16(data));
-	printf("NEG32: %lx -> %lx\n", data, neg32(data));
-	printf("NEG64: %lx -> %lx\n", data, neg64(data));
-	printf(" ZERO_SUB8: %lx -> %lx\n", data,  zero_sub8(data));
-	printf("ZERO_SUB16: %lx -> %lx\n", data, zero_sub16(data));
-	printf("ZERO_SUB32: %lx -> %lx\n", data, zero_sub32(data));
-	printf("ZERO_SUB64: %lx -> %lx\n", data, zero_sub64(data));
-	return 0;
+  int64_t data = 0xDEADBEEFFEEDBACC;
+  printf(" NEG8: %lx -> %lx\n", data, neg8(data));
+  printf("NEG16: %lx -> %lx\n", data, neg16(data));
+  printf("NEG32: %lx -> %lx\n", data, neg32(data));
+  printf("NEG64: %lx -> %lx\n", data, neg64(data));
+  printf(" ZERO_SUB8: %lx -> %lx\n", data, zero_sub8(data));
+  printf("ZERO_SUB16: %lx -> %lx\n", data, zero_sub16(data));
+  printf("ZERO_SUB32: %lx -> %lx\n", data, zero_sub32(data));
+  printf("ZERO_SUB64: %lx -> %lx\n", data, zero_sub64(data));
+  return 0;
 }

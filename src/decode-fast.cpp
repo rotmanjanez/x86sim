@@ -17,13 +17,34 @@ bool TraceDecoder::decode_fast() {
     // Arithmetic: add, or, adc, sbb, and, sub, xor, cmp
     // Low 3 bits of opcode determine the format:
     switch (bits(op, 0, 3)) {
-    case 0: DECODE(eform, rd, b_mode); DECODE(gform, ra, b_mode); break;
-    case 1: DECODE(eform, rd, v_mode); DECODE(gform, ra, v_mode); break;
-    case 2: DECODE(gform, rd, b_mode); DECODE(eform, ra, b_mode); break;
-    case 3: DECODE(gform, rd, v_mode); DECODE(eform, ra, v_mode); break;
-    case 4: rd.type = OPTYPE_REG; rd.reg.reg = APR_al; DECODE(iform, ra, b_mode); break;
-    case 5: DECODE(varreg_def32, rd, 0); DECODE(iform, ra, v_mode); break;
-    default: invalid |= true; break;
+    case 0:
+      DECODE(eform, rd, b_mode);
+      DECODE(gform, ra, b_mode);
+      break;
+    case 1:
+      DECODE(eform, rd, v_mode);
+      DECODE(gform, ra, v_mode);
+      break;
+    case 2:
+      DECODE(gform, rd, b_mode);
+      DECODE(eform, ra, b_mode);
+      break;
+    case 3:
+      DECODE(gform, rd, v_mode);
+      DECODE(eform, ra, v_mode);
+      break;
+    case 4:
+      rd.type = OPTYPE_REG;
+      rd.reg.reg = APR_al;
+      DECODE(iform, ra, b_mode);
+      break;
+    case 5:
+      DECODE(varreg_def32, rd, 0);
+      DECODE(iform, ra, v_mode);
+      break;
+    default:
+      invalid |= true;
+      break;
     }
     EndOfDecode();
 
@@ -34,10 +55,17 @@ bool TraceDecoder::decode_fast() {
     int translated_opcode = translate_opcode[subop];
     int rcreg = ((subop == 2) | (subop == 3)) ? REG_cf : REG_zero;
 
-    if (subop == 7) prefixes &= ~PFX_LOCK;
-    if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(0)) break; }
+    if (subop == 7)
+      prefixes &= ~PFX_LOCK;
+    if unlikely (rd.type == OPTYPE_MEM) {
+      if (memory_fence_if_locked(0))
+        break;
+    }
     alu_reg_or_mem(translated_opcode, rd, ra, FLAGS_DEFAULT_ALU, rcreg, (subop == 7));
-    if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(1)) break; }
+    if unlikely (rd.type == OPTYPE_MEM) {
+      if (memory_fence_if_locked(1))
+        break;
+    }
 
     break;
   }
@@ -50,8 +78,10 @@ bool TraceDecoder::decode_fast() {
     int sizeshift = reginfo[ra.reg.reg].sizeshift;
     int r = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
 
-    this << TransOp(bit(op, 3) ? OP_sub : OP_add, r, r, REG_imm, REG_zero, sizeshift, +1, 0, SETFLAG_ZF|SETFLAG_OF); // save old rdreg
-    if unlikely (no_partial_flag_updates_per_insn) this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+    this << TransOp(bit(op, 3) ? OP_sub : OP_add, r, r, REG_imm, REG_zero, sizeshift, +1, 0,
+                    SETFLAG_ZF | SETFLAG_OF); // save old rdreg
+    if unlikely (no_partial_flag_updates_per_insn)
+      this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
     break;
   }
 
@@ -62,7 +92,8 @@ bool TraceDecoder::decode_fast() {
 
     int r = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
     int sizeshift = reginfo[ra.reg.reg].sizeshift;
-    if (use64 && (sizeshift == 2)) sizeshift = 3; // There is no way to encode 32-bit pushes and pops in 64-bit mode:
+    if (use64 && (sizeshift == 2))
+      sizeshift = 3; // There is no way to encode 32-bit pushes and pops in 64-bit mode:
     int size = (1 << sizeshift);
 
     if (op < 0x58) {
@@ -138,7 +169,7 @@ bool TraceDecoder::decode_fast() {
 
     EndOfDecode();
 
-    alu_reg_or_mem(OP_mull, rd, ra, SETFLAG_CF|SETFLAG_OF, REG_imm, false, false, true, rimm.imm.imm);
+    alu_reg_or_mem(OP_mull, rd, ra, SETFLAG_CF | SETFLAG_OF, REG_imm, false, false, true, rimm.imm.imm);
     break;
   }
 
@@ -152,7 +183,7 @@ bool TraceDecoder::decode_fast() {
 
     int rdreg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
     int rdshift = reginfo[rd.reg.reg].sizeshift;
-    alu_reg_or_mem(OP_mull, rd, ra, SETFLAG_CF|SETFLAG_OF, (rdshift < 2) ? rdreg : REG_zero);
+    alu_reg_or_mem(OP_mull, rd, ra, SETFLAG_CF | SETFLAG_OF, (rdshift < 2) ? rdreg : REG_zero);
     break;
   }
 
@@ -170,7 +201,8 @@ bool TraceDecoder::decode_fast() {
     if (!last_flags_update_was_atomic)
       this << TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
     int condcode = bits(op, 0, 4);
-    TransOp transop(OP_br, REG_rip, cond_code_to_flag_regs[condcode].ra, cond_code_to_flag_regs[condcode].rb, REG_zero, 3, 0);
+    TransOp transop(OP_br, REG_rip, cond_code_to_flag_regs[condcode].ra, cond_code_to_flag_regs[condcode].rb, REG_zero,
+                    3, 0);
     transop.cond = condcode;
     transop.riptaken = (Waddr)rip + ra.imm.imm;
     transop.ripseq = (Waddr)rip;
@@ -181,10 +213,21 @@ bool TraceDecoder::decode_fast() {
   case 0x80 ... 0x83: {
     // GRP1b, GRP1s, GRP1ss:
     switch (bits(op, 0, 2)) {
-    case 0: DECODE(eform, rd, b_mode); DECODE(iform, ra, b_mode); break; // GRP1b
-    case 1: DECODE(eform, rd, v_mode); DECODE(iform, ra, v_mode); break; // GRP1S
-    case 2: invalid |= true; break;
-    case 3: DECODE(eform, rd, v_mode); DECODE(iform, ra, b_mode); break; // GRP1Ss (sign ext byte)
+    case 0:
+      DECODE(eform, rd, b_mode);
+      DECODE(iform, ra, b_mode);
+      break; // GRP1b
+    case 1:
+      DECODE(eform, rd, v_mode);
+      DECODE(iform, ra, v_mode);
+      break; // GRP1S
+    case 2:
+      invalid |= true;
+      break;
+    case 3:
+      DECODE(eform, rd, v_mode);
+      DECODE(iform, ra, b_mode);
+      break; // GRP1Ss (sign ext byte)
     }
     // function in modrm.reg: add or adc sbb and sub xor cmp
     EndOfDecode();
@@ -196,10 +239,17 @@ bool TraceDecoder::decode_fast() {
     int translated_opcode = translate_opcode[subop];
     int rcreg = ((subop == 2) | (subop == 3)) ? REG_cf : REG_zero;
 
-    if (subop == 7) prefixes &= ~PFX_LOCK;
-    if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(0)) break; }
+    if (subop == 7)
+      prefixes &= ~PFX_LOCK;
+    if unlikely (rd.type == OPTYPE_MEM) {
+      if (memory_fence_if_locked(0))
+        break;
+    }
     alu_reg_or_mem(translated_opcode, rd, ra, FLAGS_DEFAULT_ALU, rcreg, (subop == 7));
-    if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(1)) break; }
+    if unlikely (rd.type == OPTYPE_MEM) {
+      if (memory_fence_if_locked(1))
+        break;
+    }
 
     break;
   }
@@ -218,8 +268,14 @@ bool TraceDecoder::decode_fast() {
     // moves
     int bytemode = bit(op, 0) ? v_mode : b_mode;
     switch (bit(op, 1)) {
-    case 0: DECODE(eform, rd, bytemode); DECODE(gform, ra, bytemode); break;
-    case 1: DECODE(gform, rd, bytemode); DECODE(eform, ra, bytemode); break;
+    case 0:
+      DECODE(eform, rd, bytemode);
+      DECODE(gform, ra, bytemode);
+      break;
+    case 1:
+      DECODE(gform, rd, bytemode);
+      DECODE(eform, ra, bytemode);
+      break;
     }
     EndOfDecode();
 
@@ -265,7 +321,8 @@ bool TraceDecoder::decode_fast() {
     int rashift = (rex.mode64) ? 2 : ((opsize_prefix) ? 0 : 1);
     int rdshift = rashift + 1;
     EndOfDecode();
-    TransOp transop(OP_maskb, REG_rax, (rdshift < 3) ? REG_rax : REG_zero, REG_rax, REG_imm, rdshift, 0, MaskControlInfo(0, (1<<rashift)*8, 0));
+    TransOp transop(OP_maskb, REG_rax, (rdshift < 3) ? REG_rax : REG_zero, REG_rax, REG_imm, rdshift, 0,
+                    MaskControlInfo(0, (1 << rashift) * 8, 0));
     transop.cond = 2; // sign extend
     this << transop;
     break;
@@ -276,7 +333,7 @@ bool TraceDecoder::decode_fast() {
     EndOfDecode();
     int rashift = (rex.mode64) ? 3 : ((opsize_prefix) ? 1 : 2);
 
-    TransOp bt(OP_bt, REG_temp0, REG_rax, REG_imm, REG_zero, rashift, ((1<<rashift)*8)-1, 0, SETFLAG_CF);
+    TransOp bt(OP_bt, REG_temp0, REG_rax, REG_imm, REG_zero, rashift, ((1 << rashift) * 8) - 1, 0, SETFLAG_CF);
     bt.nouserflags = 1; // it still generates flags, but does not rename the user flags
     this << bt;
 
@@ -287,9 +344,10 @@ bool TraceDecoder::decode_fast() {
     // move in value
     this << TransOp(OP_mov, REG_rdx, (rashift < 2) ? REG_rdx : REG_zero, REG_temp0, REG_zero, rashift);
 
-#ifdef DIFFERENT_BEHAVIOR_FROM_HARDWARE  // Neither Intel nor AMD manuals make a reference to rax being modified, tested SD
+#ifdef DIFFERENT_BEHAVIOR_FROM_HARDWARE // Neither Intel nor AMD manuals make a reference to rax being modified, tested SD
     // zero out high bits of rax since technically both rdx and rax are modified:
-    if (rashift == 2) this << TransOp(OP_mov, REG_rax, REG_zero, REG_rax, REG_zero, 2);
+    if (rashift == 2)
+      this << TransOp(OP_mov, REG_rax, REG_zero, REG_rax, REG_zero, 2);
 #endif
     break;
   }
@@ -332,7 +390,7 @@ bool TraceDecoder::decode_fast() {
     DECODE(iform, ra, b_mode);
     EndOfDecode();
     int rdreg = arch_pseudo_reg_to_arch_reg[rd.reg.reg];
-    move_reg_or_mem(rd,ra);
+    move_reg_or_mem(rd, ra);
     break;
   }
 
@@ -427,14 +485,18 @@ bool TraceDecoder::decode_fast() {
     // of the earlier flag values in program order depending on the count. Otherwise
     // the static count (0, 1, >1) determines which flags are set.
     //
-    W32 setflags = (ra.type == OPTYPE_REG) ? FLAGS_DEFAULT_ALU : (!count) ? 0 : // count == 0
-      (count == 1) ? (isrot ? (SETFLAG_OF|SETFLAG_CF) : (SETFLAG_ZF|SETFLAG_OF|SETFLAG_CF)) : // count == 1
-      (isrot ? (SETFLAG_CF) : (SETFLAG_ZF|SETFLAG_CF)); // count > 1
+    W32 setflags = (ra.type == OPTYPE_REG) ? FLAGS_DEFAULT_ALU
+                   : (!count)              ? 0
+                                           : // count == 0
+                       (count == 1) ? (isrot ? (SETFLAG_OF | SETFLAG_CF) : (SETFLAG_ZF | SETFLAG_OF | SETFLAG_CF))
+                                                 :                         // count == 1
+                       (isrot ? (SETFLAG_CF) : (SETFLAG_ZF | SETFLAG_CF)); // count > 1
 
     static const byte translate_opcode[8] = {OP_rotl, OP_rotr, OP_rotcl, OP_rotcr, OP_shl, OP_shr, OP_shl, OP_sar};
     static const byte translate_simple_opcode[8] = {OP_nop, OP_nop, OP_nop, OP_nop, OP_shls, OP_shrs, OP_shls, OP_sars};
 
-    bool simple = ((ra.type == OPTYPE_IMM) & (ra.imm.imm <= SIMPLE_SHIFT_LIMIT) & (translate_simple_opcode[modrm.reg] != OP_nop));
+    bool simple =
+        ((ra.type == OPTYPE_IMM) & (ra.imm.imm <= SIMPLE_SHIFT_LIMIT) & (translate_simple_opcode[modrm.reg] != OP_nop));
     int translated_opcode = (simple) ? translate_simple_opcode[modrm.reg] : translate_opcode[modrm.reg];
 
     EndOfDecode();
@@ -445,7 +507,9 @@ bool TraceDecoder::decode_fast() {
       collcc.nouserflags = 1;
       this << collcc;
     }
-    int rcreg = (ra.type == OPTYPE_REG) ? REG_temp5 : (translated_opcode == OP_rotcl || translated_opcode == OP_rotcr) ? REG_cf : REG_zero;
+    int rcreg = (ra.type == OPTYPE_REG)                                            ? REG_temp5
+                : (translated_opcode == OP_rotcl || translated_opcode == OP_rotcr) ? REG_cf
+                                                                                   : REG_zero;
 
     alu_reg_or_mem(translated_opcode, rd, ra, setflags, rcreg);
 
@@ -482,7 +546,8 @@ bool TraceDecoder::decode_fast() {
   case 0xc6 ... 0xc7: {
     // move reg_or_mem,imm8|imm16|imm32|imm64 (signed imm for 32-bit to 64-bit form)
     int bytemode = bit(op, 0) ? v_mode : b_mode;
-    DECODE(eform, rd, bytemode); DECODE(iform, ra, bytemode);
+    DECODE(eform, rd, bytemode);
+    DECODE(iform, ra, bytemode);
     EndOfDecode();
     move_reg_or_mem(rd, ra);
     break;
@@ -496,7 +561,8 @@ bool TraceDecoder::decode_fast() {
     int bytes = (W16)rd.imm.imm;
     int level = (byte)ra.imm.imm;
     // we only support nesting level 0
-    if (level != 0) invalid |= true;
+    if (level != 0)
+      invalid |= true;
 
     EndOfDecode();
 
@@ -572,7 +638,8 @@ bool TraceDecoder::decode_fast() {
     //
   case 0xf6 ... 0xf7: {
     // COMPLEX: handle mul and div in the complex decoder
-    if (modrm.reg >= 4) return false;
+    if (modrm.reg >= 4)
+      return false;
 
     // GRP3b and GRP3S
     DECODE(eform, rd, (op & 1) ? v_mode : b_mode);
@@ -586,15 +653,27 @@ bool TraceDecoder::decode_fast() {
       break;
     case 2: { // not
       // As an exception to the rule, NOT does not generate any flags. Go figure.
-      if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(0)) break; }
+      if unlikely (rd.type == OPTYPE_MEM) {
+        if (memory_fence_if_locked(0))
+          break;
+      }
       alu_reg_or_mem(OP_nor, rd, rd, 0, REG_zero);
-      if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(1)) break; }
+      if unlikely (rd.type == OPTYPE_MEM) {
+        if (memory_fence_if_locked(1))
+          break;
+      }
       break;
     }
     case 3: { // neg r1 => sub r1 = 0, r1
-      if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(0)) break; }
+      if unlikely (rd.type == OPTYPE_MEM) {
+        if (memory_fence_if_locked(0))
+          break;
+      }
       alu_reg_or_mem(OP_sub, rd, rd, FLAGS_DEFAULT_ALU, REG_zero, false, true);
-      if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(1)) break; }
+      if unlikely (rd.type == OPTYPE_MEM) {
+        if (memory_fence_if_locked(1))
+          break;
+      }
       break;
     }
     default:
@@ -612,9 +691,15 @@ bool TraceDecoder::decode_fast() {
     ra.type = OPTYPE_IMM;
     ra.imm.imm = +1;
 
-    if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(0)) break; }
-    alu_reg_or_mem((bit(modrm.reg, 0)) ? OP_sub : OP_add, rd, ra, SETFLAG_ZF|SETFLAG_OF, REG_zero);
-    if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(1)) break; }
+    if unlikely (rd.type == OPTYPE_MEM) {
+      if (memory_fence_if_locked(0))
+        break;
+    }
+    alu_reg_or_mem((bit(modrm.reg, 0)) ? OP_sub : OP_add, rd, ra, SETFLAG_ZF | SETFLAG_OF, REG_zero);
+    if unlikely (rd.type == OPTYPE_MEM) {
+      if (memory_fence_if_locked(1))
+        break;
+    }
 
     break;
   }
@@ -632,9 +717,15 @@ bool TraceDecoder::decode_fast() {
       ra.type = OPTYPE_IMM;
       ra.imm.imm = +1;
 
-      if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(0)) break; }
-      alu_reg_or_mem((bit(modrm.reg, 0)) ? OP_sub : OP_add, rd, ra, SETFLAG_ZF|SETFLAG_OF, REG_zero);
-      if unlikely (rd.type == OPTYPE_MEM) { if (memory_fence_if_locked(1)) break; }
+      if unlikely (rd.type == OPTYPE_MEM) {
+        if (memory_fence_if_locked(0))
+          break;
+      }
+      alu_reg_or_mem((bit(modrm.reg, 0)) ? OP_sub : OP_add, rd, ra, SETFLAG_ZF | SETFLAG_OF, REG_zero);
+      if unlikely (rd.type == OPTYPE_MEM) {
+        if (memory_fence_if_locked(1))
+          break;
+      }
 
       break;
     }
@@ -658,7 +749,8 @@ bool TraceDecoder::decode_fast() {
         int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
         int rashift = reginfo[ra.reg.reg].sizeshift;
         // there is no way to encode a 32-bit jump address in x86-64 mode:
-        if (use64 && (rashift == 2)) rashift = 3;
+        if (use64 && (rashift == 2))
+          rashift = 3;
         if (iscall) {
           abs_code_addr_immediate(REG_temp6, 3, (Waddr)rip);
           this << TransOp(OP_st, REG_mem, REG_rsp, REG_imm, REG_temp6, sizeshift, -(1 << sizeshift));
@@ -670,7 +762,8 @@ bool TraceDecoder::decode_fast() {
         this << transop;
       } else if (ra.type == OPTYPE_MEM) {
         // there is no way to encode a 32-bit jump address in x86-64 mode:
-        if (use64 && (ra.mem.size == 2)) ra.mem.size = 3;
+        if (use64 && (ra.mem.size == 2))
+          ra.mem.size = 3;
         prefixes &= ~PFX_LOCK;
         operand_load(REG_temp0, ra);
         if (iscall) {
@@ -689,7 +782,8 @@ bool TraceDecoder::decode_fast() {
     case 6: {
       // push Ev: push reg or memory
       // There is no way to encode 32-bit pushes and pops in 64-bit mode:
-      if (use64 && ra.type == OPTYPE_MEM && ra.mem.size == 2) ra.mem.size = 3;
+      if (use64 && ra.type == OPTYPE_MEM && ra.mem.size == 2)
+        ra.mem.size = 3;
 
       int rareg;
 
@@ -702,7 +796,8 @@ bool TraceDecoder::decode_fast() {
       }
 
       int sizeshift = (ra.type == OPTYPE_REG) ? reginfo[ra.reg.reg].sizeshift : ra.mem.size;
-      if (use64 && (sizeshift == 2)) sizeshift = 3; // There is no way to encode 32-bit pushes and pops in 64-bit mode:
+      if (use64 && (sizeshift == 2))
+        sizeshift = 3; // There is no way to encode 32-bit pushes and pops in 64-bit mode:
       this << TransOp(OP_st, REG_mem, REG_rsp, REG_imm, rareg, sizeshift, -(1 << sizeshift));
       this << TransOp(OP_sub, REG_rsp, REG_rsp, REG_imm, REG_zero, (use64 ? 3 : 2), (1 << sizeshift));
 
@@ -786,12 +881,13 @@ bool TraceDecoder::decode_fast() {
     break;
   }
 
-  case 0x1a3: // bt ra,rb     101 00 011
-  case 0x1ab: // bts ra,rb    101 01 011
-  case 0x1b3: // btr ra,rb    101 10 011
+  case 0x1a3:   // bt ra,rb     101 00 011
+  case 0x1ab:   // bts ra,rb    101 01 011
+  case 0x1b3:   // btr ra,rb    101 10 011
   case 0x1bb: { // btc ra,rb  101 11 011
     // COMPLEX: Let complex decoder handle memory forms
-    if (modrm.mod != 3) return false;
+    if (modrm.mod != 3)
+      return false;
 
     DECODE(eform, rd, v_mode);
     DECODE(gform, ra, v_mode);
@@ -806,17 +902,20 @@ bool TraceDecoder::decode_fast() {
 
     // bt has no output - just flags:
     this << TransOp(opcode, (opcode == OP_bt) ? REG_temp0 : rdreg, rdreg, rareg, REG_zero, 3, 0, 0, SETFLAG_CF);
-    if unlikely (no_partial_flag_updates_per_insn) this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+    if unlikely (no_partial_flag_updates_per_insn)
+      this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
     break;
   }
 
   case 0x1ba: { // bt|btc|btr|bts ra,imm
     // COMPLEX: Let complex decoder handle memory forms
-    if (modrm.mod != 3) return false;
+    if (modrm.mod != 3)
+      return false;
 
     DECODE(eform, rd, v_mode);
     DECODE(iform, ra, b_mode);
-    if (modrm.reg < 4) MakeInvalid();
+    if (modrm.reg < 4)
+      MakeInvalid();
     EndOfDecode();
 
     static const byte x86_to_uop[4] = {OP_bt, OP_bts, OP_btr, OP_btc};
@@ -827,8 +926,10 @@ bool TraceDecoder::decode_fast() {
     int rareg = arch_pseudo_reg_to_arch_reg[ra.reg.reg];
 
     // bt has no output - just flags:
-    this << TransOp(opcode, (opcode == OP_bt) ? REG_temp0 : rdreg, rdreg, REG_imm, REG_zero, 3, ra.imm.imm, 0, SETFLAG_CF);
-    if unlikely (no_partial_flag_updates_per_insn) this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
+    this << TransOp(opcode, (opcode == OP_bt) ? REG_temp0 : rdreg, rdreg, REG_imm, REG_zero, 3, ra.imm.imm, 0,
+                    SETFLAG_CF);
+    if unlikely (no_partial_flag_updates_per_insn)
+      this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
     break;
   }
 
@@ -854,9 +955,10 @@ bool TraceDecoder::decode_fast() {
   case 0x1bc:
   case 0x1bd: {
     // bsf/bsr:
-    DECODE(gform, rd, v_mode); DECODE(eform, ra, v_mode);
+    DECODE(gform, rd, v_mode);
+    DECODE(eform, ra, v_mode);
     EndOfDecode();
-    alu_reg_or_mem((op == 0x1bc) ? OP_ctz: OP_clz, rd, ra, FLAGS_DEFAULT_ALU, REG_zero);
+    alu_reg_or_mem((op == 0x1bc) ? OP_ctz : OP_clz, rd, ra, FLAGS_DEFAULT_ALU, REG_zero);
     break;
   }
 

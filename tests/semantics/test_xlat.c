@@ -25,42 +25,36 @@
 #include <stdint.h>
 
 uint64_t xlat_addr32(void* base, uint64_t offs) {
-	uint64_t out;
-	asm (
-		".byte 0x67 \n\t"
-		"xlat"
-		:"=a"(out)
-		:"b"(base), "0"(offs));
-	return out;
+  uint64_t out;
+  asm(".byte 0x67 \n\t"
+      "xlat"
+      : "=a"(out)
+      : "b"(base), "0"(offs));
+  return out;
 }
 uint64_t xlat_addr64(void* base, uint64_t offs) {
-	uint64_t out;
-	asm (
-		"xlat"
-		:"=a"(out)
-		:"b"(base), "0"(offs));
-	return out;
+  uint64_t out;
+  asm("xlat" : "=a"(out) : "b"(base), "0"(offs));
+  return out;
 }
-uint8_t xlat_arr[]={0xCC};
+uint8_t xlat_arr[] = {0xCC};
 int main() {
-	uint64_t offs = 0xDEADBEEFFEEDBA00;
-	uint64_t res;
+  uint64_t offs = 0xDEADBEEFFEEDBA00;
+  uint64_t res;
 
-	res = xlat_addr32(xlat_arr, offs);
-	printf("XLAT (32-bit addr) of %p+%i (%lx) -> %x (%lx)\n", xlat_arr,
-	       (int)(offs & 0xFF), offs, (int)(res & 0xFF), res);
+  res = xlat_addr32(xlat_arr, offs);
+  printf("XLAT (32-bit addr) of %p+%i (%lx) -> %x (%lx)\n", xlat_arr, (int)(offs & 0xFF), offs, (int)(res & 0xFF), res);
 
 
-	// Put bogus offs into the higher 32-bits of the address to check 32-bit addressing.
-	void *xlat_arr_bogus = (void*)(0xDEADBEEF00000000 | (((uint64_t)xlat_arr) & 0xFFFFFFFF));
-	printf("Bogus addr: %p\n", xlat_arr_bogus);
+  // Put bogus offs into the higher 32-bits of the address to check 32-bit addressing.
+  void* xlat_arr_bogus = (void*)(0xDEADBEEF00000000 | (((uint64_t)xlat_arr) & 0xFFFFFFFF));
+  printf("Bogus addr: %p\n", xlat_arr_bogus);
 
-	res = xlat_addr32(xlat_arr_bogus, offs);
-	printf("XLAT (32-bit bogus addr) of %p+%i (%lx) -> %x (%lx)\n", xlat_arr_bogus,
-	       (int)(offs & 0xFF), offs, (int)(res & 0xFF), res);
+  res = xlat_addr32(xlat_arr_bogus, offs);
+  printf("XLAT (32-bit bogus addr) of %p+%i (%lx) -> %x (%lx)\n", xlat_arr_bogus, (int)(offs & 0xFF), offs,
+         (int)(res & 0xFF), res);
 
-	res = xlat_addr64(xlat_arr, offs);
-	printf("XLAT (64-bit addr) of %p+%i (%lx) -> %x (%lx)\n", xlat_arr,
-	       (int)(offs & 0xFF), offs, (int)(res & 0xFF), res);
-	return 0;
+  res = xlat_addr64(xlat_arr, offs);
+  printf("XLAT (64-bit addr) of %p+%i (%lx) -> %x (%lx)\n", xlat_arr, (int)(offs & 0xFF), offs, (int)(res & 0xFF), res);
+  return 0;
 }

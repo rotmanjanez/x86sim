@@ -22,48 +22,43 @@
 #define foreach_forward_from(Q, E, i) for (int i = E->index(); i != (Q).tail; i = add_index_modulo(i, +1, (Q).size))
 
 // Iterate forward through queue from the entry after the specified entry until the tail
-#define foreach_forward_after(Q, E, i) for (int i = add_index_modulo(E->index(), +1, (Q).size); i != (Q).tail; i = add_index_modulo(i, +1, (Q).size))
+#define foreach_forward_after(Q, E, i)                                                                                 \
+  for (int i = add_index_modulo(E->index(), +1, (Q).size); i != (Q).tail; i = add_index_modulo(i, +1, (Q).size))
 
 // Iterate backward through queue from tail to head
-#define foreach_backward(Q, i) for (int i = add_index_modulo((Q).tail, -1, (Q).size); i != add_index_modulo((Q).head, -1, (Q).size); i = add_index_modulo(i, -1, (Q).size))
+#define foreach_backward(Q, i)                                                                                         \
+  for (int i = add_index_modulo((Q).tail, -1, (Q).size); i != add_index_modulo((Q).head, -1, (Q).size);                \
+       i = add_index_modulo(i, -1, (Q).size))
 
 // Iterate backward through queue from the specified entry until the tail
-#define foreach_backward_from(Q, E, i) for (int i = E->index(); i != add_index_modulo((Q).head, -1, (Q).size); i = add_index_modulo(i, -1, (Q).size))
+#define foreach_backward_from(Q, E, i)                                                                                 \
+  for (int i = E->index(); i != add_index_modulo((Q).head, -1, (Q).size); i = add_index_modulo(i, -1, (Q).size))
 
 // Iterate backward through queue from the entry before the specified entry until the head
-#define foreach_backward_before(Q, E, i) for (int i = add_index_modulo(E->index(), -1, (Q).size); ((i != add_index_modulo((Q).head, -1, (Q).size)) && (E->index() != (Q).head)); i = add_index_modulo(i, -1, (Q).size))
+#define foreach_backward_before(Q, E, i)                                                                               \
+  for (int i = add_index_modulo(E->index(), -1, (Q).size);                                                             \
+       ((i != add_index_modulo((Q).head, -1, (Q).size)) && (E->index() != (Q).head));                                  \
+       i = add_index_modulo(i, -1, (Q).size))
 
-template <class T, int SIZE>
-struct FixedQueue: public array<T, SIZE> {
-  int head; // used for allocation
-  int tail; // used for deallocation
+template<class T, int SIZE>
+struct FixedQueue : public array<T, SIZE> {
+  int head;  // used for allocation
+  int tail;  // used for deallocation
   int count; // count of entries
 
   static const int size = SIZE;
 
-  FixedQueue() {
-    reset();
-  }
+  FixedQueue() { reset(); }
 
-  void flush() {
-    head = tail = count = 0;
-  }
+  void flush() { head = tail = count = 0; }
 
-  void reset() {
-    head = tail = count = 0;
-  }
+  void reset() { head = tail = count = 0; }
 
-  int remaining() const {
-    return max((SIZE - count) - 1, 0);
-  }
+  int remaining() const { return max((SIZE - count) - 1, 0); }
 
-  bool empty() const {
-    return (!count);
-  }
+  bool empty() const { return (!count); }
 
-  bool full() const {
-    return (!remaining());
-  }
+  bool full() const { return (!remaining()); }
 
   T* alloc() {
     if (!remaining())
@@ -77,20 +72,17 @@ struct FixedQueue: public array<T, SIZE> {
     return entry;
   }
 
-  T* push() {
-    return alloc();
-  }
+  T* push() { return alloc(); }
 
   T* push(const T& data) {
     T* slot = push();
-    if (!slot) return null;
+    if (!slot)
+      return null;
     *slot = data;
     return slot;
   }
 
-  T* enqueue(const T& data) {
-    return push(data);
-  }
+  T* enqueue(const T& data) { return push(data); }
 
   void commit(T& entry) {
     assert(entry.index() == head);
@@ -105,7 +97,8 @@ struct FixedQueue: public array<T, SIZE> {
   }
 
   T* pop() {
-    if (empty()) return null;
+    if (empty())
+      return null;
     tail = add_index_modulo(tail, -1, SIZE);
     count--;
     return &(*this)[tail];
@@ -130,14 +123,16 @@ struct FixedQueue: public array<T, SIZE> {
   void annul(T* entry) { annul(*entry); }
 
   T* pushhead() {
-    if (full()) return null;
+    if (full())
+      return null;
     head = add_index_modulo(head, -1, SIZE);
     count++;
     return &(*this)[head];
   }
 
   T* pophead() {
-    if (empty()) return null;
+    if (empty())
+      return null;
     T* p = &(*this)[head];
     count--;
     head = add_index_modulo(head, +1, SIZE);
@@ -145,22 +140,24 @@ struct FixedQueue: public array<T, SIZE> {
   }
 
   T* peekhead() {
-    if (empty()) return null;
+    if (empty())
+      return null;
     return &(*this)[head];
   }
 
   T* peektail() {
-    if (empty()) return null;
+    if (empty())
+      return null;
     int t = add_index_modulo(tail, -1, SIZE);
     return &(*this)[t];
   }
 
-  T& operator ()(int index) {
+  T& operator()(int index) {
     index = add_index_modulo(head, index, SIZE);
     return (*this)[index];
   }
 
-  const T& operator ()(int index) const {
+  const T& operator()(int index) const {
     index = add_index_modulo(head, index, SIZE);
     return (*this)[index];
   }
@@ -176,18 +173,16 @@ struct FixedQueue: public array<T, SIZE> {
   }
 };
 
-template <class T, int SIZE>
-ostream& operator <<(ostream& os, FixedQueue<T, SIZE>& queue) {
+template<class T, int SIZE>
+ostream& operator<<(ostream& os, FixedQueue<T, SIZE>& queue) {
   return queue.print(os);
 }
 
-template <class T, int SIZE>
-struct Queue: public FixedQueue<T, SIZE> {
+template<class T, int SIZE>
+struct Queue : public FixedQueue<T, SIZE> {
   typedef FixedQueue<T, SIZE> base_t;
 
-  Queue() {
-    reset();
-  }
+  Queue() { reset(); }
 
   void reset() {
     base_t::reset();
@@ -198,13 +193,14 @@ struct Queue: public FixedQueue<T, SIZE> {
 
   T* alloc() {
     T* p = base_t::alloc();
-    if likely (p) p->validate();
+    if likely (p)
+      p->validate();
     return p;
   }
 };
 
-template <class T, int size>
-ostream& operator <<(ostream& os, Queue<T, size>& queue) {
+template<class T, int size>
+ostream& operator<<(ostream& os, Queue<T, size>& queue) {
   os << "Queue<", size, "]: head ", queue.head, " to tail ", queue.tail, " (", queue.count, " entries):", endl;
   foreach_forward(queue, i) {
     const T& entry = queue[i];
@@ -218,11 +214,26 @@ ostream& operator <<(ostream& os, Queue<T, size>& queue) {
 // Fully Associative Arrays
 //
 
-template <typename T> struct InvalidTag { static const T INVALID; };
-template <> struct InvalidTag<W64> { static const W64 INVALID = 0xffffffffffffffffULL; };
-template <> struct InvalidTag<W32> { static const W32 INVALID = 0xffffffff; };
-template <> struct InvalidTag<W16> { static const W16 INVALID = 0xffff; };
-template <> struct InvalidTag<W8> { static const W8 INVALID = 0xff; };
+template<typename T>
+struct InvalidTag {
+  static const T INVALID;
+};
+template<>
+struct InvalidTag<W64> {
+  static const W64 INVALID = 0xffffffffffffffffULL;
+};
+template<>
+struct InvalidTag<W32> {
+  static const W32 INVALID = 0xffffffff;
+};
+template<>
+struct InvalidTag<W16> {
+  static const W16 INVALID = 0xffff;
+};
+template<>
+struct InvalidTag<W8> {
+  static const W8 INVALID = 0xff;
+};
 
 //
 // The replacement policy is pseudo-LRU using a most recently used
@@ -236,16 +247,14 @@ template <> struct InvalidTag<W8> { static const W8 INVALID = 0xff; };
 // or tree-based hot sector LRU.
 //
 
-template <typename T, int ways>
+template<typename T, int ways>
 struct FullyAssociativeTags {
   bitvec<ways> evictmap;
   T tags[ways];
 
   static const T INVALID = InvalidTag<T>::INVALID;
 
-  FullyAssociativeTags() {
-    reset();
-  }
+  FullyAssociativeTags() { reset(); }
 
   void reset() {
     evictmap = 0;
@@ -277,21 +286,21 @@ struct FullyAssociativeTags {
 
   int probe(T target) {
     int way = match(target);
-    if (way < 0) return -1;
+    if (way < 0)
+      return -1;
 
     use(way);
     return way;
   }
 
-  int lru() const {
-    return (evictmap.allset()) ? 0 : (~evictmap).lsb();
-  }
+  int lru() const { return (evictmap.allset()) ? 0 : (~evictmap).lsb(); }
 
   int select(T target, T& oldtag) {
     int way = probe(target);
     if (way < 0) {
       way = lru();
-      if (evictmap.allset()) evictmap = 0;
+      if (evictmap.allset())
+        evictmap = 0;
       oldtag = tags[way];
       tags[way] = target;
     }
@@ -311,21 +320,23 @@ struct FullyAssociativeTags {
 
   int invalidate(T target) {
     int way = probe(target);
-    if (way < 0) return -1;
+    if (way < 0)
+      return -1;
     invalidate_way(way);
     return way;
   }
 
-  const T& operator [](int index) const { return tags[index]; }
+  const T& operator[](int index) const { return tags[index]; }
 
-  T& operator [](int index) { return tags[index]; }
-  int operator ()(T target) { return probe(target); }
+  T& operator[](int index) { return tags[index]; }
+  int operator()(T target) { return probe(target); }
 
   stringbuf& printway(stringbuf& os, int i) const {
     os << "  way ", intstring(i, -2), ": ";
     if (tags[i] != INVALID) {
-      os << "tag 0x", hexstring(tags[i], sizeof(T)*8);
-      if (evictmap[i]) os << " (MRU)";
+      os << "tag 0x", hexstring(tags[i], sizeof(T) * 8);
+      if (evictmap[i])
+        os << " (MRU)";
     } else {
       os << "<invalid>";
     }
@@ -348,13 +359,13 @@ struct FullyAssociativeTags {
   }
 };
 
-template <typename T, int ways>
-ostream& operator <<(ostream& os, const FullyAssociativeTags<T, ways>& tags) {
+template<typename T, int ways>
+ostream& operator<<(ostream& os, const FullyAssociativeTags<T, ways>& tags) {
   return tags.print(os);
 }
 
-template <typename T, int ways>
-stringbuf& operator <<(stringbuf& sb, const FullyAssociativeTags<T, ways>& tags) {
+template<typename T, int ways>
+stringbuf& operator<<(stringbuf& sb, const FullyAssociativeTags<T, ways>& tags) {
   return tags.print(sb);
 }
 
@@ -385,23 +396,21 @@ stringbuf& operator <<(stringbuf& sb, const FullyAssociativeTags<T, ways>& tags)
 // - <width> in bits can be from 1 to 64
 //
 
-template <int size, int width, int padsize = 0>
+template<int size, int width, int padsize = 0>
 struct FullyAssociativeTagsNbitOneHot {
   typedef vec16b vec_t;
   typedef W64 base_t;
 
   static const int slices = (width + 7) / 8;
-  static const int chunkcount = (size+15) / 16;
-  static const int padchunkcount = (padsize+15) / 16;
+  static const int chunkcount = (size + 15) / 16;
+  static const int padchunkcount = (padsize + 15) / 16;
 
   vec16b tags[slices][chunkcount + padchunkcount] alignto(16);
   base_t tagsmirror[size]; // for fast scalar access
   bitvec<size> valid;
   bitvec<size> evictmap;
 
-  FullyAssociativeTagsNbitOneHot() {
-    reset();
-  }
+  FullyAssociativeTagsNbitOneHot() { reset(); }
 
   void reset() {
     valid = 0;
@@ -423,7 +432,7 @@ struct FullyAssociativeTagsNbitOneHot {
 
     int idx = (x86_sse_pextrw<0>(sum) + x86_sse_pextrw<4>(sum));
 
-    return idx-1;
+    return idx - 1;
   }
 
   static void prep(vec16b* targetslices, base_t tag) {
@@ -439,13 +448,9 @@ struct FullyAssociativeTagsNbitOneHot {
     return match(targetslices);
   }
 
-  int search(base_t tag) const {
-    return match(tag);
-  }
+  int search(base_t tag) const { return match(tag); }
 
-  int operator()(base_t tag) const {
-    return search(tag);
-  }
+  int operator()(base_t tag) const { return search(tag); }
 
   void update(int index, base_t tag) {
     // Spread it across all the words
@@ -469,16 +474,16 @@ struct FullyAssociativeTagsNbitOneHot {
     ref();
 
   public:
-    inline ref(FullyAssociativeTagsNbitOneHot& tags_, int index_): tags(tags_), index(index_) { }
+    inline ref(FullyAssociativeTagsNbitOneHot& tags_, int index_) : tags(tags_), index(index_) {}
 
-    inline ~ref() { }
+    inline ~ref() {}
 
-    inline ref& operator =(base_t tag) {
+    inline ref& operator=(base_t tag) {
       tags.update(index, tag);
       return *this;
     }
 
-    inline ref& operator =(const ref& other) {
+    inline ref& operator=(const ref& other) {
       tags.update(index, other.tagsmirror[other.index]);
       return *this;
     }
@@ -486,12 +491,10 @@ struct FullyAssociativeTagsNbitOneHot {
 
   friend class ref;
 
-  ref operator [](int index) { return ref(*this, index); }
-  base_t operator [](int index) const { return tagsmirror[index]; }
+  ref operator[](int index) { return ref(*this, index); }
+  base_t operator[](int index) const { return tagsmirror[index]; }
 
-  bool isvalid(int index) {
-    return valid[index];
-  }
+  bool isvalid(int index) { return valid[index]; }
 
   int insertslot(int idx, base_t tag) {
     valid[idx] = 1;
@@ -500,7 +503,8 @@ struct FullyAssociativeTagsNbitOneHot {
   }
 
   int insert(base_t tag) {
-    if (valid.allset()) return -1;
+    if (valid.allset())
+      return -1;
     int idx = (~valid).lsb();
     return insertslot(idx, tag);
   }
@@ -510,13 +514,12 @@ struct FullyAssociativeTagsNbitOneHot {
     (*this)[index] = 0xffffffffffffffffULL; // invalid marker
   }
 
-  void validateslot(int index) {
-    valid[index] = 1;
-  }
+  void validateslot(int index) { valid[index] = 1; }
 
   int invalidate(base_t target) {
     int index = match(target);
-    if (index < 0) return 0;
+    if (index < 0)
+      return 0;
     invalidateslot(index);
     return 1;
   }
@@ -534,7 +537,8 @@ struct FullyAssociativeTagsNbitOneHot {
 
   void masked_invalidate(const bitvec<size>& slotmask) {
     foreach (i, size) {
-      if unlikely (slotmask[i]) invalidateslot(i);
+      if unlikely (slotmask[i])
+        invalidateslot(i);
     }
   }
 
@@ -549,20 +553,20 @@ struct FullyAssociativeTagsNbitOneHot {
 
   int probe(base_t target) {
     int way = match(target);
-    if (way < 0) return way;
+    if (way < 0)
+      return way;
     use(way);
     return way;
   }
 
-  int lru() const {
-    return (evictmap.allset()) ? 0 : (~evictmap).lsb();
-  }
+  int lru() const { return (evictmap.allset()) ? 0 : (~evictmap).lsb(); }
 
   int select(base_t target, base_t& oldtag) {
     int way = probe(target);
     if (way < 0) {
       way = lru();
-      if (evictmap.allset()) evictmap = 0;
+      if (evictmap.allset())
+        evictmap = 0;
       oldtag = tagsmirror[way];
       update(way, target);
     }
@@ -584,7 +588,8 @@ struct FullyAssociativeTagsNbitOneHot {
       const byte b = *(((byte*)(&tags[i])) + slot);
       os << " ", hexstring(b, 8);
     }
-    if (!valid[slot]) os << " <invalid>";
+    if (!valid[slot])
+      os << " <invalid>";
     return os;
   }
 
@@ -597,34 +602,34 @@ struct FullyAssociativeTagsNbitOneHot {
   }
 };
 
-template <int size, int width, int padsize>
-ostream& operator <<(ostream& os, const FullyAssociativeTagsNbitOneHot<size, width, padsize>& tags) {
+template<int size, int width, int padsize>
+ostream& operator<<(ostream& os, const FullyAssociativeTagsNbitOneHot<size, width, padsize>& tags) {
   return tags.print(os);
 }
 
-template <typename T, typename V>
+template<typename T, typename V>
 struct NullAssociativeArrayStatisticsCollector {
-  static void inserted(V& elem, T newtag, int way) { }
-  static void replaced(V& elem, T oldtag, T newtag, int way) { }
-  static void probed(V& elem, T tag, int way, bool hit) { }
-  static void overflow(T tag) { }
-  static void locked(V& slot, T tag, int way) { }
-  static void unlocked(V& slot, T tag, int way) { }
-  static void invalidated(V& elem, T oldtag, int way) { }
+  static void inserted(V& elem, T newtag, int way) {}
+  static void replaced(V& elem, T oldtag, T newtag, int way) {}
+  static void probed(V& elem, T tag, int way, bool hit) {}
+  static void overflow(T tag) {}
+  static void locked(V& slot, T tag, int way) {}
+  static void unlocked(V& slot, T tag, int way) {}
+  static void invalidated(V& elem, T oldtag, int way) {}
 };
 
-template <typename T, typename V, int ways, typename stats = NullAssociativeArrayStatisticsCollector<T, V> >
+template<typename T, typename V, int ways, typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
 struct FullyAssociativeArray {
   FullyAssociativeTags<T, ways> tags;
   V data[ways];
 
-  FullyAssociativeArray() {
-    reset();
-  }
+  FullyAssociativeArray() { reset(); }
 
   void reset() {
     tags.reset();
-    foreach (i, ways) { data[i].reset(); }
+    foreach (i, ways) {
+      data[i].reset();
+    }
   }
 
   V* probe(T tag) {
@@ -643,7 +648,8 @@ struct FullyAssociativeArray {
     } else {
       if (oldtag == tags.INVALID)
         stats::inserted(slot, tag, way);
-      else stats::replaced(slot, oldtag, tag, way);
+      else
+        stats::replaced(slot, oldtag, tag, way);
     }
 
     return &slot;
@@ -673,20 +679,19 @@ struct FullyAssociativeArray {
     data[way].reset();
   }
 
-  void invalidate_line(V* line) {
-    invalidate_way(wayof(line));
-  }
+  void invalidate_line(V* line) { invalidate_way(wayof(line)); }
 
   int invalidate(T tag) {
     int way = tags.probe(tag);
-    if (way < 0) return -1;
+    if (way < 0)
+      return -1;
     invalidate_way(way);
     return way;
   }
 
-  V& operator [](int way) { return data[way]; }
+  V& operator[](int way) { return data[way]; }
 
-  V* operator ()(T tag) { return select(tag); }
+  V* operator()(T tag) { return select(tag); }
 
   ostream& print(ostream& os) const {
     foreach (i, ways) {
@@ -700,19 +705,18 @@ struct FullyAssociativeArray {
   }
 };
 
-template <typename T, typename V, int ways>
-ostream& operator <<(ostream& os, const FullyAssociativeArray<T, V, ways>& assoc) {
+template<typename T, typename V, int ways>
+ostream& operator<<(ostream& os, const FullyAssociativeArray<T, V, ways>& assoc) {
   return assoc.print(os);
 }
 
-template <typename T, typename V, int setcount, int waycount, int linesize, typename stats = NullAssociativeArrayStatisticsCollector<T, V> >
+template<typename T, typename V, int setcount, int waycount, int linesize,
+         typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
 struct AssociativeArray {
   typedef FullyAssociativeArray<T, V, waycount, stats> Set;
   Set sets[setcount];
 
-  AssociativeArray() {
-    reset();
-  }
+  AssociativeArray() { reset(); }
 
   void reset() {
     foreach (set, setcount) {
@@ -720,30 +724,20 @@ struct AssociativeArray {
     }
   }
 
-  static int setof(T addr) {
-    return bits(addr, log2(linesize), log2(setcount));
-  }
+  static int setof(T addr) { return bits(addr, log2(linesize), log2(setcount)); }
 
-  static T tagof(T addr) {
-    return floor(addr, linesize);
-  }
+  static T tagof(T addr) { return floor(addr, linesize); }
 
-  V* probe(T addr) {
-    return sets[setof(addr)].probe(tagof(addr));
-  }
+  V* probe(T addr) { return sets[setof(addr)].probe(tagof(addr)); }
 
-  V* select(T addr, T& oldaddr) {
-    return sets[setof(addr)].select(tagof(addr), oldaddr);
-  }
+  V* select(T addr, T& oldaddr) { return sets[setof(addr)].select(tagof(addr), oldaddr); }
 
   V* select(T addr) {
     T dummy;
     return sets[setof(addr)].select(tagof(addr), dummy);
   }
 
-  void invalidate(T addr) {
-    sets[setof(addr)].invalidate(tagof(addr));
-  }
+  void invalidate(T addr) { sets[setof(addr)].invalidate(tagof(addr)); }
 
   ostream& print(ostream& os) const {
     os << "AssociativeArray<", setcount, " sets, ", waycount, " ways, ", linesize, "-byte lines>:", endl;
@@ -755,8 +749,8 @@ struct AssociativeArray {
   }
 };
 
-template <typename T, typename V, int size, int ways, int linesize>
-ostream& operator <<(ostream& os, const AssociativeArray<T, V, size, ways, linesize>& aa) {
+template<typename T, typename V, int size, int ways, int linesize>
+ostream& operator<<(ostream& os, const AssociativeArray<T, V, size, ways, linesize>& aa) {
   return aa.print(os);
 }
 
@@ -764,7 +758,7 @@ ostream& operator <<(ostream& os, const AssociativeArray<T, V, size, ways, lines
 // Lockable version of associative arrays:
 //
 
-template <typename T, int ways>
+template<typename T, int ways>
 struct LockableFullyAssociativeTags {
   bitvec<ways> evictmap;
   bitvec<ways> unlockedmap;
@@ -772,9 +766,7 @@ struct LockableFullyAssociativeTags {
 
   static const T INVALID = InvalidTag<T>::INVALID;
 
-  LockableFullyAssociativeTags() {
-    reset();
-  }
+  LockableFullyAssociativeTags() { reset(); }
 
   void reset() {
     evictmap = 0;
@@ -807,14 +799,16 @@ struct LockableFullyAssociativeTags {
 
   int probe(T target) {
     int way = match(target);
-    if (way < 0) return -1;
+    if (way < 0)
+      return -1;
 
     use(way);
     return way;
   }
 
   int lru() const {
-    if (!unlockedmap) return -1;
+    if (!unlockedmap)
+      return -1;
     bitvec<ways> w = (~evictmap) & unlockedmap;
     return (*w) ? w.lsb() : 0;
   }
@@ -823,8 +817,10 @@ struct LockableFullyAssociativeTags {
     int way = probe(target);
     if (way < 0) {
       way = lru();
-      if (way < 0) return -1;
-      if (evictmap.allset()) evictmap = 0;
+      if (way < 0)
+        return -1;
+      if (evictmap.allset())
+        evictmap = 0;
       oldtag = tags[way];
       tags[way] = target;
     }
@@ -839,7 +835,8 @@ struct LockableFullyAssociativeTags {
 
   int select_and_lock(T tag, bool& firstlock, T& oldtag) {
     int way = select(tag, oldtag);
-    if (way < 0) return way;
+    if (way < 0)
+      return way;
     firstlock = unlockedmap[way];
     lock(way);
     return way;
@@ -850,7 +847,10 @@ struct LockableFullyAssociativeTags {
     return select_and_lock(tag, firstlock, dummy);
   }
 
-  int select_and_lock(T target) { bool dummy; return select_and_lock(target, dummy); }
+  int select_and_lock(T target) {
+    bool dummy;
+    return select_and_lock(target, dummy);
+  }
 
   void invalidate_way(int way) {
     tags[way] = INVALID;
@@ -860,7 +860,8 @@ struct LockableFullyAssociativeTags {
 
   int invalidate(T target) {
     int way = probe(target);
-    if (way < 0) return -1;
+    if (way < 0)
+      return -1;
     invalidate_way(way);
   }
 
@@ -869,17 +870,19 @@ struct LockableFullyAssociativeTags {
   void lock(int way) { unlockedmap[way] = 0; }
   void unlock(int way) { unlockedmap[way] = 1; }
 
-  const T& operator [](int index) const { return tags[index]; }
+  const T& operator[](int index) const { return tags[index]; }
 
-  T& operator [](int index) { return tags[index]; }
-  int operator ()(T target) { return probe(target); }
+  T& operator[](int index) { return tags[index]; }
+  int operator()(T target) { return probe(target); }
 
   stringbuf& printway(stringbuf& os, int i) const {
     os << "  way ", intstring(i, -2), ": ";
     if (tags[i] != INVALID) {
-      os << "tag 0x", hexstring(tags[i], sizeof(T)*8);
-      if (evictmap[i]) os << " (MRU)";
-      if (!unlockedmap[i]) os << " (locked)";
+      os << "tag 0x", hexstring(tags[i], sizeof(T) * 8);
+      if (evictmap[i])
+        os << " (MRU)";
+      if (!unlockedmap[i])
+        os << " (locked)";
     } else {
       os << "<invalid>";
     }
@@ -902,28 +905,28 @@ struct LockableFullyAssociativeTags {
   }
 };
 
-template <typename T, int ways>
-ostream& operator <<(ostream& os, const LockableFullyAssociativeTags<T, ways>& tags) {
+template<typename T, int ways>
+ostream& operator<<(ostream& os, const LockableFullyAssociativeTags<T, ways>& tags) {
   return tags.print(os);
 }
 
-template <typename T, int ways>
-stringbuf& operator <<(stringbuf& sb, const LockableFullyAssociativeTags<T, ways>& tags) {
+template<typename T, int ways>
+stringbuf& operator<<(stringbuf& sb, const LockableFullyAssociativeTags<T, ways>& tags) {
   return tags.print(sb);
 }
 
-template <typename T, typename V, int ways, typename stats = NullAssociativeArrayStatisticsCollector<T, V> >
+template<typename T, typename V, int ways, typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
 struct LockableFullyAssociativeArray {
   LockableFullyAssociativeTags<T, ways> tags;
   V data[ways];
 
-  LockableFullyAssociativeArray() {
-    reset();
-  }
+  LockableFullyAssociativeArray() { reset(); }
 
   void reset() {
     tags.reset();
-    foreach (i, ways) { data[i].reset(); }
+    foreach (i, ways) {
+      data[i].reset();
+    }
   }
 
   V* probe(T tag) {
@@ -947,7 +950,8 @@ struct LockableFullyAssociativeArray {
     } else {
       if (oldtag == tags.INVALID)
         stats::inserted(slot, tag, way);
-      else stats::replaced(slot, oldtag, tag, way);
+      else
+        stats::replaced(slot, oldtag, tag, way);
     }
 
     return &slot;
@@ -973,7 +977,8 @@ struct LockableFullyAssociativeArray {
     } else {
       if (oldtag == tags.INVALID)
         stats::inserted(slot, tag, way);
-      else stats::replaced(slot, oldtag, tag, way);
+      else
+        stats::replaced(slot, oldtag, tag, way);
       stats::locked(slot, tag, way);
     }
 
@@ -985,7 +990,10 @@ struct LockableFullyAssociativeArray {
     return select_and_lock(tag, firstlock, dummy);
   }
 
-  V* select_and_lock(T tag) { bool dummy; return select_and_lock(tag, dummy); }
+  V* select_and_lock(T tag) {
+    bool dummy;
+    return select_and_lock(tag, dummy);
+  }
 
   int wayof(const V* line) const {
     int way = (line - (const V*)&data);
@@ -1007,13 +1015,12 @@ struct LockableFullyAssociativeArray {
     data[way].reset();
   }
 
-  void invalidate_line(V* line) {
-    invalidate_way(wayof(line));
-  }
+  void invalidate_line(V* line) { invalidate_way(wayof(line)); }
 
   int invalidate(T tag) {
     int way = tags.probe(tag);
-    if (way < 0) return -1;
+    if (way < 0)
+      return -1;
     invalidate_way(way);
     return way;
   }
@@ -1023,21 +1030,21 @@ struct LockableFullyAssociativeArray {
     tags.unlock(way);
   }
 
-  void unlock_line(V* line) {
-    unlock_way(wayof(line));
-  }
+  void unlock_line(V* line) { unlock_way(wayof(line)); }
 
   int unlock(T tag) {
     int way = tags.probe(tag);
-    if (way < 0) return 0;
+    if (way < 0)
+      return 0;
     unlock_way(way);
-    if (tags.islocked(way)) stats::unlocked(data[way], tags[way], way);
+    if (tags.islocked(way))
+      stats::unlocked(data[way], tags[way], way);
     return way;
   }
 
-  V& operator [](int way) { return data[way]; }
+  V& operator[](int way) { return data[way]; }
 
-  V* operator ()(T tag) { return select(tag); }
+  V* operator()(T tag) { return select(tag); }
 
   ostream& print(ostream& os) const {
     foreach (i, ways) {
@@ -1051,19 +1058,18 @@ struct LockableFullyAssociativeArray {
   }
 };
 
-template <typename T, typename V, int ways>
-ostream& operator <<(ostream& os, const LockableFullyAssociativeArray<T, V, ways>& assoc) {
+template<typename T, typename V, int ways>
+ostream& operator<<(ostream& os, const LockableFullyAssociativeArray<T, V, ways>& assoc) {
   return assoc.print(os);
 }
 
-template <typename T, typename V, int setcount, int waycount, int linesize, typename stats = NullAssociativeArrayStatisticsCollector<T, V> >
+template<typename T, typename V, int setcount, int waycount, int linesize,
+         typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
 struct LockableAssociativeArray {
   typedef LockableFullyAssociativeArray<T, V, waycount, stats> Set;
   Set sets[setcount];
 
-  LockableAssociativeArray() {
-    reset();
-  }
+  LockableAssociativeArray() { reset(); }
 
   void reset() {
     foreach (set, setcount) {
@@ -1071,30 +1077,20 @@ struct LockableAssociativeArray {
     }
   }
 
-  static int setof(T addr) {
-    return bits(addr, log2(linesize), log2(setcount));
-  }
+  static int setof(T addr) { return bits(addr, log2(linesize), log2(setcount)); }
 
-  static T tagof(T addr) {
-    return floor(addr, linesize);
-  }
+  static T tagof(T addr) { return floor(addr, linesize); }
 
-  V* probe(T addr) {
-    return sets[setof(addr)].probe(tagof(addr));
-  }
+  V* probe(T addr) { return sets[setof(addr)].probe(tagof(addr)); }
 
-  V* select(T addr, T& oldaddr) {
-    return sets[setof(addr)].select(tagof(addr), oldaddr);
-  }
+  V* select(T addr, T& oldaddr) { return sets[setof(addr)].select(tagof(addr), oldaddr); }
 
   V* select(T addr) {
     T dummy;
     return select(addr, dummy);
   }
 
-  void invalidate(T addr) {
-    sets[setof(addr)].invalidate(tagof(addr));
-  }
+  void invalidate(T addr) { sets[setof(addr)].invalidate(tagof(addr)); }
 
   V* select_and_lock(T addr, bool& firstlock, T& oldtag) {
     V* line = sets[setof(addr)].select_and_lock(tagof(addr), firstlock, oldtag);
@@ -1106,7 +1102,10 @@ struct LockableAssociativeArray {
     return select_and_lock(addr, firstlock, dummy);
   }
 
-  V* select_and_lock(T addr) { bool dummy; return select_and_lock(addr, dummy); }
+  V* select_and_lock(T addr) {
+    bool dummy;
+    return select_and_lock(addr, dummy);
+  }
 
   ostream& print(ostream& os) const {
     os << "LockableAssociativeArray<", setcount, " sets, ", waycount, " ways, ", linesize, "-byte lines>:", endl;
@@ -1118,49 +1117,40 @@ struct LockableAssociativeArray {
   }
 };
 
-template <typename T, typename V, int size, int ways, int linesize>
-ostream& operator <<(ostream& os, const LockableAssociativeArray<T, V, size, ways, linesize>& aa) {
+template<typename T, typename V, int size, int ways, int linesize>
+ostream& operator<<(ostream& os, const LockableAssociativeArray<T, V, size, ways, linesize>& aa) {
   return aa.print(os);
 }
 
-template <int size, int padsize = 0>
+template<int size, int padsize = 0>
 struct FullyAssociativeTags8bit {
   typedef vec16b vec_t;
   typedef byte base_t;
 
-  static const int chunkcount = (size+15) / 16;
-  static const int padchunkcount = (padsize+15) / 16;
+  static const int chunkcount = (size + 15) / 16;
+  static const int padchunkcount = (padsize + 15) / 16;
 
   vec_t tags[chunkcount + padchunkcount] alignto(16);
   bitvec<size> valid;
 
   W64 getvalid() { return valid.integer(); }
 
-  FullyAssociativeTags8bit() {
-    reset();
-  }
+  FullyAssociativeTags8bit() { reset(); }
 
-  base_t operator [](int i) const {
-    return ((base_t*)&tags)[i];
-  }
+  base_t operator[](int i) const { return ((base_t*)&tags)[i]; }
 
-  base_t& operator [](int i) {
-    return ((base_t*)&tags)[i];
-  }
+  base_t& operator[](int i) { return ((base_t*)&tags)[i]; }
 
-  bool isvalid(int index) {
-    return valid[index];
-  }
+  bool isvalid(int index) { return valid[index]; }
 
   void reset() {
     valid = 0;
     W64* p = (W64*)&tags;
-    foreach (i, ((chunkcount + padchunkcount)*16)/8) p[i] = 0xffffffffffffffffLL;
+    foreach (i, ((chunkcount + padchunkcount) * 16) / 8)
+      p[i] = 0xffffffffffffffffLL;
   }
 
-  static const vec_t prep(base_t tag) {
-    return x86_sse_dupb(tag);
-  }
+  static const vec_t prep(base_t tag) { return x86_sse_dupb(tag); }
 
   int insertslot(int idx, base_t tag) {
     valid[idx] = 1;
@@ -1169,7 +1159,8 @@ struct FullyAssociativeTags8bit {
   }
 
   int insert(base_t tag) {
-    if (valid.allset()) return -1;
+    if (valid.allset())
+      return -1;
     int idx = (~valid).lsb();
     return insertslot(idx, tag);
   }
@@ -1178,15 +1169,13 @@ struct FullyAssociativeTags8bit {
     bitvec<size> m = 0;
 
     foreach (i, chunkcount) {
-      m = m.accum(i*16, 16, x86_sse_pmovmskb(x86_sse_pcmpeqb(target, tags[i])));
+      m = m.accum(i * 16, 16, x86_sse_pmovmskb(x86_sse_pcmpeqb(target, tags[i])));
     }
 
     return m & valid;
   }
 
-  bitvec<size> match(base_t target) const {
-    return match(prep(target));
-  }
+  bitvec<size> match(base_t target) const { return match(prep(target)); }
 
   bitvec<size> matchany(const vec_t target) const {
     bitvec<size> m = 0;
@@ -1194,53 +1183,43 @@ struct FullyAssociativeTags8bit {
     vec_t zero = prep(0);
 
     foreach (i, chunkcount) {
-      m = m.accum(i*16, 16, x86_sse_pmovmskb(x86_sse_pcmpeqb(x86_sse_pandb(tags[i], target), zero)));
+      m = m.accum(i * 16, 16, x86_sse_pmovmskb(x86_sse_pcmpeqb(x86_sse_pandb(tags[i], target), zero)));
     }
 
     return (~m) & valid;
   }
 
-  bitvec<size> matchany(base_t target) const {
-    return matchany(prep(target));
-  }
+  bitvec<size> matchany(base_t target) const { return matchany(prep(target)); }
 
   int search(const vec_t target) const {
     bitvec<size> bitmap = match(target);
     int idx = bitmap.lsb();
-    if (!bitmap) idx = -1;
+    if (!bitmap)
+      idx = -1;
     return idx;
   }
 
   int extract(const vec_t target) {
     int idx = search(target);
-    if (idx >= 0) valid[idx] = 0;
+    if (idx >= 0)
+      valid[idx] = 0;
     return idx;
   }
 
-  int search(base_t tag) const {
-    return search(prep(tag));
-  }
+  int search(base_t tag) const { return search(prep(tag)); }
 
-  bitvec<size> extract(base_t tag) {
-    return extract(prep(tag));
-  }
+  bitvec<size> extract(base_t tag) { return extract(prep(tag)); }
 
-  void invalidateslot(int index) {
-    valid[index] = 0;
-  }
+  void invalidateslot(int index) { valid[index] = 0; }
 
   const bitvec<size>& invalidatemask(const bitvec<size>& mask) {
     valid &= ~mask;
     return mask;
   }
 
-  bitvec<size> invalidate(const vec_t target) {
-    return invalidatemask(match(target));
-  }
+  bitvec<size> invalidate(const vec_t target) { return invalidatemask(match(target)); }
 
-  bitvec<size> invalidate(base_t target) {
-    return invalidate(prep(target));
-  }
+  bitvec<size> invalidate(base_t target) { return invalidate(prep(target)); }
 
   void collapse(int index) {
     base_t* tagbase = (base_t*)&tags;
@@ -1256,18 +1235,23 @@ struct FullyAssociativeTags8bit {
   }
 
   void decrement(base_t amount = 1) {
-    foreach (i, chunkcount) { tags[i] = x86_sse_psubusb(tags[i], prep(amount)); }
+    foreach (i, chunkcount) {
+      tags[i] = x86_sse_psubusb(tags[i], prep(amount));
+    }
   }
 
   void increment(base_t amount = 1) {
-    foreach (i, chunkcount) { tags[i] = x86_sse_paddusb(tags[i], prep(amount)); }
+    foreach (i, chunkcount) {
+      tags[i] = x86_sse_paddusb(tags[i], prep(amount));
+    }
   }
 
   ostream& printid(ostream& os, int slot) const {
     int tag = (*this)[slot];
     if (valid[slot])
       os << intstring(tag, 3);
-    else os << "???";
+    else
+      os << "???";
     return os;
   }
 
@@ -1280,49 +1264,40 @@ struct FullyAssociativeTags8bit {
   }
 };
 
-template <int size, int padsize>
-ostream& operator <<(ostream& os, const FullyAssociativeTags8bit<size, padsize>& tags) {
+template<int size, int padsize>
+ostream& operator<<(ostream& os, const FullyAssociativeTags8bit<size, padsize>& tags) {
   return tags.print(os);
 }
 
-template <int size, int padsize = 0>
+template<int size, int padsize = 0>
 struct FullyAssociativeTags16bit {
   typedef vec8w vec_t;
   typedef W16 base_t;
 
-  static const int chunkcount = ((size*2)+15) / 16;
-  static const int padchunkcount = ((padsize*2)+15) / 16;
+  static const int chunkcount = ((size * 2) + 15) / 16;
+  static const int padchunkcount = ((padsize * 2) + 15) / 16;
 
   vec_t tags[chunkcount + padchunkcount] alignto(16);
   bitvec<size> valid;
 
   W64 getvalid() { return valid.integer(); }
 
-  FullyAssociativeTags16bit() {
-    reset();
-  }
+  FullyAssociativeTags16bit() { reset(); }
 
-  base_t operator [](int i) const {
-    return ((base_t*)&tags)[i];
-  }
+  base_t operator[](int i) const { return ((base_t*)&tags)[i]; }
 
-  base_t& operator [](int i) {
-    return ((base_t*)&tags)[i];
-  }
+  base_t& operator[](int i) { return ((base_t*)&tags)[i]; }
 
-  bool isvalid(int index) {
-    return valid[index];
-  }
+  bool isvalid(int index) { return valid[index]; }
 
   void reset() {
     valid = 0;
     W64* p = (W64*)&tags;
-    foreach (i, ((chunkcount + padchunkcount)*16)/8) p[i] = 0xffffffffffffffffLL;
+    foreach (i, ((chunkcount + padchunkcount) * 16) / 8)
+      p[i] = 0xffffffffffffffffLL;
   }
 
-  static const vec_t prep(base_t tag) {
-    return x86_sse_dupw(tag);
-  }
+  static const vec_t prep(base_t tag) { return x86_sse_dupw(tag); }
 
   int insertslot(int idx, base_t tag) {
     valid[idx] = 1;
@@ -1331,7 +1306,8 @@ struct FullyAssociativeTags16bit {
   }
 
   int insert(base_t tag) {
-    if (valid.allset()) return -1;
+    if (valid.allset())
+      return -1;
     int idx = (~valid).lsb();
     return insertslot(idx, tag);
   }
@@ -1340,15 +1316,13 @@ struct FullyAssociativeTags16bit {
     bitvec<size> m = 0;
 
     foreach (i, chunkcount) {
-      m = m.accum(i*8, 8, x86_sse_pmovmskw(x86_sse_pcmpeqw(target, tags[i])));
+      m = m.accum(i * 8, 8, x86_sse_pmovmskw(x86_sse_pcmpeqw(target, tags[i])));
     }
 
     return m & valid;
   }
 
-  bitvec<size> match(base_t target) const {
-    return match(prep(target));
-  }
+  bitvec<size> match(base_t target) const { return match(prep(target)); }
 
   bitvec<size> matchany(const vec_t target) const {
     bitvec<size> m = 0;
@@ -1356,53 +1330,43 @@ struct FullyAssociativeTags16bit {
     vec_t zero = prep(0);
 
     foreach (i, chunkcount) {
-      m = m.accum(i*8, 8, x86_sse_pmovmskw(x86_sse_pcmpeqw(x86_sse_pandw(tags[i], target), zero)));
+      m = m.accum(i * 8, 8, x86_sse_pmovmskw(x86_sse_pcmpeqw(x86_sse_pandw(tags[i], target), zero)));
     }
 
     return (~m) & valid;
   }
 
-  bitvec<size> matchany(base_t target) const {
-    return matchany(prep(target));
-  }
+  bitvec<size> matchany(base_t target) const { return matchany(prep(target)); }
 
   int search(const vec_t target) const {
     bitvec<size> bitmap = match(target);
     int idx = bitmap.lsb();
-    if (!bitmap) idx = -1;
+    if (!bitmap)
+      idx = -1;
     return idx;
   }
 
   int extract(const vec_t target) {
     int idx = search(target);
-    if (idx >= 0) valid[idx] = 0;
+    if (idx >= 0)
+      valid[idx] = 0;
     return idx;
   }
 
-  int search(base_t tag) const {
-    return search(prep(tag));
-  }
+  int search(base_t tag) const { return search(prep(tag)); }
 
-  bitvec<size> extract(base_t tag) {
-    return extract(prep(tag));
-  }
+  bitvec<size> extract(base_t tag) { return extract(prep(tag)); }
 
-  void invalidateslot(int index) {
-    valid[index] = 0;
-  }
+  void invalidateslot(int index) { valid[index] = 0; }
 
   const bitvec<size>& invalidatemask(const bitvec<size>& mask) {
     valid &= ~mask;
     return mask;
   }
 
-  bitvec<size> invalidate(const vec_t target) {
-    return invalidatemask(match(target));
-  }
+  bitvec<size> invalidate(const vec_t target) { return invalidatemask(match(target)); }
 
-  bitvec<size> invalidate(base_t target) {
-    return invalidate(prep(target));
-  }
+  bitvec<size> invalidate(base_t target) { return invalidate(prep(target)); }
 
   void collapse(int index) {
     base_t* tagbase = (base_t*)&tags;
@@ -1418,18 +1382,23 @@ struct FullyAssociativeTags16bit {
   }
 
   void decrement(base_t amount = 1) {
-    foreach (i, chunkcount) { tags[i] = x86_sse_psubusw(tags[i], prep(amount)); }
+    foreach (i, chunkcount) {
+      tags[i] = x86_sse_psubusw(tags[i], prep(amount));
+    }
   }
 
   void increment(base_t amount = 1) {
-    foreach (i, chunkcount) { tags[i] = x86_sse_paddusw(tags[i], prep(amount)); }
+    foreach (i, chunkcount) {
+      tags[i] = x86_sse_paddusw(tags[i], prep(amount));
+    }
   }
 
   ostream& printid(ostream& os, int slot) const {
     int tag = (*this)[slot];
     if (valid[slot])
       os << intstring(tag, 3);
-    else os << "???";
+    else
+      os << "???";
     return os;
   }
 
@@ -1442,8 +1411,8 @@ struct FullyAssociativeTags16bit {
   }
 };
 
-template <int size, int padsize>
-ostream& operator <<(ostream& os, const FullyAssociativeTags16bit<size, padsize>& tags) {
+template<int size, int padsize>
+ostream& operator<<(ostream& os, const FullyAssociativeTags16bit<size, padsize>& tags) {
   return tags.print(os);
 }
 

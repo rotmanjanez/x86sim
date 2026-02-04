@@ -25,9 +25,9 @@
 // Each chunk covers 2 GB of virtual address space:
 #define SPAT_TOPLEVEL_CHUNK_BITS 17
 #define SPAT_PAGES_PER_CHUNK_BITS 19
-#define SPAT_TOPLEVEL_CHUNKS (1 << SPAT_TOPLEVEL_CHUNK_BITS) // 262144
+#define SPAT_TOPLEVEL_CHUNKS (1 << SPAT_TOPLEVEL_CHUNK_BITS)  // 262144
 #define SPAT_PAGES_PER_CHUNK (1 << SPAT_PAGES_PER_CHUNK_BITS) // 524288
-#define SPAT_BYTES_PER_CHUNK (SPAT_PAGES_PER_CHUNK / 8)    // 65536
+#define SPAT_BYTES_PER_CHUNK (SPAT_PAGES_PER_CHUNK / 8)       // 65536
 #define ADDRESS_SPACE_BITS (48)
 #define ADDRESS_SPACE_SIZE (1LL << ADDRESS_SPACE_BITS)
 
@@ -42,9 +42,10 @@
 
 class AddressSpace {
 public:
-  AddressSpace()  { }
-  ~AddressSpace()  { }
+  AddressSpace() {}
+  ~AddressSpace() {}
   void reset();
+
 public:
   Hashtable<Waddr, W8*> mapped_mem;
 
@@ -74,7 +75,8 @@ public:
 
   void* page_virt_to_mapped(Waddr addr) {
     W8** res = mapped_mem.get(floor(addr, PAGE_SIZE));
-    if (!res) return res;
+    if (!res)
+      return res;
     return (W8*)*res + lowbits(addr, 12);
   }
 
@@ -135,7 +137,8 @@ public:
 #ifdef __x86_64__
     // Is it outside of userspace address range?
     // Check disabled to allow access to VDSO in kernel space.
-    if unlikely (addr >> 48) return 0;
+    if unlikely (addr >> 48)
+      return 0;
 
     W64 chunkid = pageid(addr) >> log2(SPAT_PAGES_PER_CHUNK);
 
@@ -150,9 +153,7 @@ public:
 #endif
   }
 
-  bool fastcheck(void* addr, spat_t top) const {
-    return fastcheck((Waddr)addr, top);
-  }
+  bool fastcheck(void* addr, spat_t top) const { return fastcheck((Waddr)addr, top); }
 
   bool check(void* p, int prot) const {
     if unlikely ((prot & PROT_READ) && (!fastcheck(p, readmap)))

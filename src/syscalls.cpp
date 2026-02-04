@@ -13,14 +13,15 @@
 
 #ifdef __x86_64__
 
-declare_syscall6(__NR_mmap, void*, sys_mmap, void *, start, size_t, length, int, prot, int, flags, int, fd, W64, offset);
+declare_syscall6(__NR_mmap, void*, sys_mmap, void*, start, size_t, length, int, prot, int, flags, int, fd, W64, offset);
 declare_syscall4(__NR_ptrace, W64, sys_ptrace, int, request, pid_t, pid, W64, addr, W64, data);
 declare_syscall3(__NR_lseek, W64, sys_seek, int, fd, W64, offset, unsigned int, origin);
 declare_syscall2(__NR_arch_prctl, W64, sys_arch_prctl, int, code, void*, addr);
 
 #else
 
-declare_syscall6(__NR_mmap2, void*, sys_mmap2, void *, start, size_t, length, int, prot, int, flags, int, fd, off_t, pgoffset);
+declare_syscall6(__NR_mmap2, void*, sys_mmap2, void*, start, size_t, length, int, prot, int, flags, int, fd, off_t,
+                 pgoffset);
 
 void* sys_mmap(void* start, size_t length, int prot, int flags, int fd, W64 offset) {
   return sys_mmap2(start, length, prot, flags, fd, offset >> 12);
@@ -28,7 +29,8 @@ void* sys_mmap(void* start, size_t length, int prot, int flags, int fd, W64 offs
 
 declare_syscall4(__NR_ptrace, W32, sys_ptrace, int, request, pid_t, pid, W32, addr, W32, data);
 
-declare_syscall5(__NR__llseek, int, sys_llseek, unsigned int, fd, unsigned long, hi, unsigned long, lo, loff_t*, res, unsigned int, whence);
+declare_syscall5(__NR__llseek, int, sys_llseek, unsigned int, fd, unsigned long, hi, unsigned long, lo, loff_t*, res,
+                 unsigned int, whence);
 
 W64 sys_seek(int fd, W64 offset, unsigned int origin) {
   loff_t newoffs;
@@ -41,8 +43,9 @@ declare_syscall1(__NR_set_thread_area, int, sys_set_thread_area, struct user_des
 
 #endif
 
-declare_syscall2(__NR_munmap, int, sys_munmap, void *, start, size_t, length);
-declare_syscall4(__NR_mremap, void*, sys_mremap, void*, old_address, size_t, old_size, size_t, new_size, unsigned long, flags);
+declare_syscall2(__NR_munmap, int, sys_munmap, void*, start, size_t, length);
+declare_syscall4(__NR_mremap, void*, sys_mremap, void*, old_address, size_t, old_size, size_t, new_size, unsigned long,
+                 flags);
 declare_syscall3(__NR_mprotect, int, sys_mprotect, void*, addr, size_t, len, int, prot);
 declare_syscall3(__NR_madvise, int, sys_madvise, void*, addr, size_t, len, int, action);
 declare_syscall2(__NR_mlock, int, sys_mlock, const void*, addr, size_t, len);
@@ -68,7 +71,8 @@ declare_syscall0(__NR_gettid, pid_t, sys_gettid);
 declare_syscall1(__NR_uname, int, sys_uname, struct utsname*, buf);
 declare_syscall3(__NR_readlink, int, sys_readlink, const char*, path, char*, buf, size_t, bufsiz);
 
-declare_syscall4(__NR_rt_sigaction, long, sys_rt_sigaction, int, sig, const struct kernel_sigaction*, act, struct kernel_sigaction*, oldact, size_t, sigsetsize);
+declare_syscall4(__NR_rt_sigaction, long, sys_rt_sigaction, int, sig, const struct kernel_sigaction*, act,
+                 struct kernel_sigaction*, oldact, size_t, sigsetsize);
 
 declare_syscall4(__NR_wait4, pid_t, sys_wait4, pid_t, pid, int*, status, int, options, struct rusage*, rusage);
 
@@ -90,4 +94,3 @@ W64 sys_nanosleep(W64 nsec) {
 
   return ((W64)rem.tv_sec * 1000000000ULL) + (W64)rem.tv_nsec;
 }
-

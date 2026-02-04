@@ -14,17 +14,11 @@
 BasicBlockCache bbcache;
 
 struct BasicBlockChunkListHashtableLinkManager {
-  static inline BasicBlockChunkList* objof(selflistlink* link) {
-    return baseof(BasicBlockChunkList, hashlink, link);
-  }
+  static inline BasicBlockChunkList* objof(selflistlink* link) { return baseof(BasicBlockChunkList, hashlink, link); }
 
-  static inline W64& keyof(BasicBlockChunkList* obj) {
-    return obj->mfn;
-  }
+  static inline W64& keyof(BasicBlockChunkList* obj) { return obj->mfn; }
 
-  static inline selflistlink* linkof(BasicBlockChunkList* obj) {
-    return &obj->hashlink;
-  }
+  static inline selflistlink* linkof(BasicBlockChunkList* obj) { return &obj->hashlink; }
 };
 
 typedef SelfHashtable<W64, BasicBlockChunkList, 16384, BasicBlockChunkListHashtableLinkManager> BasicBlockPageCache;
@@ -42,73 +36,73 @@ odstream bbcache_dump_file;
 //
 
 const assist_func_t assistid_to_func[ASSIST_COUNT] = {
-  // Forced assists based on decode context
-  assist_invalid_opcode,
-  assist_exec_page_fault,
-  assist_gp_fault,
-  // Integer arithmetic
-  assist_div<byte>,
-  assist_div<W16>,
-  assist_div<W32>,
-  assist_div<W64>,
-  assist_idiv<byte>,
-  assist_idiv<W16>,
-  assist_idiv<W32>,
-  assist_idiv<W64>,
-  // x87
-  assist_x87_fist,
-  assist_x87_fldcw,
-  assist_x87_fprem,
-  assist_x87_fyl2xp1,
-  assist_x87_fsqrt,
-  assist_x87_fsincos,
-  assist_x87_frndint,
-  assist_x87_fscale,
-  assist_x87_fsin,
-  assist_x87_fcos,
-  assist_x87_fxam,
-  assist_x87_f2xm1,
-  assist_x87_fyl2x,
-  assist_x87_fptan,
-  assist_x87_fpatan,
-  assist_x87_fxtract,
-  assist_x87_fprem1,
-  assist_x87_fld80,
-  assist_x87_fstp80,
-  assist_x87_fsave,
-  assist_x87_frstor,
-  assist_x87_finit,
-  assist_x87_fclex,
-  // SSE save/restore
-  assist_ldmxcsr,
-  assist_fxsave,
-  assist_fxrstor,
-  // Interrupts, system calls, etc.
-  assist_int,
-  assist_syscall,
-  assist_hypercall,
-  assist_ptlcall,
-  assist_sysenter,
-  assist_iret16,
-  assist_iret32,
-  assist_iret64,
-  // Control register updates
-  assist_cpuid,
-  assist_rdtsc,
-  assist_cld,
-  assist_std,
-  assist_popf,
-  assist_write_segreg,
-  assist_wrmsr,
-  assist_rdmsr,
-  assist_write_cr0,
-  assist_write_cr2,
-  assist_write_cr3,
-  assist_write_cr4,
-  assist_write_debug_reg,
-  // I/O and legacy
-  assist_ioport_in,
-  assist_ioport_out,
+    // Forced assists based on decode context
+    assist_invalid_opcode,
+    assist_exec_page_fault,
+    assist_gp_fault,
+    // Integer arithmetic
+    assist_div<byte>,
+    assist_div<W16>,
+    assist_div<W32>,
+    assist_div<W64>,
+    assist_idiv<byte>,
+    assist_idiv<W16>,
+    assist_idiv<W32>,
+    assist_idiv<W64>,
+    // x87
+    assist_x87_fist,
+    assist_x87_fldcw,
+    assist_x87_fprem,
+    assist_x87_fyl2xp1,
+    assist_x87_fsqrt,
+    assist_x87_fsincos,
+    assist_x87_frndint,
+    assist_x87_fscale,
+    assist_x87_fsin,
+    assist_x87_fcos,
+    assist_x87_fxam,
+    assist_x87_f2xm1,
+    assist_x87_fyl2x,
+    assist_x87_fptan,
+    assist_x87_fpatan,
+    assist_x87_fxtract,
+    assist_x87_fprem1,
+    assist_x87_fld80,
+    assist_x87_fstp80,
+    assist_x87_fsave,
+    assist_x87_frstor,
+    assist_x87_finit,
+    assist_x87_fclex,
+    // SSE save/restore
+    assist_ldmxcsr,
+    assist_fxsave,
+    assist_fxrstor,
+    // Interrupts, system calls, etc.
+    assist_int,
+    assist_syscall,
+    assist_hypercall,
+    assist_ptlcall,
+    assist_sysenter,
+    assist_iret16,
+    assist_iret32,
+    assist_iret64,
+    // Control register updates
+    assist_cpuid,
+    assist_rdtsc,
+    assist_cld,
+    assist_std,
+    assist_popf,
+    assist_write_segreg,
+    assist_wrmsr,
+    assist_rdmsr,
+    assist_write_cr0,
+    assist_write_cr2,
+    assist_write_cr3,
+    assist_write_cr4,
+    assist_write_debug_reg,
+    // I/O and legacy
+    assist_ioport_in,
+    assist_ioport_out,
 };
 
 int assist_index(assist_func_t assist) {
@@ -133,7 +127,7 @@ const char* assist_name(assist_func_t assist) {
 
 void update_assist_stats(assist_func_t assist) {
   int idx = assist_index(assist);
-  assert(inrange(idx, 0, ASSIST_COUNT-1));
+  assert(inrange(idx, 0, ASSIST_COUNT - 1));
   stats.external.assists[idx]++;
 }
 
@@ -143,7 +137,7 @@ void split_unaligned(const TransOp& transop, TransOpBuffer& buf) {
   bool ld = isload(transop.opcode);
   bool st = isstore(transop.opcode);
 
-  assert(ld|st);
+  assert(ld | st);
 
   buf.reset();
 
@@ -202,6 +196,7 @@ void split_unaligned(const TransOp& transop, TransOpBuffer& buf) {
   }
 }
 
+// clang-format off
 static const W16 prefix_map_x86_64[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -309,6 +304,9 @@ const byte arch_pseudo_reg_to_arch_reg[APR_COUNT] = {
   // special:
   REG_rip, REG_zero
 };
+
+// For specifying easy to read arrays
+#define _ (0)
 
 static const byte onebyte_has_modrm[256] = {
   /*       0 1 2 3 4 5 6 7 8 9 a b c d e f        */
@@ -423,9 +421,10 @@ static const byte insn_is_simple[512] = {
   /*       -------------------------------        */
   /*       0 1 2 3 4 5 6 7 8 9 a b c d e f        */
 };
+// clang-format on
 #undef _
 
-static int transop_histogram[MAX_TRANSOPS_PER_USER_INSN+1];
+static int transop_histogram[MAX_TRANSOPS_PER_USER_INSN + 1];
 
 void TraceDecoder::reset() {
   byteoffset = 0;
@@ -455,7 +454,7 @@ void TraceDecoder::reset() {
   join_with_prev_insn = 0;
   outcome = DECODE_OUTCOME_OK;
   stop_at_rip = limits<W64>::max;
-  stop_at_user_insns =limits<W64>::max;
+  stop_at_user_insns = limits<W64>::max;
 }
 
 TraceDecoder::TraceDecoder(const RIPVirtPhys& rvp) {
@@ -526,12 +525,12 @@ bool TraceDecoder::flush() {
   // We reserve 2 uops for the splitting branch
   // and a possible collcc if needed.
   //
-  bool overflow = (transbufcount >= ((MAX_BB_UOPS-2) - bb.count));
+  bool overflow = (transbufcount >= ((MAX_BB_UOPS - 2) - bb.count));
 
   if unlikely (overflow) {
     if (logable(5)) {
       logfile << "Basic block overflowed (too many uops) during decode of ", bb.rip, " (ripstart ", (void*)ripstart,
-        "): req ", transbufcount, " uops but only have ", ((MAX_BB_UOPS-2) - bb.count), " free", endl;
+          "): req ", transbufcount, " uops but only have ", ((MAX_BB_UOPS - 2) - bb.count), " free", endl;
     }
     assert(!first_insn_in_bb());
     transbufcount = 0;
@@ -544,7 +543,7 @@ bool TraceDecoder::flush() {
     // Reopen the previous instruction
     //
     assert(bb.count > 0);
-    int i = bb.count-1;
+    int i = bb.count - 1;
     while (i >= 0) {
       TransOp& prevop = bb.transops[i];
       prevop.eom = 0;
@@ -562,7 +561,7 @@ bool TraceDecoder::flush() {
   assert(bytes <= 15);
 
   TransOp& first = transbuf[0];
-  TransOp& last = transbuf[transbufcount-1];
+  TransOp& last = transbuf[transbufcount - 1];
   first.som = (!join_with_prev_insn);
   last.eom = 1;
 
@@ -575,14 +574,18 @@ bool TraceDecoder::flush() {
   byte flag_sets_set = 0;
   foreach (i, transbufcount) {
     TransOp& transop = transbuf[i];
-    if likely (transop.rd < ARCHREG_COUNT) { final_archreg_writer[transop.rd] = i; }
+    if likely (transop.rd < ARCHREG_COUNT) {
+      final_archreg_writer[transop.rd] = i;
+    }
     bool sets_all_flags = ((transop.setflags == 7) && (!transop.nouserflags));
-    if unlikely (sets_all_flags) final_flags_writer = i;
-    if likely (!transop.nouserflags) flag_sets_set |= transop.setflags;
+    if unlikely (sets_all_flags)
+      final_flags_writer = i;
+    if likely (!transop.nouserflags)
+      flag_sets_set |= transop.setflags;
   }
 
   if unlikely (no_partial_flag_updates_per_insn) {
-    if unlikely ((flag_sets_set != 0) && (flag_sets_set != (SETFLAG_ZF|SETFLAG_CF|SETFLAG_OF))) {
+    if unlikely ((flag_sets_set != 0) && (flag_sets_set != (SETFLAG_ZF | SETFLAG_CF | SETFLAG_OF))) {
       logfile << "Invalid partial flag sets at rip ", (void*)ripstart, " (flag sets ", flag_sets_set, ")", endl;
       assert(false);
     }
@@ -591,7 +594,8 @@ bool TraceDecoder::flush() {
   foreach (i, transbufcount) {
     TransOp& transop = transbuf[i];
     if unlikely (bb.count >= MAX_BB_UOPS) {
-      logfile << "ERROR: Too many transops (", bb.count, ") in basic block ", bb.rip, " (current RIP: ", (void*)ripstart, ") (max ", MAX_BB_UOPS, " allowed)", endl;
+      logfile << "ERROR: Too many transops (", bb.count, ") in basic block ", bb.rip,
+          " (current RIP: ", (void*)ripstart, ") (max ", MAX_BB_UOPS, " allowed)", endl;
       logfile << bb;
       assert(bb.count < MAX_BB_UOPS);
     }
@@ -601,11 +605,21 @@ bool TraceDecoder::flush() {
     bool br = isbranch(transop.opcode);
     if unlikely (br) {
       switch (transop.opcode) {
-      case OP_br: bb.type = BB_TYPE_COND; break;
-      case OP_bru: bb.type = BB_TYPE_UNCOND; break;
-      case OP_jmp: bb.type = BB_TYPE_INDIR; break;
-      case OP_brp: bb.type = BB_TYPE_ASSIST; break;
-      default: assert(false); break;
+      case OP_br:
+        bb.type = BB_TYPE_COND;
+        break;
+      case OP_bru:
+        bb.type = BB_TYPE_UNCOND;
+        break;
+      case OP_jmp:
+        bb.type = BB_TYPE_INDIR;
+        break;
+      case OP_brp:
+        bb.type = BB_TYPE_ASSIST;
+        break;
+      default:
+        assert(false);
+        break;
       }
       bb.call = ((transop.extshift & BRANCH_HINT_PUSH_RAS) != 0);
       bb.ret = ((transop.extshift & BRANCH_HINT_POP_RAS) != 0);
@@ -627,14 +641,20 @@ bool TraceDecoder::flush() {
     bb.sse |= is_sse;
 
     bb.transops[bb.count++] = transop;
-    if (ld|st) bb.memcount++;
-    if (st) bb.storecount++;
+    if (ld | st)
+      bb.memcount++;
+    if (st)
+      bb.storecount++;
     bb.tagcount++;
 
-    if (transop.rd < ARCHREG_COUNT) setbit(bb.usedregs, transop.rd);
-    if (transop.ra < ARCHREG_COUNT) setbit(bb.usedregs, transop.ra);
-    if (transop.rb < ARCHREG_COUNT) setbit(bb.usedregs, transop.rb);
-    if (transop.rc < ARCHREG_COUNT) setbit(bb.usedregs, transop.rc);
+    if (transop.rd < ARCHREG_COUNT)
+      setbit(bb.usedregs, transop.rd);
+    if (transop.ra < ARCHREG_COUNT)
+      setbit(bb.usedregs, transop.ra);
+    if (transop.rb < ARCHREG_COUNT)
+      setbit(bb.usedregs, transop.rb);
+    if (transop.rc < ARCHREG_COUNT)
+      setbit(bb.usedregs, transop.rc);
   }
 
   stats.decoder.throughput.uops += transbufcount;
@@ -654,12 +674,15 @@ bool TraceDecoder::flush() {
 ostream& DecodedOperand::print(ostream& os) const {
   switch (type) {
   case OPTYPE_REG:
-    os << uniform_arch_reg_names[reg.reg]; break;
+    os << uniform_arch_reg_names[reg.reg];
+    break;
   case OPTYPE_IMM:
-    os << hexstring(imm.imm, 64); break;
+    os << hexstring(imm.imm, 64);
+    break;
   case OPTYPE_MEM:
-    os << "mem", (1<<mem.size), " [", uniform_arch_reg_names[mem.basereg], " + ", uniform_arch_reg_names[mem.indexreg], "*", (1 << mem.scale), " + ", hexstring(mem.offset, 64),
-      (mem.riprel) ? " riprel" : "", "]";
+    os << "mem", (1 << mem.size), " [", uniform_arch_reg_names[mem.basereg], " + ",
+        uniform_arch_reg_names[mem.indexreg], "*", (1 << mem.scale), " + ", hexstring(mem.offset, 64),
+        (mem.riprel) ? " riprel" : "", "]";
     break;
   default:
     break;
@@ -672,18 +695,29 @@ bool DecodedOperand::gform_ext(TraceDecoder& state, int bytemode, int regfield, 
 
   this->type = OPTYPE_REG;
   switch (bytemode) {
-  case b_mode: this->reg.reg = (state.rex) ? reg8x_to_uniform_reg[regfield + add] : reg8_to_uniform_reg[regfield]; break;
-  case w_mode: this->reg.reg = reg16_to_uniform_reg[regfield + add]; break;
-  case d_mode: this->reg.reg = reg32_to_uniform_reg[regfield + add]; break;
-  case q_mode: this->reg.reg = reg64_to_uniform_reg[regfield + add]; break;
+  case b_mode:
+    this->reg.reg = (state.rex) ? reg8x_to_uniform_reg[regfield + add] : reg8_to_uniform_reg[regfield];
+    break;
+  case w_mode:
+    this->reg.reg = reg16_to_uniform_reg[regfield + add];
+    break;
+  case d_mode:
+    this->reg.reg = reg32_to_uniform_reg[regfield + add];
+    break;
+  case q_mode:
+    this->reg.reg = reg64_to_uniform_reg[regfield + add];
+    break;
   case v_mode:
   case dq_mode:
-    this->reg.reg = (state.rex.mode64 | (def64 & (!state.opsize_prefix))) ? reg64_to_uniform_reg[regfield + add] :
-      ((!state.opsize_prefix) | (bytemode == dq_mode)) ? reg32_to_uniform_reg[regfield + add] :
-      reg16_to_uniform_reg[regfield + add];
+    this->reg.reg = (state.rex.mode64 | (def64 & (!state.opsize_prefix))) ? reg64_to_uniform_reg[regfield + add]
+                    : ((!state.opsize_prefix) | (bytemode == dq_mode))    ? reg32_to_uniform_reg[regfield + add]
+                                                                          : reg16_to_uniform_reg[regfield + add];
     break;
-  case x_mode: this->reg.reg = xmmreg_to_uniform_reg[regfield + add]; break;
-  default: return false;
+  case x_mode:
+    this->reg.reg = xmmreg_to_uniform_reg[regfield + add];
+    break;
+  default:
+    return false;
   }
 
   return true;
@@ -699,9 +733,11 @@ bool DecodedOperand::iform(TraceDecoder& state, int bytemode) {
 
   switch (bytemode) {
   case b_mode:
-    this->imm.imm = (W8s)state.fetch1(); break;
+    this->imm.imm = (W8s)state.fetch1();
+    break;
   case q_mode:
-    this->imm.imm = (W64s)state.fetch8(); break;
+    this->imm.imm = (W64s)state.fetch8();
+    break;
   case v_mode:
     // NOTE: Even if rex.mode64 is specified, immediates are never longer than 32 bits (except for mov):
     if (state.rex.mode64 | (!state.opsize_prefix)) {
@@ -711,7 +747,8 @@ bool DecodedOperand::iform(TraceDecoder& state, int bytemode) {
     }
     break;
   case w_mode:
-    this->imm.imm = (W16s)state.fetch2(); break;
+    this->imm.imm = (W16s)state.fetch2();
+    break;
   default:
     return false;
   }
@@ -725,9 +762,11 @@ bool DecodedOperand::iform64(TraceDecoder& state, int bytemode) {
 
   switch (bytemode) {
   case b_mode:
-    this->imm.imm = (W8s)state.fetch1(); break;
+    this->imm.imm = (W8s)state.fetch1();
+    break;
   case q_mode:
-    this->imm.imm = (W64s)state.fetch8(); break;
+    this->imm.imm = (W64s)state.fetch8();
+    break;
   case v_mode:
     if (state.rex.mode64) {
       this->imm.imm = (W64s)state.fetch8();
@@ -738,9 +777,11 @@ bool DecodedOperand::iform64(TraceDecoder& state, int bytemode) {
     }
     break;
   case w_mode:
-    this->imm.imm = (W16s)state.fetch2(); break;
+    this->imm.imm = (W16s)state.fetch2();
+    break;
   case d_mode:
-    this->imm.imm = (W32s)state.fetch4(); break;
+    this->imm.imm = (W32s)state.fetch4();
+    break;
   default:
     return false;
   }
@@ -761,35 +802,37 @@ bool DecodedOperand::eform(TraceDecoder& state, int bytemode) {
   mem.size = 0;
 
   const int mod_and_rexextbase_and_rm_to_basereg_x86_64[4][2][8] = {
-    {
-      // mod = 00
-      {APR_rax, APR_rcx, APR_rdx, APR_rbx, -1, APR_rip, APR_rsi, APR_rdi}, // rex.extbase = 0
-      {APR_r8,  APR_r9,  APR_r10, APR_r11, -1, APR_rip, APR_r14, APR_r15}, // rex.extbase = 1
-    }, {
-      // mod = 01
-      {APR_rax, APR_rcx, APR_rdx, APR_rbx, -1, APR_rbp, APR_rsi, APR_rdi}, // rex.extbase = 0
-      {APR_r8,  APR_r9,  APR_r10, APR_r11, -1, APR_r13, APR_r14, APR_r15}, // rex.extbase = 1
-    }, {
-      // mod = 10
-      {APR_rax, APR_rcx, APR_rdx, APR_rbx, -1, APR_rbp, APR_rsi, APR_rdi}, // rex.extbase = 0
-      {APR_r8,  APR_r9,  APR_r10, APR_r11, -1, APR_r13, APR_r14, APR_r15}, // rex.extbase = 1
-    }, {
-      // mod = 11: not possible since this is g-form
-      {-1, -1, -1, -1, -1, -1, -1, -1},
-      {-1, -1, -1, -1, -1, -1, -1, -1},
-    }
-  };
+      {
+          // mod = 00
+          {APR_rax, APR_rcx, APR_rdx, APR_rbx, -1, APR_rip, APR_rsi, APR_rdi}, // rex.extbase = 0
+          {APR_r8, APR_r9, APR_r10, APR_r11, -1, APR_rip, APR_r14, APR_r15},   // rex.extbase = 1
+      },
+      {
+          // mod = 01
+          {APR_rax, APR_rcx, APR_rdx, APR_rbx, -1, APR_rbp, APR_rsi, APR_rdi}, // rex.extbase = 0
+          {APR_r8, APR_r9, APR_r10, APR_r11, -1, APR_r13, APR_r14, APR_r15},   // rex.extbase = 1
+      },
+      {
+          // mod = 10
+          {APR_rax, APR_rcx, APR_rdx, APR_rbx, -1, APR_rbp, APR_rsi, APR_rdi}, // rex.extbase = 0
+          {APR_r8, APR_r9, APR_r10, APR_r11, -1, APR_r13, APR_r14, APR_r15},   // rex.extbase = 1
+      },
+      {
+          // mod = 11: not possible since this is g-form
+          {-1, -1, -1, -1, -1, -1, -1, -1},
+          {-1, -1, -1, -1, -1, -1, -1, -1},
+      }};
 
   const int mod_and_rm_to_basereg_x86[4][8] = {
-    {APR_eax, APR_ecx, APR_edx, APR_ebx, -1, APR_zero, APR_esi, APR_edi},
-    {APR_eax, APR_ecx, APR_edx, APR_ebx, -1, APR_ebp,  APR_esi, APR_edi},
-    {APR_eax, APR_ecx, APR_edx, APR_ebx, -1, APR_ebp, APR_esi, APR_edi},
-    {-1, -1, -1, -1, -1, -1, -1, -1}, // mod = 11: not possible since this is g-form
+      {APR_eax, APR_ecx, APR_edx, APR_ebx, -1, APR_zero, APR_esi, APR_edi},
+      {APR_eax, APR_ecx, APR_edx, APR_ebx, -1, APR_ebp, APR_esi, APR_edi},
+      {APR_eax, APR_ecx, APR_edx, APR_ebx, -1, APR_ebp, APR_esi, APR_edi},
+      {-1, -1, -1, -1, -1, -1, -1, -1}, // mod = 11: not possible since this is g-form
   };
 
   mem.basereg = (state.use64)
-    ? mod_and_rexextbase_and_rm_to_basereg_x86_64[state.modrm.mod][state.rex.extbase][state.modrm.rm]
-    : mod_and_rm_to_basereg_x86[state.modrm.mod][state.modrm.rm];
+                    ? mod_and_rexextbase_and_rm_to_basereg_x86_64[state.modrm.mod][state.rex.extbase][state.modrm.rm]
+                    : mod_and_rm_to_basereg_x86[state.modrm.mod][state.modrm.rm];
 
   SIBByte sib;
   if (state.modrm.rm == 4) {
@@ -797,28 +840,28 @@ bool DecodedOperand::eform(TraceDecoder& state, int bytemode) {
   }
 
   const byte mod_and_rm_to_immsize[4][8] = {
-    {0, 0, 0, 0, 0, 4, 0, 0},
-    {1, 1, 1, 1, 1, 1, 1, 1},
-    {4, 4, 4, 4, 4, 4, 4, 4},
-    {0, 0, 0, 0, 0, 0, 0, 0},
+      {0, 0, 0, 0, 0, 4, 0, 0},
+      {1, 1, 1, 1, 1, 1, 1, 1},
+      {4, 4, 4, 4, 4, 4, 4, 4},
+      {0, 0, 0, 0, 0, 0, 0, 0},
   };
 
   byte immsize = mod_and_rm_to_immsize[state.modrm.mod][state.modrm.rm];
-  mem.offset = (immsize) ? signext32((W32s)state.fetch(immsize), immsize*8) : 0;
+  mem.offset = (immsize) ? signext32((W32s)state.fetch(immsize), immsize * 8) : 0;
   mem.riprel = (mem.basereg == APR_rip);
 
   if (mem.basereg < 0) {
     // Have sib
     const int rexextbase_and_base_to_basereg[2][8] = {
-      {APR_rax, APR_rcx, APR_rdx, APR_rbx, APR_rsp, -1, APR_rsi, APR_rdi}, // rex.extbase = 0
-      {APR_r8,  APR_r9,  APR_r10, APR_r11, APR_r12, -1, APR_r14, APR_r15}, // rex.extbase = 1
+        {APR_rax, APR_rcx, APR_rdx, APR_rbx, APR_rsp, -1, APR_rsi, APR_rdi}, // rex.extbase = 0
+        {APR_r8, APR_r9, APR_r10, APR_r11, APR_r12, -1, APR_r14, APR_r15},   // rex.extbase = 1
     };
 
     mem.basereg = rexextbase_and_base_to_basereg[state.rex.extbase][sib.base];
     if (mem.basereg < 0) {
       const int rexextbase_and_mod_to_basereg[2][4] = {
-        {APR_zero, APR_rbp, APR_rbp, -1}, // rex.extbase = 0
-        {APR_zero, APR_r13, APR_r13, -1}, // rex.extbase = 1
+          {APR_zero, APR_rbp, APR_rbp, -1}, // rex.extbase = 0
+          {APR_zero, APR_r13, APR_r13, -1}, // rex.extbase = 1
       };
 
       mem.basereg = rexextbase_and_mod_to_basereg[state.rex.extbase][state.modrm.mod];
@@ -839,8 +882,8 @@ bool DecodedOperand::eform(TraceDecoder& state, int bytemode) {
     }
 
     const int rexextindex_and_index_to_indexreg[2][8] = {
-      {APR_rax, APR_rcx, APR_rdx, APR_rbx, APR_zero, APR_rbp, APR_rsi, APR_rdi}, // rex.extindex = 0
-      {APR_r8,  APR_r9,  APR_r10, APR_r11, APR_r12,  APR_r13, APR_r14, APR_r15}, // rex.extindex = 1
+        {APR_rax, APR_rcx, APR_rdx, APR_rbx, APR_zero, APR_rbp, APR_rsi, APR_rdi}, // rex.extindex = 0
+        {APR_r8, APR_r9, APR_r10, APR_r11, APR_r12, APR_r13, APR_r14, APR_r15},    // rex.extindex = 1
     };
 
     mem.indexreg = rexextindex_and_index_to_indexreg[state.rex.extindex][sib.index];
@@ -848,14 +891,28 @@ bool DecodedOperand::eform(TraceDecoder& state, int bytemode) {
   }
 
   switch (bytemode) {
-  case b_mode: mem.size = 0; break;
-  case w_mode: mem.size = 1; break;
-  case d_mode: mem.size = 2; break;
-  case q_mode: mem.size = 3; break;
+  case b_mode:
+    mem.size = 0;
+    break;
+  case w_mode:
+    mem.size = 1;
+    break;
+  case d_mode:
+    mem.size = 2;
+    break;
+  case q_mode:
+    mem.size = 3;
+    break;
     // case m_mode: mem.size = (state.use64) ? 3 : 2; break;
-  case v_mode: case dq_mode: mem.size = (state.rex.mode64) ? 3 : ((!state.opsize_prefix) | (bytemode == dq_mode)) ? 2 : 1; break; // See table 1.2 (p35) of AMD64 ISA manual
-  case x_mode: mem.size = 3; break;
-  default: return false;
+  case v_mode:
+  case dq_mode:
+    mem.size = (state.rex.mode64) ? 3 : ((!state.opsize_prefix) | (bytemode == dq_mode)) ? 2 : 1;
+    break; // See table 1.2 (p35) of AMD64 ISA manual
+  case x_mode:
+    mem.size = 3;
+    break;
+  default:
+    return false;
   }
 
   return true;
@@ -871,9 +928,9 @@ bool DecodedOperand::varreg(TraceDecoder& state, int regcode, bool def64) {
     // Always a 64-bit operation
     this->reg.reg = reg64_to_uniform_reg[regcode + (state.rex.extbase * 8)];
   } else {
-    this->reg.reg = (state.rex.mode64) ? reg64_to_uniform_reg[regcode + (state.rex.extbase * 8)] :
-      (state.opsize_prefix) ? reg16_to_uniform_reg[regcode + (state.rex.extbase * 8)]
-      : reg32_to_uniform_reg[regcode + (state.rex.extbase * 8)];
+    this->reg.reg = (state.rex.mode64)      ? reg64_to_uniform_reg[regcode + (state.rex.extbase * 8)]
+                    : (state.opsize_prefix) ? reg16_to_uniform_reg[regcode + (state.rex.extbase * 8)]
+                                            : reg32_to_uniform_reg[regcode + (state.rex.extbase * 8)];
   }
 
   return true;
@@ -889,7 +946,8 @@ bool DecodedOperand::varreg_def32(TraceDecoder& state, int regcode) {
 
 void TraceDecoder::immediate(int rdreg, int sizeshift, W64s imm, bool issigned) {
   int totalbits = (sizeshift == 3) ? 64 : (8 * (1 << sizeshift));
-  if (totalbits < 64) imm = (issigned) ? signext64(imm, totalbits) : bits(imm, 0, totalbits);
+  if (totalbits < 64)
+    imm = (issigned) ? signext64(imm, totalbits) : bits(imm, 0, totalbits);
   // Only byte and word sized immediates need to be merged with the previous value:
   this << TransOp(OP_mov, rdreg, REG_zero, REG_imm, REG_zero, 3, imm);
 }
@@ -899,20 +957,22 @@ void TraceDecoder::abs_code_addr_immediate(int rdreg, int sizeshift, W64 imm) {
 }
 
 int TraceDecoder::bias_by_segreg(int basereg) {
-  if (prefixes & (PFX_CS|PFX_DS|PFX_ES|PFX_FS|PFX_GS|PFX_SS)) {
-    int segid =
-      (prefixes & PFX_FS) ? SEGID_FS :
-      (prefixes & PFX_GS) ? SEGID_GS :
-      (prefixes & PFX_DS) ? SEGID_DS :
-      (prefixes & PFX_SS) ? SEGID_SS :
-      (prefixes & PFX_ES) ? SEGID_ES :
-      (prefixes & PFX_CS) ? SEGID_CS : -1;
+  if (prefixes & (PFX_CS | PFX_DS | PFX_ES | PFX_FS | PFX_GS | PFX_SS)) {
+    int segid = (prefixes & PFX_FS)   ? SEGID_FS
+                : (prefixes & PFX_GS) ? SEGID_GS
+                : (prefixes & PFX_DS) ? SEGID_DS
+                : (prefixes & PFX_SS) ? SEGID_SS
+                : (prefixes & PFX_ES) ? SEGID_ES
+                : (prefixes & PFX_CS) ? SEGID_CS
+                                      : -1;
 
     assert(segid >= 0);
 
     int varoffs = offsetof_(Context, seg[segid].base);
 
-    TransOp ldp(OP_ld, REG_temp6, REG_ctx, REG_imm, REG_zero, 3, varoffs); ldp.internal = 1; this << ldp;
+    TransOp ldp(OP_ld, REG_temp6, REG_ctx, REG_imm, REG_zero, 3, varoffs);
+    ldp.internal = 1;
+    this << ldp;
     this << TransOp(OP_add, REG_temp6, REG_temp6, basereg, REG_zero, 3);
     return REG_temp6;
   }
@@ -920,7 +980,8 @@ int TraceDecoder::bias_by_segreg(int basereg) {
   return basereg;
 }
 
-void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, const DecodedOperand& memref, int opcode, int datatype, int cachelevel, bool force_seg_bias, bool rmw) {
+void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, const DecodedOperand& memref, int opcode,
+                                                      int datatype, int cachelevel, bool force_seg_bias, bool rmw) {
   //
   // In the address generation form used by internally generated
   // uops, we need the full virtual address, including the segment base
@@ -959,9 +1020,8 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
   // microprocessors do not have unlimited immediate lengths.
   //
 
-  bool imm_is_not_encodable =
-    (lowbits(memref.mem.offset, memref.mem.size) != 0) |
-    (!fits_in_signed_nbit(memref.mem.offset >> memref.mem.size, imm_bits));
+  bool imm_is_not_encodable = (lowbits(memref.mem.offset, memref.mem.size) != 0) |
+                              (!fits_in_signed_nbit(memref.mem.offset >> memref.mem.size, imm_bits));
 
   if unlikely (opcode == OP_add) {
     // LEA and the like are always encodable since it's just an ADD uop:
@@ -976,7 +1036,8 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
     // [rip + imm32]: index always is zero and scale is 1
     // This mode is only possible in x86-64 code
     basereg = REG_zero;
-    if (force_seg_bias) basereg = bias_by_segreg(basereg);
+    if (force_seg_bias)
+      basereg = bias_by_segreg(basereg);
 
     if (memop) {
       abs_code_addr_immediate(REG_temp8, 3, Waddr(rip) + offset);
@@ -992,7 +1053,8 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
     }
   } else if (indexreg == REG_zero) {
     // [ra + imm32] or [ra]
-    if (force_seg_bias) basereg = bias_by_segreg(basereg);
+    if (force_seg_bias)
+      basereg = bias_by_segreg(basereg);
     if (imm_is_not_encodable) {
       this << TransOp(OP_add, REG_temp8, basereg, REG_imm, REG_zero, 3, offset);
       basereg = REG_temp8;
@@ -1009,7 +1071,8 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
     this << ldst;
   } else if (offset == 0) {
     // [ra + rb*scale] or [rb*scale]
-    if (force_seg_bias) basereg = bias_by_segreg(basereg);
+    if (force_seg_bias)
+      basereg = bias_by_segreg(basereg);
 
     int tempreg = (memop) ? REG_temp8 : destreg;
 
@@ -1032,7 +1095,8 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
     this << ldst;
   } else {
     // [ra + imm32 + rb*scale]
-    if (force_seg_bias) basereg = bias_by_segreg(basereg);
+    if (force_seg_bias)
+      basereg = bias_by_segreg(basereg);
 
     if (imm_is_not_encodable) {
       this << TransOp(OP_add, REG_temp8, basereg, REG_imm, REG_zero, 3, offset);
@@ -1054,17 +1118,21 @@ void TraceDecoder::address_generate_and_load_or_store(int destreg, int srcreg, c
   }
 }
 
-void TraceDecoder::operand_load(int destreg, const DecodedOperand& memref, int opcode, int datatype, int cachelevel, bool rmw) {
+void TraceDecoder::operand_load(int destreg, const DecodedOperand& memref, int opcode, int datatype, int cachelevel,
+                                bool rmw) {
   address_generate_and_load_or_store(destreg, REG_zero, memref, opcode, datatype, cachelevel, false, rmw);
 }
 
-void TraceDecoder::result_store(int srcreg, int tempreg, const DecodedOperand& memref, int opcode, int datatype, bool rmw) {
+void TraceDecoder::result_store(int srcreg, int tempreg, const DecodedOperand& memref, int opcode, int datatype,
+                                bool rmw) {
   address_generate_and_load_or_store(REG_mem, srcreg, memref, opcode, datatype, 0, 0, rmw);
 }
 
-void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const DecodedOperand& ra, W32 setflags, int rcreg,
-                                  bool flagsonly, bool isnegop, bool ra_rb_imm_form, W64s ra_rb_imm_form_rbimm) {
-  if (flagsonly) prefixes &= ~PFX_LOCK;
+void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const DecodedOperand& ra, W32 setflags,
+                                  int rcreg, bool flagsonly, bool isnegop, bool ra_rb_imm_form,
+                                  W64s ra_rb_imm_form_rbimm) {
+  if (flagsonly)
+    prefixes &= ~PFX_LOCK;
 
   if ((rd.type == OPTYPE_REG) && ((ra.type == OPTYPE_REG) || (ra.type == OPTYPE_IMM))) {
     //
@@ -1072,7 +1140,8 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
     //
     prefixes &= ~PFX_LOCK; // No locking on reg,reg
     assert(rd.reg.reg >= 0 && rd.reg.reg < APR_COUNT);
-    if (ra.type == OPTYPE_REG) assert(ra.reg.reg >= 0 && ra.reg.reg < APR_COUNT);
+    if (ra.type == OPTYPE_REG)
+      assert(ra.reg.reg >= 0 && ra.reg.reg < APR_COUNT);
     bool isimm = (ra.type == OPTYPE_IMM);
     int destreg = arch_pseudo_reg_to_arch_reg[rd.reg.reg];
     int srcreg = (isimm) ? REG_imm : arch_pseudo_reg_to_arch_reg[ra.reg.reg];
@@ -1082,10 +1151,16 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
     bool rahigh = (isimm) ? 0 : reginfo[ra.reg.reg].hibyte;
 
     int rareg = destreg;
-    if (rdhigh) { this << TransOp(OP_maskb, REG_temp2, REG_zero, rareg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)); rareg = REG_temp2; }
+    if (rdhigh) {
+      this << TransOp(OP_maskb, REG_temp2, REG_zero, rareg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      rareg = REG_temp2;
+    }
 
     int rbreg = srcreg;
-    if (rahigh) { this << TransOp(OP_maskb, REG_temp3, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)); rbreg = REG_temp3; }
+    if (rahigh) {
+      this << TransOp(OP_maskb, REG_temp3, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      rbreg = REG_temp3;
+    }
 
     //
     // Special case to break dependency chain for common idiom "xor X,X" => "xor zero,zero" => zero (always zero result when size >= 4 bytes)
@@ -1099,9 +1174,13 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
     if (flagsonly) {
       this << TransOp(opcode, REG_temp0, rareg, rbreg, rcreg, sizeshift, (isimm) ? ra.imm.imm : 0, 0, setflags);
     } else {
-      if (isnegop) { rbreg = rareg; rareg = REG_zero; }
+      if (isnegop) {
+        rbreg = rareg;
+        rareg = REG_zero;
+      }
       if (ra_rb_imm_form) {
-        this << TransOp(opcode, destreg, srcreg, REG_imm, (sizeshift >= 2) ? REG_zero : destreg, sizeshift, ra_rb_imm_form_rbimm, 0, setflags);
+        this << TransOp(opcode, destreg, srcreg, REG_imm, (sizeshift >= 2) ? REG_zero : destreg, sizeshift,
+                        ra_rb_imm_form_rbimm, 0, setflags);
       } else {
         if unlikely (isnegop && (sizeshift <= 1)) {
           // In decode-fast, neg r1 optimized to be => r1 = 0 - rd
@@ -1113,8 +1192,10 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
           this << TransOp(OP_mov, destreg, destreg, REG_temp0, REG_zero, sizeshift);
         } else {
           this << TransOp(opcode, (rdhigh) ? REG_temp2 : destreg, rareg, rbreg, rcreg, sizeshift,
-                        (isimm) ? ra.imm.imm : 0, 0, setflags);
-          if (rdhigh) { this << TransOp(OP_maskb, destreg, destreg, REG_temp2, REG_imm, 3, 0, MaskControlInfo(56, 8, 56)); }
+                          (isimm) ? ra.imm.imm : 0, 0, setflags);
+          if (rdhigh) {
+            this << TransOp(OP_maskb, destreg, destreg, REG_temp2, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
+          }
         }
       }
     }
@@ -1134,17 +1215,22 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
     bool rdhigh = reginfo[rd.reg.reg].hibyte;
 
     int rareg = destreg;
-    if (rdhigh) { this << TransOp(OP_maskb, REG_temp2, REG_zero, destreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)); rareg = REG_temp2; }
+    if (rdhigh) {
+      this << TransOp(OP_maskb, REG_temp2, REG_zero, destreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      rareg = REG_temp2;
+    }
 
     int sizeshift = reginfo[rd.reg.reg].sizeshift;
     if (flagsonly) {
       this << TransOp(opcode, REG_temp0, rareg, REG_temp0, rcreg, sizeshift, 0, 0, setflags);
     } else {
       if (ra_rb_imm_form) {
-        this << TransOp(opcode, destreg, REG_temp0, REG_imm, (sizeshift >= 2) ? REG_zero : destreg, sizeshift, ra_rb_imm_form_rbimm, 0, setflags);
+        this << TransOp(opcode, destreg, REG_temp0, REG_imm, (sizeshift >= 2) ? REG_zero : destreg, sizeshift,
+                        ra_rb_imm_form_rbimm, 0, setflags);
       } else {
         this << TransOp(opcode, (rdhigh) ? REG_temp2 : destreg, rareg, REG_temp0, rcreg, sizeshift, 0, 0, setflags);
-        if (rdhigh) this << TransOp(OP_maskb, destreg, destreg, REG_temp2, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
+        if (rdhigh)
+          this << TransOp(OP_maskb, destreg, destreg, REG_temp2, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
       }
     }
   } else if ((rd.type == OPTYPE_MEM) && ((ra.type == OPTYPE_REG) || (ra.type == OPTYPE_IMM))) {
@@ -1154,7 +1240,8 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
     assert(rd.mem.basereg >= 0 && rd.mem.basereg < APR_COUNT);
     assert(rd.mem.indexreg >= 0 && rd.mem.indexreg < APR_COUNT);
     assert(rd.mem.scale >= 0 && rd.mem.scale <= 3);
-    if (ra.type == OPTYPE_REG) assert(ra.reg.reg >= 0 && ra.reg.reg < APR_COUNT);
+    if (ra.type == OPTYPE_REG)
+      assert(ra.reg.reg >= 0 && ra.reg.reg < APR_COUNT);
 
     bool isimm = (ra.type == OPTYPE_IMM);
     int srcreg = (isimm) ? REG_imm : arch_pseudo_reg_to_arch_reg[ra.reg.reg];
@@ -1163,14 +1250,19 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
     int sizeshift = rd.mem.size;
     bool rahigh = (isimm) ? 0 : reginfo[ra.reg.reg].hibyte;
 
-    if (rahigh) { this << TransOp(OP_maskb, REG_temp2, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8)); srcreg = REG_temp2; }
+    if (rahigh) {
+      this << TransOp(OP_maskb, REG_temp2, REG_zero, srcreg, REG_imm, 3, 0, MaskControlInfo(0, 8, 8));
+      srcreg = REG_temp2;
+    }
 
     if (isimm) {
       this << TransOp(opcode, REG_temp0, REG_temp0, REG_imm, rcreg, sizeshift, ra.imm.imm, 0, setflags);
-      if (!flagsonly) result_store(REG_temp0, REG_temp3, rd, OP_st, 0, 1);
+      if (!flagsonly)
+        result_store(REG_temp0, REG_temp3, rd, OP_st, 0, 1);
     } else {
       this << TransOp(opcode, REG_temp0, REG_temp0, srcreg, rcreg, sizeshift, 0, 0, setflags);
-      if (!flagsonly) result_store(REG_temp0, REG_temp3, rd, OP_st, 0, 1);
+      if (!flagsonly)
+        result_store(REG_temp0, REG_temp3, rd, OP_st, 0, 1);
     }
   } else if ((rd.type == OPTYPE_MEM) && (ra.type == OPTYPE_MEM)) {
     //
@@ -1183,10 +1275,11 @@ void TraceDecoder::alu_reg_or_mem(int opcode, const DecodedOperand& rd, const De
     operand_load(REG_temp0, rd);
     int sizeshift = rd.mem.size;
     this << TransOp(opcode, REG_temp0, (isnegop) ? REG_zero : REG_temp0, REG_temp0, rcreg, sizeshift, 0, 0, setflags);
-    if (!flagsonly) result_store(REG_temp0, REG_temp3, rd);
+    if (!flagsonly)
+      result_store(REG_temp0, REG_temp3, rd);
   }
 
-  if unlikely (no_partial_flag_updates_per_insn && (setflags != (SETFLAG_ZF|SETFLAG_CF|SETFLAG_OF))) {
+  if unlikely (no_partial_flag_updates_per_insn && (setflags != (SETFLAG_ZF | SETFLAG_CF | SETFLAG_OF))) {
     this << TransOp(OP_collcc, REG_temp10, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
   }
 }
@@ -1208,16 +1301,18 @@ void TraceDecoder::move_reg_or_mem(const DecodedOperand& rd, const DecodedOperan
     bool rahigh = (isimm) ? 0 : reginfo[ra.reg.reg].hibyte;
 
     if (rdhigh || rahigh) {
-      int maskctl =
-        (rdhigh && !rahigh) ? MaskControlInfo(56, 8, 56) : // insert high byte
-        (!rdhigh && rahigh) ? MaskControlInfo(0, 8, 8) : // extract high byte
-        (rdhigh && rahigh) ? MaskControlInfo(56, 8, 0) : // move between high bytes
-        MaskControlInfo(0, 8, 0); // move between low bytes
+      int maskctl = (rdhigh && !rahigh) ? MaskControlInfo(56, 8, 56) : // insert high byte
+                        (!rdhigh && rahigh) ? MaskControlInfo(0, 8, 8)
+                                            : // extract high byte
+                        (rdhigh && rahigh) ? MaskControlInfo(56, 8, 0)
+                                           :      // move between high bytes
+                        MaskControlInfo(0, 8, 0); // move between low bytes
       this << TransOp(OP_maskb, destreg, destreg, srcreg, REG_imm, 3, (isimm) ? ra.imm.imm : 0, maskctl);
     } else {
       // must be at least 16 bits
       // On x86-64, only 8-bit and 16-bit ops need to be merged; 32-bit is zero extended to full 64 bits:
-      this << TransOp(OP_mov, destreg, (sizeshift < 2) ? destreg : REG_zero, srcreg, REG_zero, sizeshift, (isimm) ? ra.imm.imm : 0);
+      this << TransOp(OP_mov, destreg, (sizeshift < 2) ? destreg : REG_zero, srcreg, REG_zero, sizeshift,
+                      (isimm) ? ra.imm.imm : 0);
     }
   } else if ((rd.type == OPTYPE_REG) && (ra.type == OPTYPE_MEM)) {
     //
@@ -1234,7 +1329,8 @@ void TraceDecoder::move_reg_or_mem(const DecodedOperand& rd, const DecodedOperan
       operand_load(REG_temp0, ra);
       if (reginfo[rd.reg.reg].hibyte)
         this << TransOp(OP_maskb, destreg, destreg, REG_temp0, REG_imm, 3, 0, MaskControlInfo(56, 8, 56));
-      else this << TransOp(OP_mov, destreg, destreg, REG_temp0, REG_zero, sizeshift);
+      else
+        this << TransOp(OP_mov, destreg, destreg, REG_temp0, REG_zero, sizeshift);
     }
   } else if ((rd.type == OPTYPE_MEM) && ((ra.type == OPTYPE_REG) || (ra.type == OPTYPE_IMM))) {
     //
@@ -1284,7 +1380,8 @@ void TraceDecoder::signext_reg_or_mem(const DecodedOperand& rd, DecodedOperand& 
       // Just use regular move
       this << TransOp(OP_mov, rdreg, REG_zero, rareg, REG_zero, rasize);
     } else {
-      TransOp transop(OP_maskb, rdreg, (rdsize < 2) ? rdreg : REG_zero, rareg, REG_imm, rdsize, 0, MaskControlInfo(0, (1<<rasize)*8, 0));
+      TransOp transop(OP_maskb, rdreg, (rdsize < 2) ? rdreg : REG_zero, rareg, REG_imm, rdsize, 0,
+                      MaskControlInfo(0, (1 << rasize) * 8, 0));
       transop.cond = (zeroext) ? 1 : 2;
       this << transop;
     }
@@ -1299,7 +1396,8 @@ void TraceDecoder::signext_reg_or_mem(const DecodedOperand& rd, DecodedOperand& 
       // zero extend 32-bit to 64-bit or just load as 64-bit:
       operand_load((signext_to_32bit) ? REG_temp8 : rdreg, ra, (zeroext) ? OP_ld : OP_ldx);
       // sign extend and then zero high 32 bits (old way was ldxz uop):
-      if (signext_to_32bit) this << TransOp(OP_mov, rdreg, REG_zero, REG_temp8, REG_zero, 2);
+      if (signext_to_32bit)
+        this << TransOp(OP_mov, rdreg, REG_zero, REG_temp8, REG_zero, 2);
     } else {
       // need to merge 8-bit or 16-bit data:
       operand_load(REG_temp0, ra, (zeroext) ? OP_ld : OP_ldx);
@@ -1332,21 +1430,26 @@ void TraceDecoder::decode_prefixes() {
   for (;;) {
     byte b = insnbytes[byteoffset];
     W32 prefix = (use64) ? prefix_map_x86_64[b] : prefix_map_x86[b];
-    if (!prefix) break;
+    if (!prefix)
+      break;
     if (rex) {
       // REX is ignored when followed by another prefix:
       rex = 0;
       prefixes &= ~PFX_REX;
     }
     prefixes |= prefix;
-    if (prefix == PFX_REX) { rex = b; }
-    byteoffset++; rip++;
+    if (prefix == PFX_REX) {
+      rex = b;
+    }
+    byteoffset++;
+    rip++;
   }
 }
 
 void TraceDecoder::split(bool after) {
   Waddr target = (after) ? rip : ripstart;
-  if (!after) assert(!first_insn_in_bb());
+  if (!after)
+    assert(!first_insn_in_bb());
 
   //
   // Append to the previous insn (no pre-flush) if split before
@@ -1366,13 +1469,17 @@ void TraceDecoder::split(bool after) {
   end_of_block = 1;
 }
 
-void print_invalid_insns(int op, const byte* ripstart, const byte* rip, int valid_byte_count, const PageFaultErrorCode& pfec, Waddr faultaddr) {
+void print_invalid_insns(int op, const byte* ripstart, const byte* rip, int valid_byte_count,
+                         const PageFaultErrorCode& pfec, Waddr faultaddr) {
   if (pfec) {
-    if (logable(4)) logfile << "translate: page fault at iteration ", iterations, ", ", total_user_insns_committed, " commits: ",
-      "ripstart ", ripstart, ", rip ", rip, ": required ", (rip - ripstart), " more bytes but only fetched ", valid_byte_count, " bytes; ",
-      "page fault error code: ", pfec, endl, flush;
+    if (logable(4))
+      logfile << "translate: page fault at iteration ", iterations, ", ", total_user_insns_committed,
+          " commits: ", "ripstart ", ripstart, ", rip ", rip, ": required ", (rip - ripstart),
+          " more bytes but only fetched ", valid_byte_count, " bytes; ", "page fault error code: ", pfec, endl, flush;
   } else {
-    if (logable(4)) logfile << "translate: invalid opcode at iteration ", iterations, ": ", (void*)(Waddr)op, " commits ", total_user_insns_committed, " (at ripstart ", ripstart, ", rip ", rip, "); may be speculative", endl, flush;
+    if (logable(4))
+      logfile << "translate: invalid opcode at iteration ", iterations, ": ", (void*)(Waddr)op, " commits ",
+          total_user_insns_committed, " (at ripstart ", ripstart, ", rip ", rip, "); may be speculative", endl, flush;
 #if 0
     if (!config.dumpcode_filename.empty()) {
       byte insnbuf[256];
@@ -1406,14 +1513,18 @@ bool BasicBlockCache::invalidate(BasicBlock* bb, int reason) {
   }
 
   pagelist = bbpages.get(bb->rip.mfnlo);
-  if (logable(3) | log_code_page_ops) logfile << "Remove bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes) from low page list ", pagelist, ": loc ", bb->mfnlo_loc.chunk, ":", bb->mfnlo_loc.index, endl;
+  if (logable(3) | log_code_page_ops)
+    logfile << "Remove bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes) from low page list ", pagelist, ": loc ",
+        bb->mfnlo_loc.chunk, ":", bb->mfnlo_loc.index, endl;
   assert(pagelist);
   pagelist->remove(bb->mfnlo_loc);
 
-  int page_crossing = ((lowbits(bb->rip, 12) + (bb->bytes-1)) >> 12);
+  int page_crossing = ((lowbits(bb->rip, 12) + (bb->bytes - 1)) >> 12);
   if (page_crossing) {
     pagelist = bbpages.get(bb->rip.mfnhi);
-    if (logable(3) | log_code_page_ops) logfile << "Remove bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes) from high page list ", pagelist, ": loc ", bb->mfnhi_loc.chunk, ":", bb->mfnhi_loc.index, endl;
+    if (logable(3) | log_code_page_ops)
+      logfile << "Remove bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes) from high page list ", pagelist, ": loc ",
+          bb->mfnhi_loc.chunk, ":", bb->mfnhi_loc.index, endl;
     assert(pagelist);
     pagelist->remove(bb->mfnhi_loc);
   }
@@ -1428,7 +1539,8 @@ bool BasicBlockCache::invalidate(BasicBlock* bb, int reason) {
 
 bool BasicBlockCache::invalidate(const RIPVirtPhys& rvp, int reason) {
   BasicBlock* bb = get(rvp);
-  if (!bb) return true;
+  if (!bb)
+    return true;
   return invalidate(bb, reason);
 }
 
@@ -1436,11 +1548,13 @@ bool BasicBlockCache::invalidate(const RIPVirtPhys& rvp, int reason) {
 // Find the number of cached BBs on a given physical page
 //
 int BasicBlockCache::get_page_bb_count(Waddr mfn) {
-  if unlikely (mfn == RIPVirtPhys::INVALID) return 0;
+  if unlikely (mfn == RIPVirtPhys::INVALID)
+    return 0;
 
   BasicBlockChunkList* pagelist = bbpages.get(mfn);
 
-  if unlikely (!pagelist) return 0;
+  if unlikely (!pagelist)
+    return 0;
 
   return pagelist->count();
 }
@@ -1455,11 +1569,14 @@ bool BasicBlockCache::invalidate_page(Waddr mfn, int reason) {
   // We may try to invalidate the special invalid mfn if SMC
   // occurs on a page where the high virtual page is invalid.
   //
-  if unlikely (mfn == RIPVirtPhys::INVALID) return 0;
+  if unlikely (mfn == RIPVirtPhys::INVALID)
+    return 0;
 
   BasicBlockChunkList* pagelist = bbpages.get(mfn);
 
-  if (logable(3) | log_code_page_ops) logfile << "Invalidate page mfn ", mfn, ": pagelist ", pagelist, " has ", (pagelist ? pagelist->count() : 0), " entries (dirty? ", smc_isdirty(mfn), ")", endl;
+  if (logable(3) | log_code_page_ops)
+    logfile << "Invalidate page mfn ", mfn, ": pagelist ", pagelist, " has ", (pagelist ? pagelist->count() : 0),
+        " entries (dirty? ", smc_isdirty(mfn), ")", endl;
 
   smc_cleardirty(mfn);
 
@@ -1467,7 +1584,7 @@ bool BasicBlockCache::invalidate_page(Waddr mfn, int reason) {
    * i.e. we have no pagelist, then this is a successfull NOP
    */
   if unlikely (!pagelist) {
-      return true;
+    return true;
   }
 
   /* bbcache.invalidate calls pagelist.remove so we can't really use an iterator
@@ -1478,14 +1595,15 @@ bool BasicBlockCache::invalidate_page(Waddr mfn, int reason) {
   while (pagelist->count() > 0) {
     iter.reset(pagelist);
 
-    BasicBlock *bb = *iter.next();
+    BasicBlock* bb = *iter.next();
     if (logable(3) | log_code_page_ops) {
       logfile << "  Invalidate bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes)", endl;
     }
 
     if unlikely (!bbcache.invalidate(bb, reason)) {
       if (logable(3) | log_code_page_ops) {
-        logfile << "  Could not invalidate bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes): still has refcount ", bb->refcount, endl;
+        logfile << "  Could not invalidate bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes): still has refcount ",
+            bb->refcount, endl;
       }
       return false;
     }
@@ -1509,9 +1627,12 @@ bool BasicBlockCache::invalidate_page(Waddr mfn, int reason) {
 int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
   bool DEBUG = 1; // logable(1);
 
-  if (!count) return 0;
+  if (!count)
+    return 0;
 
-  if (DEBUG) logfile << "Reclaiming cached basic blocks at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits:", endl;
+  if (DEBUG)
+    logfile << "Reclaiming cached basic blocks at ", sim_cycle, " cycles, ", total_user_insns_committed,
+        " commits:", endl;
 
   stats.decoder.reclaim_rounds++;
 
@@ -1535,7 +1656,7 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
   assert(n > 0);
   average /= n;
 
-  if unlikely (urgency >= /*MAX_URGENCY*/10000000) {
+  if unlikely (urgency >= /*MAX_URGENCY*/ 10000000) {
     //
     // The allocator is so strapped for memory, we need to free
     // everything possible at all costs:
@@ -1565,7 +1686,8 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
       // If this is required, the pipeline must be flushed before
       // the forced invalidation can occur.
       //
-      logfile << "Warning: eligible bb ", bb, " ", bb->rip, " (lastused ", bb->lastused, ") still has refcount ", bb->refcount, endl;
+      logfile << "Warning: eligible bb ", bb, " ", bb->rip, " (lastused ", bb->lastused, ") still has refcount ",
+          bb->refcount, endl;
       continue;
     }
 
@@ -1593,21 +1715,25 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
     BasicBlockChunkList* page;
     int pages_freed = 0;
 
-    if (DEBUG) logfile << "Scanning ", bbpages.count, " code pages:", endl;
+    if (DEBUG)
+      logfile << "Scanning ", bbpages.count, " code pages:", endl;
     while (page = iter.next()) {
       if (page->empty()) {
         if (!page->refcount) {
-          if (DEBUG) logfile << "  mfn ", page->mfn, " has no entries; freeing", endl;
+          if (DEBUG)
+            logfile << "  mfn ", page->mfn, " has no entries; freeing", endl;
           bbpages.remove(page);
           delete page;
           pages_freed++;
         } else {
-          if (DEBUG) logfile << "  mfn ", page->mfn, " still has refs to it: cannot free it yet", endl;
+          if (DEBUG)
+            logfile << "  mfn ", page->mfn, " still has refs to it: cannot free it yet", endl;
         }
       }
     }
 
-    if (DEBUG) logfile << "Freed ", pages_freed, " empty pages", endl;
+    if (DEBUG)
+      logfile << "Freed ", pages_freed, " empty pages", endl;
   }
 
   return n;
@@ -1621,7 +1747,8 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
 void BasicBlockCache::flush() {
   bool DEBUG = 1;
 
-  if (DEBUG) logfile << "Flushing basic block cache at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits:", endl;
+  if (DEBUG)
+    logfile << "Flushing basic block cache at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits:", endl;
 
   stats.decoder.reclaim_rounds++;
 
@@ -1665,16 +1792,16 @@ void assist_exec_page_fault(Context& ctx) {
 #ifdef PTLSIM_HYPERVISOR
   Level1PTE pte = ctx.virt_to_pte(faultaddr);
   bool page_now_valid = (pte.p & (!pte.nx) & ((!ctx.kernel_mode) ? pte.us : 1));
-  if unlikely (!page_now_valid) ctx.flush_tlb_virt(faultaddr);
+  if unlikely (!page_now_valid)
+    ctx.flush_tlb_virt(faultaddr);
 #else
   bool page_now_valid = asp_check_exec((byte*)faultaddr);
 #endif
   if unlikely (page_now_valid) {
     if (logable(3)) {
-      logfile << "Spurious PageFaultOnExec detected at fault rip ",
-        (void*)(Waddr)ctx.commitarf[REG_selfrip], " with faultaddr ",
-        (void*)faultaddr, " @ ", total_user_insns_committed,
-        " user commits (", sim_cycle, " cycles)";
+      logfile << "Spurious PageFaultOnExec detected at fault rip ", (void*)(Waddr)ctx.commitarf[REG_selfrip],
+          " with faultaddr ", (void*)faultaddr, " @ ", total_user_insns_committed, " user commits (", sim_cycle,
+          " cycles)";
     }
     bbcache.invalidate(RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx), INVALIDATE_REASON_SPURIOUS);
     ctx.commitarf[REG_rip] = ctx.commitarf[REG_selfrip];
@@ -1696,14 +1823,15 @@ bool TraceDecoder::invalidate() {
     // NOTE: contextof(0) is for debugging purposes only
     Level1PTE pte = contextof(0).virt_to_pte(ripstart);
     mfn_t mfn = (pte.p) ? pte.mfn : RIPVirtPhys::INVALID;
-    if unlikely (!pte.p) contextof(0).flush_tlb_virt(ripstart);
+    if unlikely (!pte.p)
+      contextof(0).flush_tlb_virt(ripstart);
 #else
     int mfn = 0;
 #endif
     if (logable(3)) {
-      logfile << "Translation crosses into invalid page (mfn ", mfn, "): ripstart ", (void*)ripstart, ", rip ", (void*)rip,
-        ", faultaddr ", (void*)faultaddr, "; expected ", (rip - ripstart), " bytes but only got ", valid_byte_count,
-        " (next page ", (void*)(Waddr)ceil(ripstart, 4096), ")", endl;
+      logfile << "Translation crosses into invalid page (mfn ", mfn, "): ripstart ", (void*)ripstart, ", rip ",
+          (void*)rip, ", faultaddr ", (void*)faultaddr, "; expected ", (rip - ripstart), " bytes but only got ",
+          valid_byte_count, " (next page ", (void*)(Waddr)ceil(ripstart, 4096), ")", endl;
     }
 
     if likely (split_invalid_basic_blocks && (!first_insn_in_bb())) {
@@ -1725,9 +1853,11 @@ bool TraceDecoder::invalidate() {
     }
   } else {
     // The instruction-specific decoder may have already set the outcome type
-    if (outcome == DECODE_OUTCOME_OK) outcome = DECODE_OUTCOME_INVALID_OPCODE;
+    if (outcome == DECODE_OUTCOME_OK)
+      outcome = DECODE_OUTCOME_INVALID_OPCODE;
 
-    logfile << "Invalid opcode at ", (void*)ripstart, ": split_invalid_basic_blocks ", split_invalid_basic_blocks, ", first_insn_in_bb? ", first_insn_in_bb(), endl;
+    logfile << "Invalid opcode at ", (void*)ripstart, ": split_invalid_basic_blocks ", split_invalid_basic_blocks,
+        ", first_insn_in_bb? ", first_insn_in_bb(), endl;
     print_invalid_insns(op, (const byte*)ripstart, (const byte*)rip, valid_byte_count, 0, faultaddr);
 
     if likely (split_invalid_basic_blocks && (!first_insn_in_bb())) {
@@ -1752,7 +1882,8 @@ bool TraceDecoder::invalidate() {
         microcode_assist(ASSIST_GP_FAULT, ripstart, rip);
         break;
       default:
-        logfile << "Unexpected decoder outcome: ", outcome, endl; break;
+        logfile << "Unexpected decoder outcome: ", outcome, endl;
+        break;
       }
     }
   }
@@ -1767,7 +1898,8 @@ bool TraceDecoder::invalidate() {
 // Generate a memory fence of the specified type.
 //
 bool TraceDecoder::memory_fence_if_locked(bool end_of_x86_insn, int type) {
-  if likely (!(prefixes & PFX_LOCK)) return false;
+  if likely (!(prefixes & PFX_LOCK))
+    return false;
 
   if (split_basic_block_at_locks_and_fences) {
     if (end_of_x86_insn) {
@@ -1879,7 +2011,8 @@ bool TraceDecoder::translate() {
   logfile << endl;
 #endif
 
-  if (prefixes & PFX_ADDR) addrsize_prefix = 1;
+  if (prefixes & PFX_ADDR)
+    addrsize_prefix = 1;
 
   bool uses_sse = 0;
   op = fetch1();
@@ -1896,14 +2029,16 @@ bool TraceDecoder::translate() {
         op |= 0x400;
       else if (prefixes & PFX_REPZ) // prefix byte 0xf3, typically OPss
         op |= 0x200;
-      else op |= 0x300; // no prefix byte, typically OPps
+      else
+        op |= 0x300; // no prefix byte, typically OPps
     } else {
       op |= 0x100;
     }
   }
 
   // SSE uses 0x66 prefix for an opcode extension:
-  if (!uses_sse && (prefixes & PFX_DATA)) opsize_prefix = 1;
+  if (!uses_sse && (prefixes & PFX_DATA))
+    opsize_prefix = 1;
 
   modrm = ModRMByte((need_modrm) ? fetch1() : 0);
 
@@ -1936,7 +2071,8 @@ bool TraceDecoder::translate() {
     // Try again with the complex decoder if needed
     bool iscomplex = ((rc == 0) & (!invalid));
     some_insns_complex |= iscomplex;
-    if (iscomplex) rc = decode_complex();
+    if (iscomplex)
+      rc = decode_complex();
 
     if unlikely (used_microcode_assist) {
       stats.decoder.x86_decode_type[DECODE_TYPE_ASSIST]++;
@@ -1952,16 +2088,19 @@ bool TraceDecoder::translate() {
   case 4:
   case 5:
     stats.decoder.x86_decode_type[DECODE_TYPE_SSE]++;
-    rc = decode_sse(); break;
+    rc = decode_sse();
+    break;
   case 6:
     stats.decoder.x86_decode_type[DECODE_TYPE_X87]++;
-    rc = decode_x87(); break;
+    rc = decode_x87();
+    break;
   default: {
     assert(false);
   }
   } // switch
 
-  if (!rc) return rc;
+  if (!rc)
+    return rc;
 
   user_insn_count++;
 
@@ -1975,15 +2114,16 @@ bool TraceDecoder::translate() {
     return false;
   } else {
     // Block did not end with a branch: do we have more room for another x86 insn?
-    if (// ((MAX_BB_UOPS - bb.count) < (MAX_TRANSOPS_PER_USER_INSN-2)) ||
-        ((rip - bb.rip) >= (insnbytes_bufsize-15)) ||
-        ((rip - bb.rip) >= valid_byte_count) ||
-        (user_insn_count >= MAX_BB_X86_INSNS) ||
-        (rip == stop_at_rip)) {
-      if (logable(5)) logfile << "Basic block ", (void*)(Waddr)bb.rip, " too long: cutting at ", bb.count, " transops (", transbufcount, " currently in buffer)", endl;
+    if ( // ((MAX_BB_UOPS - bb.count) < (MAX_TRANSOPS_PER_USER_INSN-2)) ||
+        ((rip - bb.rip) >= (insnbytes_bufsize - 15)) || ((rip - bb.rip) >= valid_byte_count) ||
+        (user_insn_count >= MAX_BB_X86_INSNS) || (rip == stop_at_rip)) {
+      if (logable(5))
+        logfile << "Basic block ", (void*)(Waddr)bb.rip, " too long: cutting at ", bb.count, " transops (",
+            transbufcount, " currently in buffer)", endl;
       // bb.rip_taken and bb.rip_not_taken were already filled out for the last instruction.
       if unlikely (!last_flags_update_was_atomic) {
-        if (logable(5)) logfile << "Basic block ", (void*)(Waddr)bb.rip, " had non-atomic flags update: adding collcc", endl;
+        if (logable(5))
+          logfile << "Basic block ", (void*)(Waddr)bb.rip, " had non-atomic flags update: adding collcc", endl;
         this << TransOp(OP_collcc, REG_temp0, REG_zf, REG_cf, REG_of, 3, 0, 0, FLAGS_DEFAULT_ALU);
       }
       split_after();
@@ -2002,8 +2142,11 @@ bool TraceDecoder::translate() {
 ostream& printflags(ostream& os, W64 flags) {
   os << "0x", hexstring(flags, 32), " = [";
 
-  for (int i = (FLAG_COUNT-1); i >= 0; i--) {
-    if (bit(flags, i)) os << " ", x86_flag_names[i]; else os << " -";
+  for (int i = (FLAG_COUNT - 1); i >= 0; i--) {
+    if (bit(flags, i))
+      os << " ", x86_flag_names[i];
+    else
+      os << " -";
   }
   os << " ] ";
   return os;
@@ -2023,17 +2166,22 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
   }
 
   if unlikely (smc_isdirty(rvp.mfnlo)) {
-    if (logable(5) | log_code_page_ops) logfile << "Pre-invalidate low mfn for ", rvp, endl;
-    if unlikely (!invalidate_page(rvp.mfnlo, INVALIDATE_REASON_DIRTY)) return null;
+    if (logable(5) | log_code_page_ops)
+      logfile << "Pre-invalidate low mfn for ", rvp, endl;
+    if unlikely (!invalidate_page(rvp.mfnlo, INVALIDATE_REASON_DIRTY))
+      return null;
   }
 
   if unlikely (smc_isdirty(rvp.mfnhi)) {
-    if (logable(5) | log_code_page_ops) logfile << "Pre-invalidate high mfn for ", rvp, endl;
-    if unlikely (!invalidate_page(rvp.mfnhi, INVALIDATE_REASON_DIRTY)) return null;
+    if (logable(5) | log_code_page_ops)
+      logfile << "Pre-invalidate high mfn for ", rvp, endl;
+    if unlikely (!invalidate_page(rvp.mfnhi, INVALIDATE_REASON_DIRTY))
+      return null;
   }
 
   BasicBlock* bb = get(rvp);
-  if likely (bb) return bb;
+  if likely (bb)
+    return bb;
 
   byte insnbuf[MAX_BB_BYTES];
 
@@ -2041,7 +2189,8 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
   trans.fillbuf(ctx, insnbuf, sizeof(insnbuf));
 
   if (logable(5) | log_code_page_ops) {
-    logfile << "Translating ", rvp, " (", trans.valid_byte_count, " bytes valid) at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits", endl;
+    logfile << "Translating ", rvp, " (", trans.valid_byte_count, " bytes valid) at ", sim_cycle, " cycles, ",
+        total_user_insns_committed, " commits", endl;
   }
 
   if (rvp.mfnlo == RIPVirtPhys::INVALID) {
@@ -2050,7 +2199,8 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
 
   for (;;) {
     // if (DEBUG) logfile << "rip ", (void*)trans.rip, ", relrip = ", (void*)(trans.rip - trans.bb.rip), endl;
-    if (!trans.translate()) break;
+    if (!trans.translate())
+      break;
   }
 
   trans.bb.hitcount = 0;
@@ -2090,9 +2240,11 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
   // to somehow lock it with a refcount to prevent this.
   //
   pagelist->add(bb, bb->mfnlo_loc);
-  if (logable(5) | log_code_page_ops) logfile << "Add bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes) to low page list ", pagelist, ": loc ", bb->mfnlo_loc.chunk, ":", bb->mfnlo_loc.index, endl;
+  if (logable(5) | log_code_page_ops)
+    logfile << "Add bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes) to low page list ", pagelist, ": loc ",
+        bb->mfnlo_loc.chunk, ":", bb->mfnlo_loc.index, endl;
 
-  int page_crossing = ((lowbits(bb->rip, 12) + (bb->bytes-1)) >> 12);
+  int page_crossing = ((lowbits(bb->rip, 12) + (bb->bytes - 1)) >> 12);
 
   if (page_crossing) {
     smc_cleardirty(bb->rip.mfnhi);
@@ -2107,7 +2259,9 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
     }
     pagelisthi->refcount++;
     pagelisthi->add(bb, bb->mfnhi_loc);
-    if (logable(5) | log_code_page_ops) logfile << "Add bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes) to high page list ", pagelisthi, ": loc ", bb->mfnhi_loc.chunk, ":", bb->mfnhi_loc.index, endl;
+    if (logable(5) | log_code_page_ops)
+      logfile << "Add bb ", bb, " (", bb->rip, ", ", bb->bytes, " bytes) to high page list ", pagelisthi, ": loc ",
+          bb->mfnhi_loc.chunk, ":", bb->mfnhi_loc.index, endl;
     pagelisthi->refcount--;
   }
 
@@ -2116,7 +2270,8 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
   if (logable(5)) {
     logfile << "=====================================================================", endl;
     logfile << *bb, endl;
-    logfile << "End of basic block: rip ", trans.bb.rip, " -> taken rip 0x", (void*)(Waddr)trans.bb.rip_taken, ", not taken rip 0x", (void*)(Waddr)trans.bb.rip_not_taken, endl;
+    logfile << "End of basic block: rip ", trans.bb.rip, " -> taken rip 0x", (void*)(Waddr)trans.bb.rip_taken,
+        ", not taken rip 0x", (void*)(Waddr)trans.bb.rip_not_taken, endl;
   }
 
   bb->release();
@@ -2125,9 +2280,9 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
 }
 
 #ifdef __x86_64__
-# define MAX_RIP 0xffffffffffffffffULL
+#define MAX_RIP 0xffffffffffffffffULL
 #else
-# define MAX_RIP 0xffffffffU
+#define MAX_RIP 0xffffffffU
 #endif
 
 //
@@ -2153,11 +2308,13 @@ void BasicBlockCache::translate_in_place(BasicBlock& targetbb, Context& ctx, Wad
   trans.fillbuf(ctx, insnbuf, sizeof(insnbuf));
 
   if (logable(5) | log_code_page_ops) {
-    logfile << "Translating ", rvp, " (", trans.valid_byte_count, " bytes valid) at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits", endl;
+    logfile << "Translating ", rvp, " (", trans.valid_byte_count, " bytes valid) at ", sim_cycle, " cycles, ",
+        total_user_insns_committed, " commits", endl;
   }
 
   for (;;) {
-    if (!trans.translate()) break;
+    if (!trans.translate())
+      break;
   }
 
   trans.bb.hitcount = 0;
@@ -2169,7 +2326,8 @@ void BasicBlockCache::translate_in_place(BasicBlock& targetbb, Context& ctx, Wad
   if (logable(5)) {
     logfile << "=====================================================================", endl;
     logfile << targetbb, endl;
-    logfile << "End of basic block: rip ", trans.bb.rip, " -> taken rip 0x", (void*)(Waddr)trans.bb.rip_taken, ", not taken rip 0x", (void*)(Waddr)trans.bb.rip_not_taken, endl;
+    logfile << "End of basic block: rip ", trans.bb.rip, " -> taken rip 0x", (void*)(Waddr)trans.bb.rip_taken,
+        ", not taken rip 0x", (void*)(Waddr)trans.bb.rip_not_taken, endl;
   }
 }
 
@@ -2188,11 +2346,13 @@ BasicBlock* BasicBlockCache::translate_and_clone(Context& ctx, Waddr rip) {
   trans.fillbuf(ctx, insnbuf, sizeof(insnbuf));
 
   if (logable(5) | log_code_page_ops) {
-    logfile << "Translating ", rvp, " (", trans.valid_byte_count, " bytes valid) at ", sim_cycle, " cycles, ", total_user_insns_committed, " commits", endl;
+    logfile << "Translating ", rvp, " (", trans.valid_byte_count, " bytes valid) at ", sim_cycle, " cycles, ",
+        total_user_insns_committed, " commits", endl;
   }
 
   for (;;) {
-    if (!trans.translate()) break;
+    if (!trans.translate())
+      break;
   }
 
   BasicBlock* bb = trans.bb.clone();
@@ -2211,16 +2371,17 @@ ostream& BasicBlockCache::print(ostream& os) {
     double percent_of_total_uops = ((double)(bb.hitcount * bb.tagcount) / (double)total_uops_committed);
     double percent_of_total_bbs = ((double)(bb.hitcount) / (double)total_basic_blocks_committed);
 
-    os << "  ", bb.rip, ": ",
-      intstring(bb.tagcount, 4), "t ", intstring(bb.memcount - bb.storecount, 3), "ld ",
-      intstring(bb.storecount, 3), "st ", intstring(bb.user_insn_count, 3), "u ",
-      intstring(bb.hitcount, 10), "h ", intstring(bb.predcount, 10), "pr ",
-      //floatstring(100.0 * (double)bb.predcount / (double)bb.hitcount, 10, 2), "%pr ",
-      //floatstring(100.0 * percent_of_total_uops, 6, 2), "%uops",
-      intstring(bb.hitcount * bb.tagcount, 10), "uu ",
-      ": taken 0x", hexstring(bb.rip_taken, 48), ", seq ", hexstring(bb.rip_not_taken, 48);
-    if (bb.rip_taken == bb.rip) os << " [loop]";
-    if (bb.repblock) os << " [repblock]";
+    os << "  ", bb.rip, ": ", intstring(bb.tagcount, 4), "t ", intstring(bb.memcount - bb.storecount, 3), "ld ",
+        intstring(bb.storecount, 3), "st ", intstring(bb.user_insn_count, 3), "u ", intstring(bb.hitcount, 10), "h ",
+        intstring(bb.predcount, 10), "pr ",
+        //floatstring(100.0 * (double)bb.predcount / (double)bb.hitcount, 10, 2), "%pr ",
+        //floatstring(100.0 * percent_of_total_uops, 6, 2), "%uops",
+        intstring(bb.hitcount * bb.tagcount, 10), "uu ", ": taken 0x", hexstring(bb.rip_taken, 48), ", seq ",
+        hexstring(bb.rip_not_taken, 48);
+    if (bb.rip_taken == bb.rip)
+      os << " [loop]";
+    if (bb.repblock)
+      os << " [repblock]";
     os << endl;
   }
 
@@ -2229,5 +2390,6 @@ ostream& BasicBlockCache::print(ostream& os) {
 
 void shutdown_decode() {
   bbcache.flush();
-  if (bbcache_dump_file) bbcache_dump_file.close();
+  if (bbcache_dump_file)
+    bbcache_dump_file.close();
 }
