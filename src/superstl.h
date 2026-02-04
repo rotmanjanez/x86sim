@@ -1608,64 +1608,6 @@ void sort(T* p, size_t n, const Comparator& compare = DefaultComparator<T>()) {
   }
 }
 
-
-//
-// Mutex with recursive locking
-//
-// acquire(vcpuid) can be called multiple times
-// with the same vcpuid, but if the vcpuid
-// does not match locking_vcpuid, the function
-// spins until the lock can be acquired.
-//
-// release(vcpuid) unlocks the mutex. The current
-// vcpuid must equal locking_vcpu.
-//
-struct RecursiveMutex {
-  W16s locking_vcpuid;
-  W16 counter;
-
-  RecursiveMutex() { reset(); }
-
-  void reset() {
-    locking_vcpuid = -1;
-    counter = 0;
-  }
-
-  bool acquire() {
-    W16s current = current_vcpuid();
-    bool acquired;
-    bool recursive;
-
-    for (;;) {
-      W16s oldv = cmpxchg(locking_vcpuid, current, W16s(-1));
-      barrier();
-      acquired = (oldv == -1);
-      recursive = (oldv == current);
-
-      if unlikely (acquired | recursive)
-        break;
-
-      cpu_pause();
-    }
-
-    counter++;
-
-    return (!recursive);
-  }
-
-  void release() {
-    W16s current = current_vcpuid();
-    assert(locking_vcpuid == current);
-    assert(counter > 0);
-
-    counter--;
-    if likely (!counter) {
-      locking_vcpuid = -1;
-      barrier();
-    }
-  }
-};
-
 //
 // Safe divide and remainder functions that return true iff operation did not generate an exception:
 //
@@ -1673,13 +1615,6 @@ template<typename T>
 bool div_rem(T& quotient, T& remainder, T dividend_hi, T dividend_lo, T divisor);
 template<typename T>
 bool div_rem_s(T& quotient, T& remainder, T dividend_hi, T dividend_lo, T divisor);
-
-template<typename T>
-struct ScopedLock {
-  T& lock;
-  ScopedLock(T& lock_) : lock(lock_) { lock.acquire(); }
-  ~ScopedLock() { lock.release(); }
-};
 
 } // namespace superstl
 
