@@ -1,6 +1,0 @@
-#!/bin/sh
-cd $1
-shift
-for f in $@; do
-  make -C $f run >& $f/run.log
-done
