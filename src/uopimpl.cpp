@@ -211,13 +211,7 @@ make_exp_aluop_all_sizes(bts, (rb = lowbits(rb, log2(sizeof(T) * 8)), cf = bit(r
 make_exp_aluop_all_sizes(btr, (rb = lowbits(rb, log2(sizeof(T) * 8)), cf = bit(ra, rb), rd = ra & ~(1LL << rb)), CF);
 make_exp_aluop_all_sizes(btc, (rb = lowbits(rb, log2(sizeof(T) * 8)), cf = bit(ra, rb), rd = ra ^ (1LL << rb)), CF);
 
-template<typename T>
-inline W64 x86_bswap(T v) {
-  asm("bswap %[v]" : [v] "+r"(v));
-  return v;
-}
-
-make_exp_aluop_all_sizes(bswap, (rd = ((sizeof(T) >= 4) ? x86_bswap(rb) : 0)), 0);
+make_exp_aluop_all_sizes(bswap, (rd = ((sizeof(T) >= 4) ? std::byteswap(rb) : 0)), 0);
 
 template<int ptlopcode, template<typename, int> class func, typename T, int genflags>
 inline void ctzclzop(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags) {

@@ -10,8 +10,11 @@
 #define _GLOBALS_H_
 
 #include <assert.h>
+#include <atomic>
+#include <bit>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <type_traits>
 extern "C" {
 #include <sys/ptrace.h>
@@ -374,101 +377,50 @@ enum { MXCSR_ROUND_NEAREST, MXCSR_ROUND_DOWN, MXCSR_ROUND_UP, MXCSR_ROUND_TOWARD
 #define MXCSR_EXCEPTION_DISABLE_MASK 0x1f80 // OR this into mxcsr to disable all exceptions
 #define MXCSR_DEFAULT 0x1f80                // default settings (no exceptions, defaults for rounding and denormals)
 
-inline W32 x86_bsf32(W32 b) {
-  W32 r = 0;
-  asm("bsf %[b],%[r]" : [r] "+r"(r) : [b] "r"(b));
-  return r;
-}
-inline W64 x86_bsf64(W64 b) {
-  W64 r = 0;
-  asm("bsf %[b],%[r]" : [r] "+r"(r) : [b] "r"(b));
-  return r;
-}
-inline W32 x86_bsr32(W32 b) {
-  W32 r = 0;
-  asm("bsr %[b],%[r]" : [r] "+r"(r) : [b] "r"(b));
-  return r;
-}
-inline W64 x86_bsr64(W64 b) {
-  W64 r = 0;
-  asm("bsr %[b],%[r]" : [r] "+r"(r) : [b] "r"(b));
-  return r;
-}
-
 template<typename T>
 inline bool x86_bt(T r, T b) {
-  byte c;
-  asm("bt %[b],%[r]; setc %[c]" : [c] "=q"(c) : [r] "r"(r), [b] "r"(b));
-  return c;
+  using U = std::make_unsigned_t<T>;
+  constexpr int digits = std::numeric_limits<U>::digits;
+  return (static_cast<U>(r) >> (static_cast<U>(b) % digits)) & 1;
 }
-template<typename T>
-inline bool x86_btn(T r, T b) {
-  byte c;
-  asm("bt %[b],%[r]; setnc %[c]" : [c] "=r"(c) : [r] "r"(r), [b] "r"(b));
-  return c;
-}
-
 // Return the updated data; ignore the old value
 template<typename T>
 inline W64 x86_bts(T r, T b) {
-  asm("bts %[b],%[r]" : [r] "+r"(r) : [b] "r"(b));
-  return r;
+  using U = std::make_unsigned_t<T>;
+  constexpr int digits = std::numeric_limits<U>::digits;
+  return static_cast<T>(static_cast<U>(r) | (U(1) << (static_cast<U>(b) % digits)));
 }
 template<typename T>
 inline W64 x86_btr(T r, T b) {
-  asm("btr %[b],%[r]" : [r] "+r"(r) : [b] "r"(b));
-  return r;
+  using U = std::make_unsigned_t<T>;
+  constexpr int digits = std::numeric_limits<U>::digits;
+  return static_cast<T>(static_cast<U>(r) & ~(U(1) << (static_cast<U>(b) % digits)));
 }
 template<typename T>
 inline W64 x86_btc(T r, T b) {
-  asm("btc %[b],%[r]" : [r] "+r"(r) : [b] "r"(b));
-  return r;
+  using U = std::make_unsigned_t<T>;
+  constexpr int digits = std::numeric_limits<U>::digits;
+  return static_cast<T>(static_cast<U>(r) ^ (U(1) << (static_cast<U>(b) % digits)));
 }
 
 // Return the old value of the bit, but still update the data
 template<typename T>
 inline bool x86_test_bts(T& r, T b) {
-  byte c;
-  asm("bts %[b],%[r]; setc %[c]" : [c] "=r"(c), [r] "+r"(r) : [b] "r"(b));
+  bool c = x86_bt(r, b);
+  r = static_cast<T>(x86_bts(r, b));
   return c;
 }
 template<typename T>
 inline bool x86_test_btr(T& r, T b) {
-  byte c;
-  asm("btr %[b],%[r]; setc %[c]" : [c] "=r"(c), [r] "+r"(r) : [b] "r"(b));
+  bool c = x86_bt(r, b);
+  r = static_cast<T>(x86_btr(r, b));
   return c;
 }
 template<typename T>
 inline bool x86_test_btc(T& r, T b) {
-  byte c;
-  asm("btc %[b],%[r]; setc %[c]" : [c] "=r"(c), [r] "+r"(r) : [b] "r"(b));
+  bool c = x86_bt(r, b);
+  r = static_cast<T>(x86_btc(r, b));
   return c;
-}
-
-// Full SMP-aware locking with test-and-[set|reset|complement] in memory
-template<typename T>
-inline bool x86_locked_bts(T& r, T b) {
-  byte c;
-  asm volatile("lock bts %[b],%[r]; setc %[c]" : [c] "=r"(c), [r] "+m"(r) : [b] "r"(b) : "memory");
-  return c;
-}
-template<typename T>
-inline bool x86_locked_btr(T& r, T b) {
-  byte c;
-  asm volatile("lock btr %[b],%[r]; setc %[c]" : [c] "=r"(c), [r] "+m"(r) : [b] "r"(b) : "memory");
-  return c;
-}
-template<typename T>
-inline bool x86_locked_btc(T& r, T b) {
-  byte c;
-  asm volatile("lock btc %[b],%[r]; setc %[c]" : [c] "=r"(c), [r] "+m"(r) : [b] "r"(b) : "memory");
-  return c;
-}
-
-template<typename T>
-inline T bswap(T r) {
-  asm("bswap %[r]" : [r] "+r"(r));
-  return r;
 }
 
 static inline W16 x86_sse_maskeqb(const vec16b v, byte target) {
@@ -476,69 +428,10 @@ static inline W16 x86_sse_maskeqb(const vec16b v, byte target) {
 }
 
 // This is a barrier for the compiler only, NOT the processor!
-#define barrier() asm volatile("" : : : "memory")
+#define barrier() std::atomic_signal_fence(std::memory_order_seq_cst)
 
 // Denote parallel sections for the compiler
 #define parallel
-
-template<typename T>
-static inline T xchg(T& v, T newv) {
-  switch (sizeof(T)) {
-  case 1:
-    asm volatile("lock xchgb %[newv],%[v]" : [v] "+m"(v), [newv] "+r"(newv) : : "memory");
-    break;
-  case 2:
-    asm volatile("lock xchgw %[newv],%[v]" : [v] "+m"(v), [newv] "+r"(newv) : : "memory");
-    break;
-  case 4:
-    asm volatile("lock xchgl %[newv],%[v]" : [v] "+m"(v), [newv] "+r"(newv) : : "memory");
-    break;
-  case 8:
-    asm volatile("lock xchgq %[newv],%[v]" : [v] "+m"(v), [newv] "+r"(newv) : : "memory");
-    break;
-  }
-  return newv;
-}
-
-template<typename T>
-static inline T xadd(T& v, T incr) {
-  switch (sizeof(T)) {
-  case 1:
-    asm volatile("lock xaddb %[incr],%[v]" : [v] "+m"(v), [incr] "+r"(incr) : : "memory");
-    break;
-  case 2:
-    asm volatile("lock xaddw %[incr],%[v]" : [v] "+m"(v), [incr] "+r"(incr) : : "memory");
-    break;
-  case 4:
-    asm volatile("lock xaddl %[incr],%[v]" : [v] "+m"(v), [incr] "+r"(incr) : : "memory");
-    break;
-  case 8:
-    asm volatile("lock xaddq %[incr],%[v]" : [v] "+m"(v), [incr] "+r"(incr) : : "memory");
-    break;
-  }
-  return incr;
-}
-
-template<typename T>
-static inline T cmpxchg(T& mem, T newv, T cmpv) {
-  switch (sizeof(T)) {
-  case 1:
-    asm volatile("lock cmpxchgb %[newv],%[mem]" : [mem] "+m"(mem), [cmpv] "+a"(cmpv), [newv] "+r"(newv) : : "memory");
-    break;
-  case 2:
-    asm volatile("lock cmpxchgw %[newv],%[mem]" : [mem] "+m"(mem), [cmpv] "+a"(cmpv), [newv] "+r"(newv) : : "memory");
-    break;
-  case 4:
-    asm volatile("lock cmpxchgl %[newv],%[mem]" : [mem] "+m"(mem), [cmpv] "+a"(cmpv), [newv] "+r"(newv) : : "memory");
-    break;
-  case 8:
-    asm volatile("lock cmpxchgq %[newv],%[mem]" : [mem] "+m"(mem), [cmpv] "+a"(cmpv), [newv] "+r"(newv) : : "memory");
-    break;
-  }
-
-  // Return the old value in the slot (so we can check if it matches newv)
-  return cmpv;
-}
 
 static inline void cpu_pause() {
   asm volatile("pause" : : : "memory");
@@ -560,26 +453,15 @@ static inline W64 rdtsc() {
 
 template<typename T>
 static inline T x86_ror(T r, int n) {
-  asm("ror %%cl,%[r]" : [r] "+q"(r) : [n] "c"((byte)n));
-  return r;
+  using U = std::make_unsigned_t<T>;
+  return static_cast<T>(std::rotr(static_cast<U>(r), n));
 }
 
 template<typename T>
 static inline T x86_rol(T r, int n) {
-  asm("rol %%cl,%[r]" : [r] "+q"(r) : [n] "c"((byte)n));
-  return r;
+  using U = std::make_unsigned_t<T>;
+  return static_cast<T>(std::rotl(static_cast<U>(r), n));
 }
-
-#ifndef PTLSIM_AMD64
-// Need to emulate this on 32-bit x86
-// Throws "explicit template specialization cannot have a storage class" in gcc 4.4.1 (probably 4.3+).
-// Fix as per http://gcc.gnu.org/gcc-4.3/porting_to.html
-//static inline W64 x86_ror(W64 r, int n) {
-template<>
-inline W64 x86_ror(W64 r, int n) {
-  return (r >> n) | (r << (64 - n));
-}
-#endif
 
 template<typename T>
 static inline T dupb(const byte b) {
@@ -716,23 +598,6 @@ void swap(T& a, T& b) {
   b = t;
 }
 
-// #define noinline __attribute__((noinline))
-
-//
-// Force the compiler to use branchless forms:
-//
-template<typename T, typename K>
-T select(K cond, T if0, T if1) {
-  T z = if0;
-  asm("test %[cond],%[cond]; cmovnz %[if1],%[z]" : [z] "+r"(z) : [cond] "r"(cond), [if1] "rm"(if1) : "flags");
-  return z;
-}
-
-template<typename T, typename K>
-void condmove(K cond, T& v, T newv) {
-  asm("test %[cond],%[cond]; cmovnz %[newv],%[v]" : [v] "+r"(v) : [cond] "r"(cond), [newv] "rm"(newv) : "flags");
-}
-
 #define ptralign(ptr, bytes) ((decltype(ptr))((unsigned long)(ptr) & ~((bytes) - 1)))
 #define ptrmask(ptr, bytes) ((decltype(ptr))((unsigned long)(ptr) & ((bytes) - 1)))
 
@@ -787,7 +652,7 @@ extern const W64 expand_8bit_to_64bit_lut[256];
 
 // Operand must be non-zero or result is undefined:
 inline unsigned int lsbindex32(W32 n) {
-  return x86_bsf32(n);
+  return n ? std::countr_zero(n) : 0;
 }
 
 inline int lsbindexi32(W32 n) {
@@ -795,21 +660,9 @@ inline int lsbindexi32(W32 n) {
   return (n ? r : -1);
 }
 
-#ifdef PTLSIM_AMD64
 inline unsigned int lsbindex64(W64 n) {
-  return x86_bsf64(n);
+  return n ? std::countr_zero(n) : 0;
 }
-#else
-inline unsigned int lsbindex64(W64 n) {
-  W32 lo = LO32(n);
-  W32 hi = HI32(n);
-
-  int ilo = lsbindex32(lo);
-  int ihi = lsbindex32(hi) + 32;
-
-  return (lo) ? ilo : ihi;
-}
-#endif
 
 inline unsigned int lsbindexi64(W64 n) {
   int r = lsbindex64(n);
@@ -825,7 +678,7 @@ inline unsigned int lsbindex(W64 n) {
 
 // Operand must be non-zero or result is undefined:
 inline unsigned int msbindex32(W32 n) {
-  return x86_bsr32(n);
+  return n ? std::bit_width(n) - 1 : 0;
 }
 
 inline int msbindexi32(W32 n) {
@@ -833,21 +686,9 @@ inline int msbindexi32(W32 n) {
   return (n ? r : -1);
 }
 
-#ifdef PTLSIM_AMD64
 inline unsigned int msbindex64(W64 n) {
-  return x86_bsr64(n);
+  return n ? std::bit_width(n) - 1 : 0;
 }
-#else
-inline unsigned int msbindex64(W64 n) {
-  W32 lo = LO32(n);
-  W32 hi = HI32(n);
-
-  int ilo = msbindex32(lo);
-  int ihi = msbindex32(hi) + 32;
-
-  return (hi) ? ihi : ilo;
-}
-#endif
 
 inline unsigned int msbindexi64(W64 n) {
   int r = msbindex64(n);

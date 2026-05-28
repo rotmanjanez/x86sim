@@ -256,40 +256,6 @@ decl_div_rem_s(W64);
 
 using namespace superstl;
 
-//
-// Division functions
-//
-#ifdef PTLSIM_AMD64
-
-#define do_div(n, base)                                                                                                \
-  ({                                                                                                                   \
-    W32 __base = (base);                                                                                               \
-    W32 __rem;                                                                                                         \
-    __rem = ((W64)(n)) % __base;                                                                                       \
-    (n) = ((W64)(n)) / __base;                                                                                         \
-    __rem;                                                                                                             \
-  })
-
-#else
-
-// 32-bit x86
-#define do_div(n, base)                                                                                                \
-  ({                                                                                                                   \
-    W32 __upper, __low, __high, __mod, __base;                                                                         \
-    __base = (base);                                                                                                   \
-    asm("" : "=a"(__low), "=d"(__high) : "A"(n));                                                                      \
-    __upper = __high;                                                                                                  \
-    if (__high) {                                                                                                      \
-      __upper = __high % (__base);                                                                                     \
-      __high = __high / (__base);                                                                                      \
-    }                                                                                                                  \
-    asm("divl %2" : "=a"(__low), "=d"(__mod) : "rm"(__base), "0"(__low), "1"(__upper));                                \
-    asm("" : "=A"(n) : "a"(__low), "d"(__high));                                                                       \
-    __mod;                                                                                                             \
-  })
-
-#endif
-
 const unsigned char popcountlut8bit[] = {
     0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 1, 2, 2, 3, 2,
     3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3,
