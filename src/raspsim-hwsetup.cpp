@@ -7,7 +7,7 @@
 struct PTLsimConfig;
 extern PTLsimConfig config;
 
-static Context ctx alignto(4096) insection(".ctx"){};
+static Context ctx alignto(4096){};
 static AddressSpace asp{};
 
 // Raspsim class implementation

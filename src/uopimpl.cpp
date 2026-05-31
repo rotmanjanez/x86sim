@@ -15,15 +15,6 @@ inline void capture_uop_context(const IssueState& state, W64 ra, W64 rb, W64 rc,
                                 int opcode, int size, int cond = 0, int extshift = 0, W64 riptaken = 0,
                                 W64 ripseq = 0) {}
 
-#ifndef PTLSIM_AMD64
-#define EMULATE_64BIT
-#endif
-
-#ifdef PTLSIM_AMD64
-typedef W64 Wmax;
-#else
-typedef W32 Wmax;
-#endif
 
 // void uop_impl_bogus(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags) { asm("int3"); }
 
@@ -32,50 +23,25 @@ typedef W32 Wmax;
 //
 template<typename T>
 inline byte x86_genflags(T r) {
-  byte sf, zf, pf;
-  asm("test %[r],%[r]\n"
-      "sets %[sf]\n"
-      "setz %[zf]\n"
-      "setp %[pf]\n"
-      : [sf] "=q"(sf), [zf] "=q"(zf), [pf] "=q"(pf)
-      : [r] "q"(r));
+  using U = std::make_unsigned_t<T>;
 
-  return (sf << 7) + (zf << 6) + (pf << 2);
-}
+  const U value = static_cast<U>(r);
+  byte flags = 0;
 
-template<typename T>
-inline byte x86_genflags_separate(T sr, T zr, T pr) {
-  byte sf, zf, pf;
-  asm("test %[sr],%[sr]\n"
-      "sets %[sf]\n"
-      "test %[zr],%[zr]\n"
-      "setz %[zf]\n"
-      "test %[pr],%[pr]\n"
-      "setp %[pf]\n"
-      "shl  $7,%[sf]\n"
-      "shl  $6,%[zf]\n"
-      "shl  $2,%[pf]\n"
-      : [sf] "=q"(sf), [zf] "=q"(zf), [pf] "=q"(pf)
-      : [sr] "q"(sr), [zr] "q"(zr), [pr] "q"(pr));
+  if ((value >> ((sizeof(T) * 8) - 1)) & 1)
+    flags |= FLAG_SF;
+  if (value == 0)
+    flags |= FLAG_ZF;
+  if ((std::popcount(static_cast<unsigned>(value & 0xff)) & 1) == 0)
+    flags |= FLAG_PF;
 
-  return (sf | zf | pf);
+  return flags;
 }
 
 template byte x86_genflags<byte>(byte r);
 template byte x86_genflags<W16>(W16 r);
 template byte x86_genflags<W32>(W32 r);
-
-#ifdef PTLSIM_AMD64
 template byte x86_genflags<W64>(W64 r);
-#else
-template<>
-byte x86_genflags<W64>(W64 r) {
-
-  W32 l = LO32(r);
-  W32 h = HI32(r);
-  return x86_genflags_separate(h, l | h, l ^ h);
-}
-#endif
 
 //
 // Flags format: OF - - - SF ZF - AF - PF - CF
@@ -274,52 +240,12 @@ void uop_impl_xorcc(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 
   capture_uop_context(state, ra, rb, rc, raflags, rbflags, rcflags, OP_xorcc, 0);
 }
 
-#ifdef EMULATE_64BIT
-#define make_x86_aluop2_chained_64bit(name, opcode1, opcode2, pretext)                                                 \
-  template<int genflags>                                                                                               \
-  struct x86_op_##name<W64, genflags> {                                                                                \
-    W64 operator()(W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags, byte& cf, byte& of) {                \
-      W32 ralo = LO32(ra);                                                                                             \
-      W32 rahi = HI32(ra);                                                                                             \
-      W32 rblo = LO32(rb);                                                                                             \
-      W32 rbhi = HI32(rb);                                                                                             \
-      asm(pretext #opcode1 " %[rblo],%[ralo];" #opcode2 " %[rbhi],%[rahi];"                                            \
-                           "setc %[cf]; seto %[of]"                                                                    \
-          : [ralo] "+r"(ralo), [rahi] "+r"(rahi), [cf] "=q"(cf), [of] "=q"(of)                                         \
-          : [rblo] "rm"(rblo), [rbhi] "rm"(rbhi), [rcflags] "rm"(rcflags));                                            \
-      return ((W64)rahi << 32) + ((W64)ralo);                                                                          \
-    }                                                                                                                  \
-  };
-#endif
-
 make_x86_aluop_all_sizes(add, adc, ZAPS | CF | OF, PRETEXT_ALL_FLAGS_IN);
 make_x86_aluop_all_sizes(sub, sbb, ZAPS | CF | OF, PRETEXT_ALL_FLAGS_IN);
-
-#ifdef EMULATE_64BIT
-make_x86_aluop2_chained_64bit(add, adc, adc, PRETEXT_ALL_FLAGS_IN);
-make_x86_aluop2_chained_64bit(sub, sbb, sbb, PRETEXT_ALL_FLAGS_IN);
-#endif
 
 //
 // 3-operand ALU operation with shift of rc by 0/1/2/3
 //
-
-#define make_x86_aluop3(name, opcode1, opcode2)                                                                        \
-  template<typename T, int genflags>                                                                                   \
-  struct name {                                                                                                        \
-    T operator()(T ra, T rb, T rc, W16 raflags, W16 rbflags, W16 rcflags, byte& cf, byte& of) {                        \
-      if (genflags & (SETFLAG_CF | SETFLAG_OF))                                                                        \
-        asm(#opcode1 " %[rb],%[ra];" #opcode2 " %[rc],%[ra]; setc %[cf]; seto %[of]"                                   \
-            : [ra] "+r"(ra), [cf] "=q"(cf), [of] "=q"(of)                                                              \
-            : [rb] "rm"(rb), [rc] "rm"(rc));                                                                           \
-      else                                                                                                             \
-        asm(#opcode1 " %[rb],%[ra]; " #opcode2 " %[rc],%[ra]"                                                          \
-            : [ra] "+r"(ra)                                                                                            \
-            : [rb] "rm"(rb), [rc] "rm"(rc)                                                                             \
-            : "flags");                                                                                                \
-      return ra;                                                                                                       \
-    }                                                                                                                  \
-  }
 
 template<int ptlopcode, template<typename, int> class func, typename T, int genflags, int rcshift>
 inline void aluop3s(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags) {
@@ -360,8 +286,6 @@ inline void aluop3s(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 
           {&aluop3s<ptlopcode, nativeop, W64, 0, 3>, &aluop3s<ptlopcode, nativeop, W64, (flagset), 3>},                \
       },                                                                                                               \
   }
-
-//make_x86_aluop3(x86_op_ ## name, opcode1, opcode2); \
 
 #define make_exp_aluop3_all_sizes_all_shifts(ptlopcode, name, expr, setflags)                                          \
   make_exp_aluop(exp_op_##name, (expr));                                                                               \
@@ -616,12 +540,12 @@ void uop_impl_permb(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 
   template<typename T, int genflags>                                                                                   \
   struct name {                                                                                                        \
     T operator()(T ra, T rb, T rc, W16 raflags, W16 rbflags, W16 rcflags, byte& cf, byte& of) {                        \
-      Wmax rax = ra;                                                                                                   \
-      Wmax rdx;                                                                                                        \
+      W64 rax = ra;                                                                                                   \
+      W64 rdx;                                                                                                        \
       asm(#opcode " %[rb]; setc %[cf]; seto %[of];"                                                                    \
           : [rax] "+a"(rax), [rdx] "+d"(rdx), [cf] "=q"(cf), [of] "=q"(of)                                             \
           : [rb] "q"(rb));                                                                                             \
-      Wmax rd;                                                                                                         \
+      W64 rd;                                                                                                         \
       if (sizeof(T) == 1)                                                                                              \
         (extrtextsize1);                                                                                               \
       else                                                                                                             \
@@ -1581,26 +1505,6 @@ W16 compare_and_gen_flags(T ra, T rb) {
 
   return x86_genflags<T>(ra) | (W16(cf) << 0) | (W16(of) << 11);
 }
-
-#ifdef EMULATE_64BIT
-template<>
-W16 compare_and_gen_flags(W64 ra, W64 rb) {
-  byte cf = 0;
-  byte of = 0;
-  W32 ralo = LO32(ra);
-  W32 rahi = HI32(ra);
-  W32 rblo = LO32(rb);
-  W32 rbhi = HI32(rb);
-  asm("sub %[rblo],%[ralo]\n"
-      "sub %[rbhi],%[rahi]\n"
-      "setc %[cf]; seto %[of]"
-      : [ralo] "+r"(ralo), [rahi] "+r"(rahi), [cf] "=q"(cf), [of] "=q"(of)
-      : [rblo] "rm"(rblo), [rbhi] "rm"(rbhi));
-
-  return (x86_genflags<byte>(byte(ra)) & FLAG_PF) | ((ra) ? 0 : FLAG_ZF) | (bit(ra, 63) ? FLAG_SF : 0) |
-         (W16(cf) << 0) | (W16(of) << 11);
-}
-#endif
 
 template<int sizeshift, int cond>
 void uop_impl_vcmp(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags) {

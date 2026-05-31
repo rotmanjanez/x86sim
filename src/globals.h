@@ -305,10 +305,6 @@ inline bool x86_test_btc(T& r, T b) {
 // Denote parallel sections for the compiler
 #define parallel
 
-static inline void cpu_pause() {
-  asm volatile("pause" : : : "memory");
-}
-
 template<typename T>
 static inline T x86_ror(T r, int n) {
   using U = std::make_unsigned_t<T>;
