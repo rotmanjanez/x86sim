@@ -8,48 +8,6 @@
 #include "decode.h"
 #include "logging.h"
 
-template<typename T>
-void assist_div(Context& ctx) {
-  Waddr rax = ctx.commitarf[REG_rax];
-  Waddr rdx = ctx.commitarf[REG_rdx];
-  asm("div %[divisor];" : "+a"(rax), "+d"(rdx) : [divisor] "q"((T)ctx.commitarf[REG_ar1]));
-  ctx.commitarf[REG_rax] = rax;
-  ctx.commitarf[REG_rdx] = rdx;
-  ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
-}
-
-template<typename T>
-void assist_idiv(Context& ctx) {
-  Waddr rax = ctx.commitarf[REG_rax];
-  Waddr rdx = ctx.commitarf[REG_rdx];
-  asm("idiv %[divisor];" : "+a"(rax), "+d"(rdx) : [divisor] "q"((T)ctx.commitarf[REG_ar1]));
-  ctx.commitarf[REG_rax] = rax;
-  ctx.commitarf[REG_rdx] = rdx;
-  ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
-}
-
-// Not possible in 64-bit mode
-#ifndef PTLSIM_AMD64
-template<>
-void assist_div<W64>(Context& ctx) {
-  assert(false);
-}
-template<>
-void assist_idiv<W64>(Context& ctx) {
-  assert(false);
-}
-#endif
-
-template void assist_div<byte>(Context& ctx);
-template void assist_div<W16>(Context& ctx);
-template void assist_div<W32>(Context& ctx);
-template void assist_div<W64>(Context& ctx);
-
-template void assist_idiv<byte>(Context& ctx);
-template void assist_idiv<W16>(Context& ctx);
-template void assist_idiv<W32>(Context& ctx);
-template void assist_idiv<W64>(Context& ctx);
-
 void assist_int(Context& ctx) {
   byte intid = ctx.commitarf[REG_ar1];
   if (intid == 0x80) {
@@ -1458,22 +1416,6 @@ bool TraceDecoder::decode_complex() {
     }
     default:
       // 6 (div), 7 (idiv)
-      /*
-      ra.type = OPTYPE_REG;
-      ra.reg.reg = 0; // not used
-      move_reg_or_mem(ra, rd, REG_ar1);
-
-      int subop_and_size_to_assist_idx[2][4] = {
-        {ASSIST_DIV8,  ASSIST_DIV16,  ASSIST_DIV32,  ASSIST_DIV64},
-        {ASSIST_IDIV8, ASSIST_IDIV16, ASSIST_IDIV32, ASSIST_IDIV64}
-      };
-
-      int size = (rd.type == OPTYPE_REG) ? reginfo[rd.reg.reg].sizeshift : rd.mem.size;
-
-      microcode_assist(subop_and_size_to_assist_idx[modrm.reg - 6][size], ripstart, rip);
-      end_of_block = 1;
-      */
-
       ra.type = OPTYPE_REG;
       ra.reg.reg = 0; // not used
       move_reg_or_mem(ra, rd, REG_temp2);
@@ -1522,18 +1464,6 @@ bool TraceDecoder::decode_complex() {
         put(TransOp(OP_mov, REG_rax, REG_rax, REG_temp0, REG_zero, sizeshift)); // quotient in %al
         put(TransOp(OP_maskb, REG_rax, REG_rax, REG_temp1, REG_imm, 3, 0,
                     MaskControlInfo(56, 8, 56))); // remainder in %ah
-
-        /*
-        // Byte-size divides have special semantics
-        int subop_and_size_to_assist_idx[2][4] = {
-          {ASSIST_DIV8,  ASSIST_DIV16,  ASSIST_DIV32,  ASSIST_DIV64},
-          {ASSIST_IDIV8, ASSIST_IDIV16, ASSIST_IDIV32, ASSIST_IDIV64}
-        };
-
-        put(TransOp(OP_mov, REG_ar1, REG_zero, REG_temp2, REG_zero, 3));
-        microcode_assist(subop_and_size_to_assist_idx[modrm.reg - 6][sizeshift], ripstart, rip);
-        end_of_block = 1;
-        */
       }
 
       break;

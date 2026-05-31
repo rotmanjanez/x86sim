@@ -377,15 +377,6 @@ enum {
   ASSIST_INVALID_OPCODE,
   ASSIST_EXEC_PAGE_FAULT,
   ASSIST_GP_FAULT,
-  // Integer arithmetic
-  ASSIST_DIV8,
-  ASSIST_DIV16,
-  ASSIST_DIV32,
-  ASSIST_DIV64,
-  ASSIST_IDIV8,
-  ASSIST_IDIV16,
-  ASSIST_IDIV32,
-  ASSIST_IDIV64,
   // x87
   ASSIST_X87_FIST,
   ASSIST_X87_FLDCW,
@@ -457,15 +448,6 @@ static const char* assist_names[ASSIST_COUNT] = {
     "invalid_opcode",
     "exec_page_fault",
     "gp_fault",
-    // Integer arithmetic
-    "div<byte>",
-    "div<W16>",
-    "div<W32>",
-    "div<W64>",
-    "idiv<byte>",
-    "idiv<W16>",
-    "idiv<W32>",
-    "idiv<W64>",
     // x87
     "x87_fist",
     "x87_fldcw",
@@ -535,11 +517,6 @@ void update_assist_stats(assist_func_t assist);
 void assist_invalid_opcode(Context& ctx);
 void assist_exec_page_fault(Context& ctx);
 void assist_gp_fault(Context& ctx);
-// Integer arithmetic
-template<typename T>
-void assist_div(Context& ctx);
-template<typename T>
-void assist_idiv(Context& ctx);
 // x87
 void assist_x87_fist(Context& ctx);
 void assist_x87_fldcw(Context& ctx);

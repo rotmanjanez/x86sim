@@ -37,7 +37,7 @@ int sys_execve(const char* filename, const char** argv, const char** envp);
 pid_t sys_gettid();
 pid_t sys_getppid();
 pid_t sys_getpid();
-void sys_exit(int code);
+[[noreturn]] void sys_exit(int code);
 void* sys_brk(void* newbrk);
 int sys_readlink(const char* path, char* buf, size_t bufsiz);
 W64 sys_nanosleep(W64 nsec);

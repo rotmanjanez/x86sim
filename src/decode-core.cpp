@@ -56,15 +56,6 @@ const assist_func_t assistid_to_func[ASSIST_COUNT] = {
     assist_invalid_opcode,
     assist_exec_page_fault,
     assist_gp_fault,
-    // Integer arithmetic
-    assist_div<byte>,
-    assist_div<W16>,
-    assist_div<W32>,
-    assist_div<W64>,
-    assist_idiv<byte>,
-    assist_idiv<W16>,
-    assist_idiv<W32>,
-    assist_idiv<W64>,
     // x87
     assist_x87_fist,
     assist_x87_fldcw,
