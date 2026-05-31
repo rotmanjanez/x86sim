@@ -236,124 +236,6 @@ struct std::formatter<v8hi> {
   }
 };
 
-inline vec16b x86_sse_pcmpeqb(vec16b a, vec16b b) {
-  asm("pcmpeqb %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-inline vec8w x86_sse_pcmpeqw(vec8w a, vec8w b) {
-  asm("pcmpeqw %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-inline vec4i x86_sse_pcmpeqd(vec4i a, vec4i b) {
-  asm("pcmpeqd %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-inline vec16b x86_sse_psubusb(vec16b a, vec16b b) {
-  asm("psubusb %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-inline vec16b x86_sse_paddusb(vec16b a, vec16b b) {
-  asm("paddusb %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-inline vec16b x86_sse_pandb(vec16b a, vec16b b) {
-  asm("pand %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-inline vec8w x86_sse_psubusw(vec8w a, vec8w b) {
-  asm("psubusb %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-inline vec8w x86_sse_paddusw(vec8w a, vec8w b) {
-  asm("paddsub %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-inline vec8w x86_sse_pandw(vec8w a, vec8w b) {
-  asm("pand %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-inline vec16b x86_sse_packsswb(vec8w a, vec8w b) {
-  asm("packsswb %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return (vec16b)a;
-}
-inline W32 x86_sse_pmovmskb(vec16b vec) {
-  W32 mask;
-  asm("pmovmskb %[vec],%[mask]" : [mask] "=r"(mask) : [vec] "x"(vec));
-  return mask;
-}
-inline W32 x86_sse_pmovmskw(vec8w vec) {
-  return x86_sse_pmovmskb(x86_sse_packsswb(vec, vec)) & 0xff;
-}
-inline vec16b x86_sse_psadbw(vec16b a, vec16b b) {
-  asm("psadbw %[b],%[a]" : [a] "+x"(a) : [b] "xg"(b));
-  return a;
-}
-template<int i>
-inline W16 x86_sse_pextrw(vec16b a) {
-  W32 rd;
-  asm("pextrw %[i],%[a],%[rd]" : [rd] "=r"(rd) : [a] "x"(a), [i] "N"(i));
-  return rd;
-}
-
-inline vec16b x86_sse_ldvbu(const vec16b* m) {
-  vec16b rd;
-  asm("movdqu %[m],%[rd]" : [rd] "=x"(rd) : [m] "xm"(*m));
-  return rd;
-}
-inline void x86_sse_stvbu(vec16b* m, const vec16b ra) {
-  asm("movdqu %[ra],%[m]" : [m] "=m"(*m) : [ra] "x"(ra) : "memory");
-}
-inline vec8w x86_sse_ldvwu(const vec8w* m) {
-  vec8w rd;
-  asm("movdqu %[m],%[rd]" : [rd] "=x"(rd) : [m] "xm"(*m));
-  return rd;
-}
-inline void x86_sse_stvwu(vec8w* m, const vec8w ra) {
-  asm("movdqu %[ra],%[m]" : [m] "=m"(*m) : [ra] "x"(ra) : "memory");
-}
-
-inline vec16b x86_sse_zerob() {
-  vec16b rd;
-  asm("pxor %[rd],%[rd]" : [rd] "+x"(rd));
-  return rd;
-}
-inline vec16b x86_sse_onesb() {
-  vec16b rd;
-  asm("pcmpeqb %[rd],%[rd]" : [rd] "+x"(rd));
-  return rd;
-}
-inline vec8w x86_sse_zerow() {
-  vec8w rd;
-  asm("pxor %[rd],%[rd]" : [rd] "+x"(rd));
-  return rd;
-}
-inline vec8w x86_sse_onesw() {
-  vec8w rd;
-  asm("pcmpeqw %[rd],%[rd]" : [rd] "+x"(rd));
-  return rd;
-}
-
-// If lddqu is available (SSE3: Athlon 64 (some cores, like X2), Pentium 4 Prescott), use that instead. It may be faster.
-
-extern const byte byte_to_vec16b[256][16];
-extern const byte index_bytes_vec16b[16][16];
-extern const byte index_bytes_plus1_vec16b[16][16];
-
-inline vec16b x86_sse_dupb(const byte b) {
-  return *((vec16b*)&byte_to_vec16b[b]);
-}
-
-inline vec8w x86_sse_dupw(const W16 b) {
-  W32 w = (b << 16) | b;
-  vec8w v;
-  W32* wp = (W32*)&v;
-  wp[0] = w;
-  wp[1] = w;
-  wp[2] = w;
-  wp[3] = w;
-  return v;
-}
-
 inline void x86_set_mxcsr(W32 value) {
   asm volatile("ldmxcsr %[value]" : : [value] "m"(value));
 }
@@ -421,10 +303,6 @@ inline bool x86_test_btc(T& r, T b) {
   bool c = x86_bt(r, b);
   r = static_cast<T>(x86_btc(r, b));
   return c;
-}
-
-static inline W16 x86_sse_maskeqb(const vec16b v, byte target) {
-  return x86_sse_pmovmskb(x86_sse_pcmpeqb(v, x86_sse_dupb(target)));
 }
 
 // This is a barrier for the compiler only, NOT the processor!

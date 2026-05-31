@@ -411,12 +411,11 @@ typedef byte issueq_tag_t;
 template<int size, int operandcount = MAX_OPERANDS>
 struct IssueQueue {
 #ifdef BIG_ROB
-  typedef FullyAssociativeTags16bit<size, size> assoc_t;
-  typedef vec8w vec_t;
+  using assoc_t = FullyAssociativeTagsNbit<size, 16, size>;
 #else
-  typedef FullyAssociativeTags8bit<size, size> assoc_t;
-  typedef vec16b vec_t;
+  using assoc_t = FullyAssociativeTagsNbit<size, 8, size>;
 #endif
+  using vec_t = typename assoc_t::tag_array_t;
 
   typedef issueq_tag_t tag_t;
 

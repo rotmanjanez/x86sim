@@ -355,43 +355,28 @@ struct std::formatter<FullyAssociativeTags<T, ways>> {
 
 
 //
-// Associative array implemented using vectorized
-// comparisons spread across multiple byte slices
-// and executed in parallel.
-//
-// This implementation is roughly 2-4x as fast
-// as the naive scalar code on SSE2 machines,
-// especially for larger arrays.
-//
-// Very small arrays (less than 8 entries) should
-// use the normal scalar FullyAssociativeTags
-// for best performance. Both classes use the
-// same principle for very fast one-hot matching.
+// Associative array
 //
 // Limitations:
 //
 // - Every tag in the array must be unique,
 //   except for the invalid tag (all 1s)
 //
-// - <size> can be from 1 to 128. Technically
-//   up to 254, however element 255 cannot
-//   be used. Matching is done in groups
-//   of 16 elements in parallel.
+// - <size> can be from 1 to 128.
 //
 // - <width> in bits can be from 1 to 64
 //
 
 template<int size, int width, int padsize = 0>
 struct FullyAssociativeTagsNbitOneHot {
-  typedef vec16b vec_t;
   typedef W64 base_t;
 
   static const int slices = (width + 7) / 8;
-  static const int chunkcount = (size + 15) / 16;
-  static const int padchunkcount = (padsize + 15) / 16;
+  static const int storewidth = slices * 8;
+  static constexpr base_t invalid_tag = ~base_t{0};
+  static constexpr base_t storemask = (storewidth >= 64) ? invalid_tag : ((base_t{1} << storewidth) - 1);
 
-  vec16b tags[slices][chunkcount + padchunkcount] alignto(16);
-  base_t tagsmirror[size]; // for fast scalar access
+  std::array<base_t, size + padsize> tags;
   std::bitset<size> valid;
   std::bitset<size> evictmap;
 
@@ -400,37 +385,18 @@ struct FullyAssociativeTagsNbitOneHot {
   void reset() {
     valid = 0;
     evictmap = 0;
-    memset(tags, 0xff, sizeof(tags));
-    memset(tagsmirror, 0xff, sizeof(tagsmirror));
+    tags.fill(invalid_tag);
   }
 
-  int match(const vec16b* targetslices) const {
-    vec16b sum = x86_sse_zerob();
-
-    foreach (i, chunkcount) {
-      vec16b eq = *((vec16b*)&index_bytes_plus1_vec16b[i]);
-      foreach (j, slices) {
-        eq = x86_sse_pandb(x86_sse_pcmpeqb(tags[j][i], targetslices[j]), eq);
-      }
-      sum = x86_sse_psadbw(sum, eq);
-    }
-
-    int idx = (x86_sse_pextrw<0>(sum) + x86_sse_pextrw<4>(sum));
-
-    return idx - 1;
-  }
-
-  static void prep(vec16b* targetslices, base_t tag) {
-    foreach (i, slices) {
-      targetslices[i] = x86_sse_dupb((byte)tag);
-      tag >>= 8;
-    }
-  }
+  static base_t stored_tag(base_t tag) { return tag & storemask; }
 
   int match(base_t tag) const {
-    vec16b targetslices[16];
-    prep(targetslices, tag);
-    return match(targetslices);
+    const base_t target = stored_tag(tag);
+    foreach (i, size) {
+      if (valid[i] && (stored_tag(tags[i]) == target))
+        return i;
+    }
+    return -1;
   }
 
   int search(base_t tag) const { return match(tag); }
@@ -438,14 +404,7 @@ struct FullyAssociativeTagsNbitOneHot {
   int operator()(base_t tag) const { return search(tag); }
 
   void update(int index, base_t tag) {
-    // Spread it across all the words
-    base_t t = tag;
-    foreach (i, slices) {
-      *(((byte*)(&tags[i])) + index) = (byte)t;
-      t >>= 8;
-    }
-
-    tagsmirror[index] = tag;
+    tags[index] = tag;
     valid[index] = 1;
     evictmap[index] = 1;
   }
@@ -477,7 +436,7 @@ struct FullyAssociativeTagsNbitOneHot {
   friend class ref;
 
   ref operator[](int index) { return ref(*this, index); }
-  base_t operator[](int index) const { return tagsmirror[index]; }
+  base_t operator[](int index) const { return tags[index]; }
 
   bool isvalid(int index) { return valid[index]; }
 
@@ -488,15 +447,16 @@ struct FullyAssociativeTagsNbitOneHot {
   }
 
   int insert(base_t tag) {
-    if (valid.all())
-      return -1;
-    int idx = lsb(~valid);
-    return insertslot(idx, tag);
+    foreach (idx, size) {
+      if (!valid[idx])
+        return insertslot(idx, tag);
+    }
+    return -1;
   }
 
   void invalidateslot(int index) {
     valid[index] = 0;
-    (*this)[index] = 0xffffffffffffffffULL; // invalid marker
+    tags[index] = invalid_tag;
   }
 
   void validateslot(int index) { valid[index] = 1; }
@@ -513,8 +473,8 @@ struct FullyAssociativeTagsNbitOneHot {
     std::bitset<size> m;
 
     foreach (i, size) {
-      base_t tag = tagsmirror[i];
-      m[i] = ((tag & tagmask) == targettag);
+      base_t tag = tags[i];
+      m[i] = valid[i] && ((tag & tagmask) == targettag);
     }
 
     return m;
@@ -544,7 +504,13 @@ struct FullyAssociativeTagsNbitOneHot {
     return way;
   }
 
-  int lru() const { return (evictmap.all()) ? 0 : lsb(~evictmap); }
+  int lru() const {
+    foreach (i, size) {
+      if (!evictmap[i])
+        return i;
+    }
+    return 0;
+  }
 
   int select(base_t target, base_t& oldtag) {
     int way = probe(target);
@@ -552,7 +518,7 @@ struct FullyAssociativeTagsNbitOneHot {
       way = lru();
       if (evictmap.all())
         evictmap = 0;
-      oldtag = tagsmirror[way];
+      oldtag = tags[way];
       update(way, target);
     }
     use(way);
@@ -568,7 +534,7 @@ struct FullyAssociativeTagsNbitOneHot {
     base_t tag = (*this)[slot];
     std::string result = std::format("{:>3}: {:016x} ", slot, tag);
     for (int i = 0; i < slices; i++) {
-      const byte b = *(((byte*)(&tags[i])) + slot);
+      const byte b = (byte)(tag >> (i * 8));
       result += std::format(" {:02x}", b);
     }
     if (!valid[slot])
@@ -1108,35 +1074,38 @@ struct std::formatter<LockableAssociativeArray<T, V, setcount, waycount, linesiz
   }
 };
 
-template<int size, int padsize = 0>
-struct FullyAssociativeTags8bit {
-  typedef vec16b vec_t;
-  typedef byte base_t;
+template<int size, int width, int padsize = 0>
+struct FullyAssociativeTagsNbit {
+  static_assert((width == 8) || (width == 16), "FullyAssociativeTagsNbit supports 8-bit and 16-bit tags");
 
-  static const int chunkcount = (size + 15) / 16;
-  static const int padchunkcount = (padsize + 15) / 16;
+  using base_t = std::conditional_t<width == 8, byte, W16>;
+  static constexpr int tags_per_chunk = 16 / sizeof(base_t);
+  using tag_array_t = std::array<base_t, tags_per_chunk>;
+  using vec_t = tag_array_t;
 
-  vec_t tags[chunkcount + padchunkcount] alignto(16);
+  std::array<base_t, size + padsize> tags;
   std::bitset<size> valid;
 
-  W64 getvalid() { return valid.integer(); }
+  W64 getvalid() { return valid.to_ullong(); }
 
-  FullyAssociativeTags8bit() { reset(); }
+  FullyAssociativeTagsNbit() { reset(); }
 
-  base_t operator[](int i) const { return ((base_t*)&tags)[i]; }
+  base_t operator[](int i) const { return tags[i]; }
 
-  base_t& operator[](int i) { return ((base_t*)&tags)[i]; }
+  base_t& operator[](int i) { return tags[i]; }
 
   bool isvalid(int index) { return valid[index]; }
 
   void reset() {
     valid = 0;
-    W64* p = (W64*)&tags;
-    foreach (i, ((chunkcount + padchunkcount) * 16) / 8)
-      p[i] = 0xffffffffffffffffLL;
+    tags.fill((base_t)-1);
   }
 
-  static const vec_t prep(base_t tag) { return x86_sse_dupb(tag); }
+  static tag_array_t prep(base_t tag) {
+    tag_array_t result;
+    result.fill(tag);
+    return result;
+  }
 
   int insertslot(int idx, base_t tag) {
     valid[idx] = 1;
@@ -1151,183 +1120,31 @@ struct FullyAssociativeTags8bit {
     return insertslot(idx, tag);
   }
 
-  std::bitset<size> match(const vec_t target) const {
+  std::bitset<size> match(const tag_array_t& target) const {
     std::bitset<size> m = 0;
 
-    foreach (i, chunkcount) {
-      auto v = x86_sse_pmovmskb(x86_sse_pcmpeqb(target, tags[i]));
-      m |= v << (i * 16);
-    }
+    foreach (i, size)
+      if (tags[i] == target[i % tags_per_chunk])
+        m[i] = 1;
 
     return m & valid;
   }
 
   std::bitset<size> match(base_t target) const { return match(prep(target)); }
 
-  std::bitset<size> matchany(const vec_t target) const {
+  std::bitset<size> matchany(const tag_array_t& target) const {
     std::bitset<size> m = 0;
 
-    vec_t zero = prep(0);
-
-    foreach (i, chunkcount) {
-      auto v = x86_sse_pmovmskb(x86_sse_pcmpeqb(x86_sse_pandb(tags[i], target), zero));
-      m |= v << (i * 16);
-    }
-
-    return (~m) & valid;
-  }
-
-  std::bitset<size> matchany(base_t target) const { return matchany(prep(target)); }
-
-  int search(const vec_t target) const {
-    std::bitset<size> bitmap = match(target);
-    int idx = lsb(bitmap);
-    if (!bitmap)
-      idx = -1;
-    return idx;
-  }
-
-  int extract(const vec_t target) {
-    int idx = search(target);
-    if (idx >= 0)
-      valid[idx] = 0;
-    return idx;
-  }
-
-  int search(base_t tag) const { return search(prep(tag)); }
-
-  std::bitset<size> extract(base_t tag) { return extract(prep(tag)); }
-
-  void invalidateslot(int index) { valid[index] = 0; }
-
-  const std::bitset<size>& invalidatemask(const std::bitset<size>& mask) {
-    valid &= ~mask;
-    return mask;
-  }
-
-  std::bitset<size> invalidate(const vec_t target) { return invalidatemask(match(target)); }
-
-  std::bitset<size> invalidate(base_t target) { return invalidate(prep(target)); }
-
-  void collapse(int index) {
-    base_t* tagbase = (base_t*)&tags;
-    base_t* base = tagbase + index;
-    vec_t* dp = (vec_t*)base;
-    vec_t* sp = (vec_t*)(base + sizeof(base_t));
-
-    foreach (i, chunkcount) {
-      x86_sse_stvbu(dp++, x86_sse_ldvbu(sp++));
-    }
-
-    valid = valid.remove(index);
-  }
-
-  void decrement(base_t amount = 1) {
-    foreach (i, chunkcount) {
-      tags[i] = x86_sse_psubusb(tags[i], prep(amount));
-    }
-  }
-
-  void increment(base_t amount = 1) {
-    foreach (i, chunkcount) {
-      tags[i] = x86_sse_paddusb(tags[i], prep(amount));
-    }
-  }
-
-  std::string slotid(int slot) const {
-    int tag = (*this)[slot];
-    if (valid[slot])
-      return std::format("{:>3}", tag);
-    else
-      return "???";
-  }
-};
-
-template<int Size, int PadSize>
-struct std::formatter<FullyAssociativeTags8bit<Size, PadSize>> {
-  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-
-  auto format(const FullyAssociativeTags8bit<Size, PadSize>& tags, std::format_context& ctx) const {
-    auto out = ctx.out();
-    for (int i = 0; i < Size; i++) {
-      out = std::format_to(out, "{} ", tags.slotid(i));
-    }
-    return out;
-  }
-};
-
-template<int size, int padsize = 0>
-struct FullyAssociativeTags16bit {
-  typedef vec8w vec_t;
-  typedef W16 base_t;
-
-  static const int chunkcount = ((size * 2) + 15) / 16;
-  static const int padchunkcount = ((padsize * 2) + 15) / 16;
-
-  vec_t tags[chunkcount + padchunkcount] alignto(16);
-  std::bitset<size> valid;
-
-  W64 getvalid() { return valid.integer(); }
-
-  FullyAssociativeTags16bit() { reset(); }
-
-  base_t operator[](int i) const { return ((base_t*)&tags)[i]; }
-
-  base_t& operator[](int i) { return ((base_t*)&tags)[i]; }
-
-  bool isvalid(int index) { return valid[index]; }
-
-  void reset() {
-    valid = 0;
-    W64* p = (W64*)&tags;
-    foreach (i, ((chunkcount + padchunkcount) * 16) / 8)
-      p[i] = 0xffffffffffffffffLL;
-  }
-
-  static const vec_t prep(base_t tag) { return x86_sse_dupw(tag); }
-
-  int insertslot(int idx, base_t tag) {
-    valid[idx] = 1;
-    (*this)[idx] = tag;
-    return idx;
-  }
-
-  int insert(base_t tag) {
-    if (valid.all())
-      return -1;
-    int idx = lsb(~valid);
-    return insertslot(idx, tag);
-  }
-
-  std::bitset<size> match(const vec_t target) const {
-    std::bitset<size> m = 0;
-
-    foreach (i, chunkcount) {
-      auto v = x86_sse_pmovmskw(x86_sse_pcmpeqw(target, tags[i]));
-      m |= v << (i * 8);
-    }
+    foreach (i, size)
+      if ((tags[i] & target[i % tags_per_chunk]) != 0)
+        m[i] = 1;
 
     return m & valid;
   }
 
-  std::bitset<size> match(base_t target) const { return match(prep(target)); }
-
-  std::bitset<size> matchany(const vec_t target) const {
-    std::bitset<size> m = 0;
-
-    vec_t zero = prep(0);
-
-    foreach (i, chunkcount) {
-      auto v = x86_sse_pmovmskw(x86_sse_pcmpeqw(x86_sse_pandw(tags[i], target), zero));
-      m |= v << (i * 8);
-    }
-
-    return (~m) & valid;
-  }
-
   std::bitset<size> matchany(base_t target) const { return matchany(prep(target)); }
 
-  int search(const vec_t target) const {
+  int search(const tag_array_t& target) const {
     std::bitset<size> bitmap = match(target);
     int idx = lsb(bitmap);
     if (bitmap.none())
@@ -1335,7 +1152,7 @@ struct FullyAssociativeTags16bit {
     return idx;
   }
 
-  int extract(const vec_t target) {
+  int extract(const tag_array_t& target) {
     int idx = search(target);
     if (idx >= 0)
       valid[idx] = 0;
@@ -1353,33 +1170,29 @@ struct FullyAssociativeTags16bit {
     return mask;
   }
 
-  std::bitset<size> invalidate(const vec_t target) { return invalidatemask(match(target)); }
+  std::bitset<size> invalidate(const tag_array_t& target) { return invalidatemask(match(target)); }
 
   std::bitset<size> invalidate(base_t target) { return invalidate(prep(target)); }
 
   void collapse(int index) {
-    base_t* tagbase = (base_t*)&tags;
-    base_t* base = tagbase + index;
-    vec_t* dp = (vec_t*)base;
-    vec_t* sp = (vec_t*)(base + 1);
+    for (int i = index; i < (size + padsize) - 1; i++)
+      tags[i] = tags[i + 1];
+    tags[(size + padsize) - 1] = (base_t)-1;
 
-    foreach (i, chunkcount) {
-      x86_sse_stvwu(dp++, x86_sse_ldvwu(sp++));
-    }
-
-    valid.reset(index);
+    for (int i = index; i < size - 1; i++)
+      valid[i] = valid[i + 1];
+    valid.reset(size - 1);
   }
 
   void decrement(base_t amount = 1) {
-    foreach (i, chunkcount) {
-      tags[i] = x86_sse_psubusw(tags[i], prep(amount));
-    }
+    foreach (i, size)
+      tags[i] = (tags[i] < amount) ? 0 : tags[i] - amount;
   }
 
   void increment(base_t amount = 1) {
-    foreach (i, chunkcount) {
-      tags[i] = x86_sse_paddusw(tags[i], prep(amount));
-    }
+    const base_t max = (base_t)-1;
+    foreach (i, size)
+      tags[i] = (tags[i] > max - amount) ? max : tags[i] + amount;
   }
 
   std::string slotid(int slot) const {
@@ -1391,11 +1204,17 @@ struct FullyAssociativeTags16bit {
   }
 };
 
-template<int Size, int PadSize>
-struct std::formatter<FullyAssociativeTags16bit<Size, PadSize>> {
+template<int size, int padsize = 0>
+using FullyAssociativeTags8bit = FullyAssociativeTagsNbit<size, 8, padsize>;
+
+template<int size, int padsize = 0>
+using FullyAssociativeTags16bit = FullyAssociativeTagsNbit<size, 16, padsize>;
+
+template<int Size, int Width, int PadSize>
+struct std::formatter<FullyAssociativeTagsNbit<Size, Width, PadSize>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const FullyAssociativeTags16bit<Size, PadSize>& tags, std::format_context& ctx) const {
+  auto format(const FullyAssociativeTagsNbit<Size, Width, PadSize>& tags, std::format_context& ctx) const {
     auto out = ctx.out();
     for (int i = 0; i < Size; i++) {
       out = std::format_to(out, "{} ", tags.slotid(i));
