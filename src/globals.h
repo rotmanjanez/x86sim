@@ -46,12 +46,6 @@ extern "C" {
 asmlinkage void assert_fail(const char* __assertion, const char* __file, unsigned int __line, const char* __function)
     __attribute__((__noreturn__));
 
-// For embedded debugging use only:
-static inline void assert_fail_trap(const char* __assertion, const char* __file, unsigned int __line,
-                                    const char* __function) {
-  asm("ud2a" : : "a"(__assertion), "b"(__file), "c"(__line), "d"(__function));
-}
-
 
 template<typename T>
 struct isprimitive_t {
@@ -313,20 +307,6 @@ inline bool x86_test_btc(T& r, T b) {
 
 static inline void cpu_pause() {
   asm volatile("pause" : : : "memory");
-}
-
-static inline void prefetch(const void* x) {
-  asm volatile("prefetcht0 (%0)" : : "r"(x));
-}
-
-static inline void cpuid(int op, W32& eax, W32& ebx, W32& ecx, W32& edx) {
-  asm("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "0"(op));
-}
-
-static inline W64 rdtsc() {
-  W32 lo, hi;
-  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-  return ((W64)lo) | (((W64)hi) << 32);
 }
 
 template<typename T>

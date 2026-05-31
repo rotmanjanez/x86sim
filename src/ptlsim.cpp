@@ -284,10 +284,8 @@ PTLsimMachine* PTLsimMachine::getcurrent() {
 
 
 void simulateInitializedMachine(PTLsimMachine& machine) {
-  W64 tsc_at_start = rdtsc();
   current_machine = &machine;
   machine.run(config);
-  W64 tsc_at_end = rdtsc();
   machine.update_stats(stats);
   current_machine = null;
 }

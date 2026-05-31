@@ -528,7 +528,7 @@ inline int lsb(const std::bitset<N>& bits) {
 // Convenient list iterator
 //
 #define foreachlink(list, type, iter)                                                                                  \
-  for (type* iter = (type*)((list)->first); (iter != NULL); prefetch(iter->next), iter = (type*)(iter->next))
+  for (type* iter = (type*)((list)->first); (iter != NULL); __builtin_prefetch(iter->next), iter = (type*)(iter->next))
 
 template<typename K, typename T>
 struct KeyValuePair {
@@ -641,7 +641,7 @@ public:
 
         T* obj = LM::objof(link);
         link = link->next;
-        prefetch(link);
+        __builtin_prefetch(link);
         return obj;
       }
     }
@@ -849,7 +849,7 @@ struct ChunkList {
     Chunk* chunk = (Chunk*)head;
 
     while (chunk) {
-      prefetch(chunk->link.next);
+      __builtin_prefetch(chunk->link.next);
       int index = chunk->add(entry);
       if likely (index >= 0) {
         hint.chunk = chunk;
@@ -890,7 +890,7 @@ struct ChunkList {
 
     while (chunk) {
       Chunk* next = (Chunk*)chunk->link.next;
-      prefetch(next);
+      __builtin_prefetch(next);
       delete chunk;
       chunk = next;
     }
@@ -930,7 +930,7 @@ struct ChunkList {
           if unlikely (!chunk)
             return null;
           nextchunk = (Chunk*)chunk->link.next;
-          prefetch(nextchunk);
+          __builtin_prefetch(nextchunk);
           i = 0;
         }
 

@@ -52,11 +52,7 @@ extern "C" void assert_fail(const char* __assertion, const char* __file, unsigne
   }
   logging::flush();
 
-  sys_exit(1); // Well, we don't want core dumps.
-
-  // Crash and make a core dump:
-  asm("ud2a");
-  abort();
+  sys_exit(1);
 }
 
 // Saved and restored by asm code:
