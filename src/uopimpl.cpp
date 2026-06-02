@@ -604,32 +604,6 @@ inline void uop_impl_mulhl(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflag
 uopimpl_func_t implmap_mulhl[4] = {&uop_impl_mulhl<W8>, &uop_impl_mulhl<W16>, &uop_impl_mulhl<W32>,
                                    &uop_impl_mulhl<W64>};
 
-#ifndef PTLSIM_AMD64
-template<int genflags>
-struct x86_op_mull<W64, genflags> {
-  W64 operator()(W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags, byte& cf, byte& of) {
-    asm("int3");
-    return 0;
-  }
-};
-
-template<int genflags>
-struct x86_op_mulh<W64, genflags> {
-  W64 operator()(W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags, byte& cf, byte& of) {
-    asm("int3");
-    return 0;
-  }
-};
-
-template<int genflags>
-struct x86_op_mulhu<W64, genflags> {
-  W64 operator()(W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags, byte& cf, byte& of) {
-    asm("int3");
-    return 0;
-  }
-};
-#endif
-
 template<int ptlopcode, typename T>
 void x86_div(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags) {
   T quotient, remainder;
