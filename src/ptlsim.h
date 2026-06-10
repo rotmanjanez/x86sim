@@ -205,11 +205,7 @@ struct formatter<PTLsimBanner> {
     sys_uname(&hostinfo);
 
     auto out = std::format_to(ctx.out(), "//  \n");
-#ifdef PTLSIM_AMD64
     out = std::format_to(out, "//  PTLsim: Cycle Accurate x86-64 Simulator\n");
-#else
-    out = std::format_to(out, "//  PTLsim: Cycle Accurate x86 Simulator (32-bit version)\n");
-#endif
     out = std::format_to(out, "//  Copyright 1999-2007 Matt T. Yourst <yourst@yourst.com>\n");
     out = std::format_to(out, "// \n");
     out = std::format_to(out, "//  Revision {} ({})\n", stringify(SVNREV), stringify(SVNDATE));

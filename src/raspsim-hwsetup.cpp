@@ -415,13 +415,9 @@ void Context::propagate_x86_exception(byte exception, W32 errorcode, Waddr virta
   Raspsim::propagate_x86_exception(exception, errorcode, virtaddr);
 }
 
-#ifdef PTLSIM_AMD64
-
 void handle_syscall_64bit() {
   Raspsim::handle_syscall_64bit();
 }
-
-#endif // PTLSIM_AMD64
 
 void handle_syscall_32bit(int semantics) {
   Raspsim::handle_syscall_32bit(semantics);

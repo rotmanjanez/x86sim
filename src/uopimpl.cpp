@@ -16,8 +16,6 @@ inline void capture_uop_context(const IssueState& state, W64 ra, W64 rb, W64 rc,
                                 W64 ripseq = 0) {}
 
 
-// void uop_impl_bogus(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags) { asm("int3"); }
-
 //
 // Flags generation (all but CF and OF)
 //
@@ -147,9 +145,6 @@ inline void aluop(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rb
 
 #define PRETEXT_NO_FLAGS_IN ""
 #define PRETEXT_ALL_FLAGS_IN "pushw %[rcflags]; popfw; "
-
-//make_x86_aluop_all_sizes(add, add, ZAPS|CF|OF, PRETEXT_NO_FLAGS_IN);
-//make_x86_aluop_all_sizes(sub, sub, ZAPS|CF|OF, PRETEXT_NO_FLAGS_IN);
 
 template<typename T>
 inline void exp_op_mov(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags) {
@@ -293,43 +288,6 @@ inline void aluop3s(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 
 
 make_exp_aluop3_all_sizes_all_shifts(OP_adda, adda, (rd = (ra + rb + rc)), 0);
 make_exp_aluop3_all_sizes_all_shifts(OP_suba, suba, (rd = (ra - rb + rc)), 0);
-
-/*
-make_x86_aluop3_all_sizes_all_shifts(adda, add, add, ZAPS|CF|OF);
-make_x86_aluop3_all_sizes_all_shifts(adds, add, sub, ZAPS|CF|OF);
-make_x86_aluop3_all_sizes_all_shifts(suba, sub, add, ZAPS|CF|OF);
-make_x86_aluop3_all_sizes_all_shifts(subs, sub, sub, ZAPS|CF|OF);
-*/
-
-#ifdef EMULATE_64BIT
-
-#define make_x86_aluop3_chained_64bit(name, opcode1, opcode2, opcode1c, opcode2c)                                      \
-  template<int genflags>                                                                                               \
-  struct x86_op_##name<W64, genflags> {                                                                                \
-    W64 operator()(W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags, byte& cf, byte& of) {                \
-      W32 ralo = LO32(ra);                                                                                             \
-      W32 rahi = HI32(ra);                                                                                             \
-      W32 rblo = LO32(rb);                                                                                             \
-      W32 rbhi = HI32(rb);                                                                                             \
-      W32 rclo = LO32(rc);                                                                                             \
-      W32 rchi = HI32(rc);                                                                                             \
-      asm(#opcode1 " %[rblo],%[ralo];" #opcode1c " %[rbhi],%[rahi];" #opcode2 " %[rclo],%[ralo];" #opcode2c            \
-                   " %[rchi],%[rahi];"                                                                                 \
-                   "setc %[cf]; seto %[of]"                                                                            \
-          : [ralo] "+r"(ralo), [rahi] "+r"(rahi), [cf] "=q"(cf), [of] "=q"(of)                                         \
-          : [rblo] "rm"(rblo), [rbhi] "rm"(rbhi), [rclo] "rm"(rclo), [rchi] "rm"(rchi), [rcflags] "rm"(rcflags));      \
-      return ((W64)rahi << 32) + ((W64)ralo);                                                                          \
-    }                                                                                                                  \
-  }
-
-/*
-make_x86_aluop3_chained_64bit(adda, add, add, adc, adc);
-make_x86_aluop3_chained_64bit(adds, add, sub, adc, sbb);
-make_x86_aluop3_chained_64bit(suba, sub, add, sbb, adc);
-make_x86_aluop3_chained_64bit(subs, sub, sub, sbb, sbb);
-*/
-
-#endif
 
 //
 // Shifts and rotates
@@ -1946,14 +1904,12 @@ uopimpl_func_t get_synthcode_for_cond_branch(int opcode, int cond, int size, boo
   uopimpl_func_t func;
 
   switch (opcode) {
-#ifdef PTLSIM_AMD64
   case OP_br_sub:
     func = implmap_br_sub[cond][size][except];
     break;
   case OP_br_and:
     func = implmap_br_and[cond][size][except];
     break;
-#endif
   case OP_br:
     func = implmap_br[cond][except];
     break;

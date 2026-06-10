@@ -62,9 +62,7 @@ public:
   // Implement as desired depending on the bindings
   static void propagate_x86_exception(byte exception, W32 errorcode, Waddr virtaddr);
 
-#ifdef PTLSIM_AMD64
   static void handle_syscall_64bit();
-#endif // PTLSIM_AMD64
   static void handle_syscall_32bit(int semantics);
 };
 
