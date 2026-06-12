@@ -27,21 +27,7 @@ typedef SelfHashtable<W64, BasicBlockChunkList, 16384, BasicBlockChunkListHashta
 
 BasicBlockPageCache bbpages;
 
-int bbcache_dump_fd = -1;
-
-static bool write_all(int fd, const void* buf, size_t count) {
-  const byte* p = static_cast<const byte*>(buf);
-  while (count > 0) {
-    ssize_t n = sys_write(fd, p, count);
-    if (n > 0) {
-      p += n;
-      count -= static_cast<size_t>(n);
-      continue;
-    }
-    return false;
-  }
-  return true;
-}
+FILE* bbcache_dump_file = nullptr;
 
 //
 // Calling convention:
@@ -1519,10 +1505,10 @@ bool BasicBlockCache::invalidate(BasicBlock* bb, int reason) {
     return false;
   }
 
-  if unlikely (bbcache_dump_fd >= 0) {
-    if (!write_all(bbcache_dump_fd, static_cast<BasicBlockBase*>(bb), sizeof(BasicBlockBase)) ||
-        !write_all(bbcache_dump_fd, bb->transops, bb->count * sizeof(TransOp))) {
-      logging::println(logging::WARNING, "Failed to write basic block {} to bb dump fd {}", (void*)bb, bbcache_dump_fd);
+  if unlikely (bbcache_dump_file) {
+    if (std::fwrite(static_cast<BasicBlockBase*>(bb), sizeof(BasicBlockBase), 1, bbcache_dump_file) != 1 ||
+        std::fwrite(bb->transops, sizeof(TransOp), bb->count, bbcache_dump_file) != (size_t)bb->count) {
+      logging::println(logging::WARNING, "Failed to write basic block {} to bb dump file", (void*)bb);
     }
   }
 
@@ -2356,8 +2342,8 @@ auto std::formatter<BasicBlockCache>::format(BasicBlockCache& bbc, std::format_c
 
 void shutdown_decode() {
   bbcache.flush();
-  if (bbcache_dump_fd >= 0) {
-    sys_close(bbcache_dump_fd);
-    bbcache_dump_fd = -1;
+  if (bbcache_dump_file) {
+    std::fclose(bbcache_dump_file);
+    bbcache_dump_file = nullptr;
   }
 }

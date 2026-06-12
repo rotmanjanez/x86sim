@@ -117,9 +117,6 @@ void ConfigurationParser<PTLsimConfig>::setup() {
 #ifndef CONFIG_ONLY
 
 void collect_common_sysinfo(PTLsimStats& stats) {
-  utsname hostinfo;
-  sys_uname(&hostinfo);
-
 #define strput(x, y) (strncpy((x), (y), sizeof(x)))
 
   std::string build_ts = std::format("{} {}", __DATE__, __TIME__);
@@ -130,10 +127,9 @@ void collect_common_sysinfo(PTLsimStats& stats) {
   std::string compiler = std::format("gcc-{}.{}", __GNUC__, __GNUC_MINOR__);
   strput(stats.simulator.version.build_compiler, compiler.c_str());
 
-  stats.simulator.run.timestamp = sys_time(0);
-  std::string hostname = std::format("{}-{} ({})", hostinfo.nodename, hostinfo.sysname, hostinfo.machine);
-  strput(stats.simulator.run.hostname, hostname.c_str());
-  strput(stats.simulator.run.kernel_version, hostinfo.release);
+  stats.simulator.run.timestamp = time(nullptr);
+  strput(stats.simulator.run.hostname, host_platform_name());
+  strput(stats.simulator.run.kernel_version, "unknown");
 }
 
 void print_usage(int argc, char** argv) {
@@ -154,8 +150,8 @@ void backup_and_reopen_logfile() {
 
     // Backup old log file
     std::string oldname = std::format("{}.backup", config.log_filename);
-    sys_unlink(oldname.c_str());
-    sys_rename(config.log_filename.c_str(), oldname.c_str());
+    std::remove(oldname.c_str());
+    std::rename(config.log_filename.c_str(), oldname.c_str());
 
     // Open new log file
     logging::set_file_sink(config.log_filename.c_str());
@@ -210,10 +206,10 @@ bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
 
   if (!config.bbcache_dump_filename.empty() && (config.bbcache_dump_filename != current_bbcache_dump_filename)) {
     // Can also use "-logfile /dev/fd/1" to send to stdout (or /dev/fd/2 for stderr):
-    if (bbcache_dump_fd >= 0)
-      sys_close(bbcache_dump_fd);
-    bbcache_dump_fd = sys_open(config.bbcache_dump_filename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (bbcache_dump_fd < 0) {
+    if (bbcache_dump_file)
+      std::fclose(bbcache_dump_file);
+    bbcache_dump_file = std::fopen(config.bbcache_dump_filename.c_str(), "wb");
+    if (!bbcache_dump_file) {
       logging::println(logging::WARNING, "Cannot open bb dump file '{}'", config.bbcache_dump_filename);
     }
     current_bbcache_dump_filename = config.bbcache_dump_filename;

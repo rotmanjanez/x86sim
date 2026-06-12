@@ -5,8 +5,6 @@
 // Copyright 2000-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
-#include <fstream>
-#include <sstream>
 #include "config.h"
 #include "logging.h"
 

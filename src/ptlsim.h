@@ -23,6 +23,22 @@ extern W64 total_user_insns_committed;
 
 void user_process_terminated(int rc);
 
+// Compile-time host platform name; replaces runtime uname(), which is not
+// available on all targets (e.g. wasm)
+constexpr const char* host_platform_name() {
+#if defined(__EMSCRIPTEN__)
+  return "emscripten";
+#elif defined(__wasi__)
+  return "wasi";
+#elif defined(__APPLE__)
+  return "darwin";
+#elif defined(__linux__)
+  return "linux";
+#else
+  return "unknown";
+#endif
+}
+
 static const int MAX_TRANSOP_BUFFER_SIZE = 4;
 
 struct PTLsimConfig;
@@ -201,9 +217,6 @@ template<>
 struct formatter<PTLsimBanner> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
   auto format(const PTLsimBanner& banner, format_context& ctx) const {
-    utsname hostinfo;
-    sys_uname(&hostinfo);
-
     auto out = std::format_to(ctx.out(), "//  \n");
     out = std::format_to(out, "//  PTLsim: Cycle Accurate x86-64 Simulator\n");
     out = std::format_to(out, "//  Copyright 1999-2007 Matt T. Yourst <yourst@yourst.com>\n");
@@ -211,7 +224,7 @@ struct formatter<PTLsimBanner> {
     out = std::format_to(out, "//  Revision {} ({})\n", stringify(SVNREV), stringify(SVNDATE));
     out = std::format_to(out, "//  Built {} {} on {} using gcc-{}.{}\n", __DATE__, __TIME__, stringify(BUILDHOST),
                          stringify(__GNUC__), stringify(__GNUC_MINOR__));
-    out = std::format_to(out, "//  Running on {}-{} ({})\n", hostinfo.nodename, hostinfo.sysname, hostinfo.machine);
+    out = std::format_to(out, "//  Running on {}\n", host_platform_name());
     out = std::format_to(out, "//  \n");
 
     out = std::format_to(out, "//  Arguments:\n");
