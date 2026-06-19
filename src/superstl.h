@@ -519,9 +519,19 @@ struct shortptr {
 };
 
 
+// Index of the least significant set bit (N if no bit is set)
 template<std::size_t N>
 inline int lsb(const std::bitset<N>& bits) {
-  return std::countl_zero(bits.to_ullong());
+  return std::countr_zero(bits.to_ullong());
+}
+
+// Remove the bit at the given index, shifting all higher bits down by one
+template<std::size_t N>
+inline std::bitset<N> remove_bit(const std::bitset<N>& bits, int index) {
+  const unsigned long long v = bits.to_ullong();
+  const unsigned long long lo = v & ((1ULL << index) - 1);
+  const unsigned long long hi = (v >> index) >> 1;
+  return std::bitset<N>(lo | (hi << index));
 }
 
 //

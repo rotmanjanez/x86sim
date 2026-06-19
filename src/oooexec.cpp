@@ -236,9 +236,11 @@ bool IssueQueue<size, operandcount>::remove(int slot) {
     tags[i].collapse(slot);
   }
 
-  valid.reset(slot);
-  issued.reset(slot);
-  allready.reset(slot);
+  // Collapsing removal: shift all state above the removed slot down by one,
+  // matching the collapse() of the tag arrays above.
+  valid = remove_bit(valid, slot);
+  issued = remove_bit(issued, slot);
+  allready = remove_bit(allready, slot);
 
   count--;
   assert(count >= 0);
