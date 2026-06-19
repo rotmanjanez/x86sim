@@ -1705,11 +1705,6 @@ const byte intercluster_bandwidth_map[MAX_CLUSTERS][MAX_CLUSTERS] = {{64}};
 
 #endif // INSIDE_OOOCORE
 
-//
-// This part is used when parsing stats.h to build the
-// data store template; these must be in sync with the
-// corresponding definitions elsewhere.
-//
 #ifdef MULTI_IQ
 static const char* cluster_names[MAX_CLUSTERS] = {"int0", "int1", "ld", "fp"};
 #else
@@ -1719,9 +1714,9 @@ static const char* cluster_names[MAX_CLUSTERS] = {"all"};
 static const char* phys_reg_file_names[PHYS_REG_FILE_COUNT] = {"int", "fp", "st", "br"};
 }; // namespace OutOfOrderModel
 
-struct PerContextOutOfOrderCoreStats { // rootnode:
+struct PerContextOutOfOrderCoreStats {
   struct fetch {
-    struct stop { // node: summable
+    struct stop {
       W64 stalled;
       W64 icache_miss;
       W64 fetchq_full;
@@ -1731,15 +1726,15 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
       W64 branch_taken;
       W64 full_width;
     } stop;
-    W64 opclass[OPCLASS_COUNT];                  // label: opclass_names
-    W64 width[OutOfOrderModel::FETCH_WIDTH + 1]; // histo: 0, OutOfOrderModel::FETCH_WIDTH, 1
+    W64 opclass[OPCLASS_COUNT];
+    W64 width[OutOfOrderModel::FETCH_WIDTH + 1];
     W64 blocks;
     W64 uops;
     W64 user_insns;
   } fetch;
 
   struct frontend {
-    struct status { // node: summable
+    struct status {
       W64 complete;
       W64 fetchq_empty;
       W64 rob_full;
@@ -1747,7 +1742,7 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
       W64 ldq_full;
       W64 stq_full;
     } status;
-    W64 width[OutOfOrderModel::FRONTEND_WIDTH + 1]; // histo: 0, OutOfOrderModel::FRONTEND_WIDTH, 1
+    W64 width[OutOfOrderModel::FRONTEND_WIDTH + 1];
     struct renamed {
       W64 none;
       W64 reg;
@@ -1761,23 +1756,23 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
       W64 br;
     } alloc;
     // NOTE: This is capped at 255 consumers to keep the size reasonable:
-    W64 consumer_count[256]; // histo: 0, 255, 1
+    W64 consumer_count[256];
   } frontend;
 
   struct dispatch {
-    W64 cluster[OutOfOrderModel::MAX_CLUSTERS]; // label: OutOfOrderModel::cluster_names
+    W64 cluster[OutOfOrderModel::MAX_CLUSTERS];
     struct redispatch {
       W64 trigger_uops;
       W64 deadlock_flushes;
       W64 deadlock_uops_flushed;
-      W64 dependent_uops[OutOfOrderModel::ROB_SIZE + 1]; // histo: 0, OutOfOrderModel::ROB_SIZE, 1
+      W64 dependent_uops[OutOfOrderModel::ROB_SIZE + 1];
     } redispatch;
   } dispatch;
 
   struct issue {
     W64 uops;
     double uipc;
-    struct result { // node: summable
+    struct result {
       W64 no_fu;
       W64 replay;
       W64 misspeculated;
@@ -1786,11 +1781,11 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
       W64 exception;
       W64 complete;
     } result;
-    W64 opclass[OPCLASS_COUNT]; // label: opclass_names
+    W64 opclass[OPCLASS_COUNT];
   } issue;
 
   struct writeback {
-    W64 writebacks[OutOfOrderModel::PHYS_REG_FILE_COUNT]; // label: OutOfOrderModel::phys_reg_file_names
+    W64 writebacks[OutOfOrderModel::PHYS_REG_FILE_COUNT];
   } writeback;
 
   struct commit {
@@ -1799,7 +1794,7 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
     double uipc;
     double ipc;
 
-    struct result { // node: summable
+    struct result {
       W64 none;
       W64 ok;
       W64 exception;
@@ -1810,12 +1805,12 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
       W64 stop;
     } result;
 
-    struct setflags { // node: summable
+    struct setflags {
       W64 yes;
       W64 no;
     } setflags;
 
-    W64 opclass[OPCLASS_COUNT]; // label: opclass_names
+    W64 opclass[OPCLASS_COUNT];
   } commit;
 
   struct branchpred {
@@ -1823,11 +1818,11 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
     W64 updates;
 
     // These counters are [0] = mispred, [1] = correct
-    W64 cond[2];    // label: branchpred_outcome_names
-    W64 indir[2];   // label: branchpred_outcome_names
-    W64 ret[2];     // label: branchpred_outcome_names
-    W64 summary[2]; // label: branchpred_outcome_names
-    struct ras {    // node: summable
+    W64 cond[2];
+    W64 indir[2];
+    W64 ret[2];
+    W64 summary[2];
+    struct ras {
       W64 pushes;
       W64 overflows;
       W64 pops;
@@ -1838,13 +1833,13 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
 
   struct dcache {
     struct load {
-      struct issue { // node: summable
+      struct issue {
         W64 complete;
         W64 miss;
         W64 exception;
         W64 ordering;
         W64 unaligned;
-        struct replay { // node: summable
+        struct replay {
           W64 sfr_addr_and_data_not_ready;
           W64 sfr_addr_not_ready;
           W64 sfr_data_not_ready;
@@ -1856,13 +1851,13 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
         } replay;
       } issue;
 
-      struct forward { // node: summable
+      struct forward {
         W64 cache;
         W64 sfr;
         W64 sfr_and_cache;
       } forward;
 
-      struct dependency { // node: summable
+      struct dependency {
         W64 independent;
         W64 predicted_alias_unresolved;
         W64 stq_address_match;
@@ -1870,24 +1865,24 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
         W64 fence;
       } dependency;
 
-      struct type { // node: summable
+      struct type {
         W64 aligned;
         W64 unaligned;
         W64 internal;
       } type;
 
-      W64 size[4]; // label: sizeshift_names
+      W64 size[4];
 
-      W64 datatype[DATATYPE_COUNT]; // label: datatype_names
+      W64 datatype[DATATYPE_COUNT];
     } load;
 
     struct store {
-      struct issue { // node: summable
+      struct issue {
         W64 complete;
         W64 exception;
         W64 ordering;
         W64 unaligned;
-        struct replay { // node: summable
+        struct replay {
           W64 sfr_addr_and_data_not_ready;
           W64 sfr_addr_not_ready;
           W64 sfr_data_not_ready;
@@ -1901,23 +1896,23 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
         } replay;
       } issue;
 
-      struct forward { // node: summable
+      struct forward {
         W64 zero;
         W64 sfr;
       } forward;
 
-      struct type { // node: summable
+      struct type {
         W64 aligned;
         W64 unaligned;
         W64 internal;
       } type;
 
-      W64 size[4]; // label: sizeshift_names
+      W64 size[4];
 
-      W64 datatype[DATATYPE_COUNT]; // label: datatype_names
+      W64 datatype[DATATYPE_COUNT];
     } store;
 
-    struct fence { // node: summable
+    struct fence {
       W64 lfence;
       W64 sfence;
       W64 mfence;
@@ -1928,34 +1923,35 @@ struct PerContextOutOfOrderCoreStats { // rootnode:
 //
 // Out-of-Order Core
 //
-struct OutOfOrderCoreStats { // rootnode:
+struct OutOfOrderCoreStats {
+
   W64 cycles;
 
   struct dispatch {
-    struct source {                                    // node: summable
-      W64 integer[OutOfOrderModel::MAX_PHYSREG_STATE]; // label: OutOfOrderModel::physreg_state_names
-      W64 fp[OutOfOrderModel::MAX_PHYSREG_STATE];      // label: OutOfOrderModel::physreg_state_names
-      W64 st[OutOfOrderModel::MAX_PHYSREG_STATE];      // label: OutOfOrderModel::physreg_state_names
-      W64 br[OutOfOrderModel::MAX_PHYSREG_STATE];      // label: OutOfOrderModel::physreg_state_names
+    struct source {
+      W64 integer[OutOfOrderModel::MAX_PHYSREG_STATE];
+      W64 fp[OutOfOrderModel::MAX_PHYSREG_STATE];
+      W64 st[OutOfOrderModel::MAX_PHYSREG_STATE];
+      W64 br[OutOfOrderModel::MAX_PHYSREG_STATE];
     } source;
-    W64 width[OutOfOrderModel::DISPATCH_WIDTH + 1]; // histo: 0, OutOfOrderModel::DISPATCH_WIDTH, 1
+    W64 width[OutOfOrderModel::DISPATCH_WIDTH + 1];
   } dispatch;
 
   struct issue {
-    struct source {                                    // node: summable
-      W64 integer[OutOfOrderModel::MAX_PHYSREG_STATE]; // label: OutOfOrderModel::physreg_state_names
-      W64 fp[OutOfOrderModel::MAX_PHYSREG_STATE];      // label: OutOfOrderModel::physreg_state_names
-      W64 st[OutOfOrderModel::MAX_PHYSREG_STATE];      // label: OutOfOrderModel::physreg_state_names
-      W64 br[OutOfOrderModel::MAX_PHYSREG_STATE];      // label: OutOfOrderModel::physreg_state_names
+    struct source {
+      W64 integer[OutOfOrderModel::MAX_PHYSREG_STATE];
+      W64 fp[OutOfOrderModel::MAX_PHYSREG_STATE];
+      W64 st[OutOfOrderModel::MAX_PHYSREG_STATE];
+      W64 br[OutOfOrderModel::MAX_PHYSREG_STATE];
     } source;
     struct width {
 #ifdef MULTI_IQ
-      W64 int0[OutOfOrderModel::MAX_ISSUE_WIDTH + 1]; // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
-      W64 int1[OutOfOrderModel::MAX_ISSUE_WIDTH + 1]; // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
-      W64 ld[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];   // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
-      W64 fp[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];   // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
+      W64 int0[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
+      W64 int1[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
+      W64 ld[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
+      W64 fp[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
 #else
-      W64 all[OutOfOrderModel::MAX_ISSUE_WIDTH + 1]; // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
+      W64 all[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
 #endif
     } width;
   } issue;
@@ -1963,25 +1959,25 @@ struct OutOfOrderCoreStats { // rootnode:
   struct writeback {
     struct width {
 #ifdef MULTI_IQ
-      W64 int0[OutOfOrderModel::MAX_ISSUE_WIDTH + 1]; // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
-      W64 int1[OutOfOrderModel::MAX_ISSUE_WIDTH + 1]; // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
-      W64 ld[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];   // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
-      W64 fp[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];   // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
+      W64 int0[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
+      W64 int1[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
+      W64 ld[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
+      W64 fp[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
 #else
-      W64 all[OutOfOrderModel::MAX_ISSUE_WIDTH + 1]; // histo: 0, OutOfOrderModel::MAX_ISSUE_WIDTH, 1
+      W64 all[OutOfOrderModel::MAX_ISSUE_WIDTH + 1];
 #endif
     } width;
   } writeback;
 
   struct commit {
-    struct freereg { // node: summable
+    struct freereg {
       W64 pending;
       W64 free;
     } freereg;
 
     W64 free_regs_recycled;
 
-    W64 width[OutOfOrderModel::COMMIT_WIDTH + 1]; // histo: 0, OutOfOrderModel::COMMIT_WIDTH, 1
+    W64 width[OutOfOrderModel::COMMIT_WIDTH + 1];
   } commit;
 
   struct branchpred {
@@ -1989,11 +1985,11 @@ struct OutOfOrderCoreStats { // rootnode:
     W64 updates;
 
     // These counters are [0] = mispred, [1] = correct
-    W64 cond[2];    // label: branchpred_outcome_names
-    W64 indir[2];   // label: branchpred_outcome_names
-    W64 ret[2];     // label: branchpred_outcome_names
-    W64 summary[2]; // label: branchpred_outcome_names
-    struct ras {    // node: summable
+    W64 cond[2];
+    W64 indir[2];
+    W64 ret[2];
+    W64 summary[2];
+    struct ras {
       W64 pushes;
       W64 overflows;
       W64 pops;
@@ -2010,7 +2006,7 @@ struct OutOfOrderCoreStats { // rootnode:
 
   struct simulator {
     double total_time;
-    struct cputime { // node: summable
+    struct cputime {
       double fetch;
       double decode;
       double rename;

@@ -11,9 +11,7 @@
 #include "globals.h"
 #include "ptlsim.h"
 #include "logging.h"
-#define CPT_STATS
 #include "stats.h"
-#undef CPT_STATS
 
 #ifndef CONFIG_ONLY
 //
@@ -123,7 +121,6 @@ void print_usage(int argc, char** argv) {
   logging::eprint("{}", configparser.options.format_to_string_usage(&config));
 }
 
-std::string current_stats_filename;
 std::string current_log_filename;
 std::string current_bbcache_dump_filename;
 

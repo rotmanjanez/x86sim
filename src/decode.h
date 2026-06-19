@@ -437,12 +437,6 @@ enum {
 
 extern const assist_func_t assistid_to_func[ASSIST_COUNT];
 
-//
-// These need to be in the header file so dstbuild can
-// pick them up without having to link every file in PTLsim
-// just to build the data store template. The linker will
-// eliminate duplicates.
-//
 static const char* assist_names[ASSIST_COUNT] = {
     // Forced assists based on decode context
     "invalid_opcode",
@@ -631,15 +625,7 @@ extern BasicBlockCache bbcache;
 
 extern FILE* bbcache_dump_file;
 
-//
-// This part is used when parsing stats.h to build the
-// data store template; these must be in sync with the
-// corresponding definitions elsewhere.
-//
 static const char* decode_type_names[DECODE_TYPE_COUNT] = {"fast", "complex", "x87", "sse", "assist"};
-
-static const char* invalidate_reason_names[INVALIDATE_REASON_COUNT] = {"smc",     "dma",   "spurious",
-                                                                       "reclaim", "dirty", "empty"};
 
 //
 // std::formatter specializations

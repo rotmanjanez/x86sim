@@ -594,21 +594,21 @@ struct CacheHierarchy {
 #endif // STATS_ONLY
 }; // namespace CacheSubsystem
 
-struct PerContextDataCacheStats { // rootnode:
+struct PerContextDataCacheStats {
   struct load {
-    struct hit { // node: summable
+    struct hit {
       W64 L1;
       W64 L2;
       W64 L3;
       W64 mem;
     } hit;
 
-    struct dtlb { // node: summable
+    struct dtlb {
       W64 hits;
       W64 misses;
     } dtlb;
 
-    struct tlbwalk { // node: summable
+    struct tlbwalk {
       W64 L1_dcache_hit;
       W64 L1_dcache_miss;
       W64 no_lfrq_mb;
@@ -616,19 +616,19 @@ struct PerContextDataCacheStats { // rootnode:
   } load;
 
   struct fetch {
-    struct hit { // node: summable
+    struct hit {
       W64 L1;
       W64 L2;
       W64 L3;
       W64 mem;
     } hit;
 
-    struct itlb { // node: summable
+    struct itlb {
       W64 hits;
       W64 misses;
     } itlb;
 
-    struct tlbwalk { // node: summable
+    struct tlbwalk {
       W64 L1_dcache_hit;
       W64 L1_dcache_miss;
       W64 no_lfrq_mb;
@@ -640,9 +640,9 @@ struct PerContextDataCacheStats { // rootnode:
   } store;
 };
 
-struct DataCacheStats { // rootnode:
+struct DataCacheStats {
   struct load {
-    struct transfer { // node: summable
+    struct transfer {
       W64 L2_to_L1_full;
       W64 L2_to_L1_partial;
       W64 L2_L1I_full;
@@ -651,7 +651,7 @@ struct DataCacheStats { // rootnode:
 
   struct missbuf {
     W64 inserts;
-    struct deliver { // node: summable
+    struct deliver {
       W64 mem_to_L3;
       W64 L3_to_L2;
       W64 L2_to_L1D;
@@ -659,7 +659,7 @@ struct DataCacheStats { // rootnode:
     } deliver;
   } missbuf;
 
-  struct prefetch { // node: summable
+  struct prefetch {
     W64 in_L1;
     W64 in_L2;
     W64 required;
@@ -672,7 +672,7 @@ struct DataCacheStats { // rootnode:
     W64 resets;
     W64 total_latency;
     double average_latency;
-    W64 width[CacheSubsystem::MAX_WAKEUPS_PER_CYCLE + 1]; // histo: 0, CacheSubsystem::MAX_WAKEUPS_PER_CYCLE+1, 1
+    W64 width[CacheSubsystem::MAX_WAKEUPS_PER_CYCLE + 1];
   } lfrq;
 
   PerContextDataCacheStats total;

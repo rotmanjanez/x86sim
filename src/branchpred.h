@@ -74,8 +74,6 @@ struct BranchPredictorInterface {
 
 extern BranchPredictorInterface branchpred;
 
-static const char* branchpred_outcome_names[2] = {"mispred", "correct"};
-
 //
 // std::formatter specialization for ReturnAddressStackEntry
 //
