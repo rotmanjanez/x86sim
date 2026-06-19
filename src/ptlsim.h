@@ -12,7 +12,6 @@
 #include <string_view>
 
 #include "globals.h"
-#include "mm.h"
 #include "ptlsim-api.h"
 #include "ptlhwdef.h"
 #include "config.h"
