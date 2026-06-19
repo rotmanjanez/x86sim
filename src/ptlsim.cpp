@@ -116,22 +116,6 @@ void ConfigurationParser<PTLsimConfig>::setup() {
 
 #ifndef CONFIG_ONLY
 
-void collect_common_sysinfo(PTLsimStats& stats) {
-#define strput(x, y) (strncpy((x), (y), sizeof(x)))
-
-  std::string build_ts = std::format("{} {}", __DATE__, __TIME__);
-  strput(stats.simulator.version.build_timestamp, build_ts.c_str());
-  stats.simulator.version.svn_revision = SVNREV;
-  strput(stats.simulator.version.svn_timestamp, stringify(SVNDATE));
-  strput(stats.simulator.version.build_hostname, stringify(BUILDHOST));
-  std::string compiler = std::format("gcc-{}.{}", __GNUC__, __GNUC_MINOR__);
-  strput(stats.simulator.version.build_compiler, compiler.c_str());
-
-  stats.simulator.run.timestamp = time(nullptr);
-  strput(stats.simulator.run.hostname, host_platform_name());
-  strput(stats.simulator.run.kernel_version, "unknown");
-}
-
 void print_usage(int argc, char** argv) {
   logging::eprintln("Syntax: ptlsim <executable> <arguments...>");
   logging::eprintln("All other options come from file /home/<username>/.ptlsim/path/to/executable");

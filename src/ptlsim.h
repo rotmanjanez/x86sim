@@ -9,6 +9,8 @@
 #ifndef _PTLSIM_H_
 #define _PTLSIM_H_
 
+#include <string_view>
+
 #include "globals.h"
 #include "mm.h"
 #include "ptlsim-api.h"
@@ -38,6 +40,29 @@ constexpr const char* host_platform_name() {
   return "unknown";
 #endif
 }
+
+#ifndef BUILDHOST
+#define BUILDHOST unknown
+#endif
+#ifndef GIT_REVISION
+#define GIT_REVISION unknown
+#endif
+
+// Compile-time build provenance; single source of truth for the startup
+// banner and PTLsimStats
+namespace build_info {
+inline constexpr std::string_view timestamp = __DATE__ " " __TIME__;
+inline constexpr std::string_view hostname = stringify(BUILDHOST);
+inline constexpr std::string_view git_revision = stringify(GIT_REVISION);
+inline constexpr std::string_view compiler =
+#if defined(__clang__)
+    "clang-" stringify(__clang_major__) "." stringify(__clang_minor__) "." stringify(__clang_patchlevel__);
+#elif defined(__GNUC__)
+    "gcc-" stringify(__GNUC__) "." stringify(__GNUC_MINOR__) "." stringify(__GNUC_PATCHLEVEL__);
+#else
+    "unknown";
+#endif
+} // namespace build_info
 
 static const int MAX_TRANSOP_BUFFER_SIZE = 4;
 
@@ -92,8 +117,6 @@ struct TransOpBuffer {
 void split_unaligned(const TransOp& transop, TransOpBuffer& buf);
 
 bool handle_config_change(PTLsimConfig& config, int argc = 0, char** argv = null);
-void collect_common_sysinfo(PTLsimStats& stats);
-void collect_sysinfo(PTLsimStats& stats, int argc, char** argv);
 void print_sysinfo();
 void backup_and_reopen_logfile();
 void shutdown_subsystems();
@@ -221,9 +244,9 @@ struct formatter<PTLsimBanner> {
     out = std::format_to(out, "//  PTLsim: Cycle Accurate x86-64 Simulator\n");
     out = std::format_to(out, "//  Copyright 1999-2007 Matt T. Yourst <yourst@yourst.com>\n");
     out = std::format_to(out, "// \n");
-    out = std::format_to(out, "//  Revision {} ({})\n", stringify(SVNREV), stringify(SVNDATE));
-    out = std::format_to(out, "//  Built {} {} on {} using gcc-{}.{}\n", __DATE__, __TIME__, stringify(BUILDHOST),
-                         stringify(__GNUC__), stringify(__GNUC_MINOR__));
+    out = std::format_to(out, "//  Built {} on {} using {}\n", build_info::timestamp, build_info::hostname,
+                         build_info::compiler);
+    out = std::format_to(out, "//  Revision {}\n", build_info::git_revision);
     out = std::format_to(out, "//  Running on {}\n", host_platform_name());
     out = std::format_to(out, "//  \n");
 

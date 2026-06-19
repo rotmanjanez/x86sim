@@ -9,6 +9,9 @@
 #ifndef _STATS_H_
 #define _STATS_H_
 
+#include <ctime>
+#include <string_view>
+
 #include "globals.h"
 #include "superstl.h"
 #include "ptlsim.h"
