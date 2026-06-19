@@ -9,13 +9,6 @@
 #include "ptlsim.h"
 #include "dcache.h"
 
-const char* opclass_names[OPCLASS_COUNT] = {
-    "logic",       "addsub", "addsubc", "addshift",   "sel",        "cmp",        "br.cc",
-    "jmp",         "bru",    "assist",  "mf",         "ld",         "st",         "ld.pre",
-    "shiftsimple", "shift",  "mul",     "bitscan",    "flags",      "chk",        "fpu",
-    "fp-div-sqrt", "fp-cmp", "fp-perm", "fp-cvt-i2f", "fp-cvt-f2i", "fp-cvt-f2f", "vec",
-};
-
 //
 // Micro-operation (uop) definitions
 //
@@ -406,10 +399,6 @@ void Context::fxrstor(const FXSAVEStruct& state) {
   }
 }
 
-const char* datatype_names[DATATYPE_COUNT] = {"int",      "float",     "vec-float", "double",    "vec-double",
-                                              "vec-8bit", "vec-16bit", "vec-32bit", "vec-64bit", "vec-128bit"};
-
-extern const char* datatype_names[DATATYPE_COUNT];
 /*
  * Convert a condition code (as in jump, setcc, cmovcc, etc) to
  * the one or two architectural registers last updated with the

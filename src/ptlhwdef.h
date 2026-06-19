@@ -636,8 +636,6 @@ enum {
 
 #define OPCLASS_USECOND (OPCLASS_COND_BRANCH | OPCLASS_SELECT | OPCLASS_CHECK)
 
-extern const char* opclass_names[OPCLASS_COUNT];
-
 //
 // Micro-operations (uops):
 // See table in ptlhwdef.cpp for details.
@@ -961,8 +959,6 @@ enum {
   DATATYPE_VEC_128BIT,
   DATATYPE_COUNT
 };
-extern const char* datatype_names[DATATYPE_COUNT];
-
 struct TransOpBase {
   // Opcode:
   byte opcode;
@@ -1168,15 +1164,6 @@ typedef void (*assist_func_t)(Context& ctx);
 const char* assist_name(assist_func_t func);
 int assist_index(assist_func_t func);
 
-
-//
-// This part is used when parsing stats.h to build the
-// data store template; these must be in sync with the
-// corresponding definitions elsewhere.
-//
-#ifdef DSTBUILD
-static const char* sizeshift_names[4] = {"1 (byte)", "2 (word)", "4 (dword)", "8 (qword)"};
-#endif
 
 //
 // std::formatter specializations for C++23 std::print/std::format support
