@@ -7,6 +7,7 @@
 // Copyright 2006-2008 Hui Zeng <hzeng@cs.binghamton.edu>
 //
 
+#include <cstdlib>
 #include <format>
 #include <print>
 #include <cstdio>
@@ -943,7 +944,7 @@ void PhysicalRegister::fill_operand_info(PhysicalRegisterOperandInfo& opinfo) {
 bool EventLog::init(size_t bufsize) {
   reset();
   size_t bytes = bufsize * sizeof(OutOfOrderCoreEvent);
-  start = (OutOfOrderCoreEvent*)ptl_mm_alloc_private_pages(bytes);
+  start = (OutOfOrderCoreEvent*)std::aligned_alloc(PAGE_SIZE, ceil(bytes, PAGE_SIZE));
   if unlikely (!start)
     return false;
   end = start + bufsize;
@@ -958,8 +959,7 @@ void EventLog::reset() {
   if (!start)
     return;
 
-  size_t bytes = (end - start) * sizeof(OutOfOrderCoreEvent);
-  ptl_mm_free_private_pages(start, bytes);
+  std::free(start);
   start = null;
   end = null;
   tail = null;

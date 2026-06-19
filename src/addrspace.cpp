@@ -1,4 +1,7 @@
 #include "addrspace.h"
+
+#include <cstdlib>
+#include <cstring>
 //
 // Shadow page accessibility table format (x86-64 only):
 // Top level:  1048576 bytes: 131072 64-bit pointers to chunks
@@ -15,7 +18,9 @@ byte& AddressSpace::pageid_to_map_byte(spat_t top, Waddr pageid) {
   W64 chunkid = pageid >> log2(SPAT_PAGES_PER_CHUNK);
 
   if (!top[chunkid]) {
-    top[chunkid] = (SPATChunk*)ptl_mm_alloc_private_pages(SPAT_BYTES_PER_CHUNK);
+    top[chunkid] = (SPATChunk*)std::aligned_alloc(PAGE_SIZE, ceil((Waddr)SPAT_BYTES_PER_CHUNK, PAGE_SIZE));
+    if (top[chunkid])
+      std::memset(top[chunkid], 0, SPAT_BYTES_PER_CHUNK);
   }
   SPATChunk& chunk = *top[chunkid];
   W64 byteid = bits(pageid, 3, log2(SPAT_BYTES_PER_CHUNK));
@@ -65,23 +70,27 @@ void AddressSpace::make_inaccessible(void* p, Waddr size, spat_t top) {
 
 AddressSpace::spat_t AddressSpace::allocmap() {
 #ifdef PTLSIM_AMD64
-  return (spat_t)ptl_mm_alloc_private_pages(SPAT_TOPLEVEL_CHUNKS * sizeof(SPATChunk*));
+  constexpr Waddr bytes = SPAT_TOPLEVEL_CHUNKS * sizeof(SPATChunk*);
 #else
-  return (spat_t)ptl_mm_alloc_private_pages(SPAT_BYTES);
+  constexpr Waddr bytes = SPAT_BYTES;
 #endif
+  spat_t top = (spat_t)std::aligned_alloc(PAGE_SIZE, ceil(bytes, PAGE_SIZE));
+  if (top)
+    std::memset(top, 0, bytes);
+  return top;
 }
 void AddressSpace::freemap(AddressSpace::spat_t top) {
 #ifdef PTLSIM_AMD64
   if (top) {
     foreach (i, SPAT_TOPLEVEL_CHUNKS) {
       if (top[i])
-        ptl_mm_free_private_pages(top[i], SPAT_BYTES_PER_CHUNK);
+        std::free(top[i]);
     }
-    ptl_mm_free_private_pages(top, SPAT_TOPLEVEL_CHUNKS * sizeof(SPATChunk*));
+    std::free(top);
   }
 #else
   if (top) {
-    ptl_mm_free_private_pages(top, SPAT_BYTES);
+    std::free(top);
   }
 #endif
 }

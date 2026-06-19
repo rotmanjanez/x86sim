@@ -5,6 +5,8 @@
 // Copyright 2003-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
+#include <cstdlib>
+
 #include "globals.h"
 #include "ptlsim.h"
 #include "seqcore.h"
@@ -517,7 +519,7 @@ struct SequentialCoreEventLog {
 bool SequentialCoreEventLog::init(size_t bufsize) {
   reset();
   size_t bytes = bufsize * sizeof(SequentialCoreEvent);
-  start = (SequentialCoreEvent*)ptl_mm_alloc_private_pages(bytes);
+  start = (SequentialCoreEvent*)std::aligned_alloc(PAGE_SIZE, ceil(bytes, PAGE_SIZE));
   if unlikely (!start)
     return false;
   end = start + bufsize;
@@ -532,8 +534,7 @@ void SequentialCoreEventLog::reset() {
   if (!start)
     return;
 
-  size_t bytes = (end - start) * sizeof(SequentialCoreEvent);
-  ptl_mm_free_private_pages(start, bytes);
+  std::free(start);
   start = null;
   end = null;
   tail = null;
