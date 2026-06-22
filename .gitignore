@@ -16,3 +16,14 @@ __pycache__
 pyraspsim/dist
 pyraspsim/build
 .cache/
+.DS_Store
+
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+*.ninja*
+raspsim
+build/
+compile_commands.json
+Makefile
+makefile
