@@ -23,8 +23,6 @@
 // Address space management
 //
 
-#ifdef PTLSIM_AMD64
-
 // Each chunk covers 2 GB of virtual address space:
 #define SPAT_TOPLEVEL_CHUNK_BITS 17
 #define SPAT_PAGES_PER_CHUNK_BITS 19
@@ -34,14 +32,6 @@
 #define ADDRESS_SPACE_BITS (48)
 #define ADDRESS_SPACE_SIZE (1LL << ADDRESS_SPACE_BITS)
 
-#else
-
-// Each chunk covers 2 GB of virtual address space:
-#define ADDRESS_SPACE_BITS (32)
-#define ADDRESS_SPACE_SIZE (1LL << ADDRESS_SPACE_BITS)
-#define SPAT_BYTES ((ADDRESS_SPACE_SIZE / PAGE_SIZE) / 8)
-
-#endif
 
 #ifndef PROT_NONE
 #define PROT_NONE 0x0
@@ -91,12 +81,9 @@ public:
   //
   // Shadow page attribute table
   //
-#ifdef PTLSIM_AMD64
   typedef byte SPATChunk[SPAT_BYTES_PER_CHUNK];
   typedef SPATChunk** spat_t;
-#else
-  typedef byte* spat_t;
-#endif
+
   spat_t readmap;
   spat_t writemap;
   spat_t execmap;
@@ -110,11 +97,7 @@ public:
   void make_inaccessible(void* address, Waddr size, spat_t top);
 
   Waddr pageid(void* address) const {
-#ifdef PTLSIM_AMD64
     return ((W64)lowbits((W64)address, ADDRESS_SPACE_BITS)) >> log2(PAGE_SIZE);
-#else
-    return ((Waddr)address) >> log2(PAGE_SIZE);
-#endif
   }
 
   Waddr pageid(Waddr address) const { return pageid((void*)address); }
@@ -142,7 +125,7 @@ public:
   int getattr(void* start);
 
   bool fastcheck(Waddr addr, spat_t top) const {
-#ifdef PTLSIM_AMD64
+
     // Is it outside of userspace address range?
     // Check disabled to allow access to VDSO in kernel space.
     if unlikely (addr >> 48)
@@ -156,9 +139,6 @@ public:
     AddressSpace::SPATChunk& chunk = *top[chunkid];
     Waddr byteid = bits(pageid(addr), 3, log2(SPAT_BYTES_PER_CHUNK));
     return bit(chunk[byteid], lowbits(pageid(addr), 3));
-#else // 32-bit
-    return bit(top[pageid(addr) >> 3], lowbits(pageid(addr), 3));
-#endif
   }
 
   bool fastcheck(void* addr, spat_t top) const { return fastcheck((Waddr)addr, top); }

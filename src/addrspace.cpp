@@ -10,11 +10,8 @@
 // Total: 131072 chunks x 524288 pages per chunk x 4 KB per page = 48 bits virtual address space
 // Total: 17 bits       + 19 bits                + 12 bits       = 48 bits virtual address space
 //
-// In 32-bit version, SPAT is a flat 131072-byte bit vector.
-//
 
 byte& AddressSpace::pageid_to_map_byte(spat_t top, Waddr pageid) {
-#ifdef PTLSIM_AMD64
   W64 chunkid = pageid >> log2(SPAT_PAGES_PER_CHUNK);
 
   if (!top[chunkid]) {
@@ -26,9 +23,6 @@ byte& AddressSpace::pageid_to_map_byte(spat_t top, Waddr pageid) {
   W64 byteid = bits(pageid, 3, log2(SPAT_BYTES_PER_CHUNK));
   assert(byteid <= SPAT_BYTES_PER_CHUNK);
   return chunk[byteid];
-#else
-  return top[pageid >> 3];
-#endif
 }
 
 void AddressSpace::make_accessible(void* p, Waddr size, spat_t top) {
@@ -69,18 +63,14 @@ void AddressSpace::make_inaccessible(void* p, Waddr size, spat_t top) {
 
 
 AddressSpace::spat_t AddressSpace::allocmap() {
-#ifdef PTLSIM_AMD64
   constexpr Waddr bytes = SPAT_TOPLEVEL_CHUNKS * sizeof(SPATChunk*);
-#else
-  constexpr Waddr bytes = SPAT_BYTES;
-#endif
+
   spat_t top = (spat_t)std::aligned_alloc(PAGE_SIZE, ceil(bytes, PAGE_SIZE));
   if (top)
     std::memset(top, 0, bytes);
   return top;
 }
 void AddressSpace::freemap(AddressSpace::spat_t top) {
-#ifdef PTLSIM_AMD64
   if (top) {
     foreach (i, SPAT_TOPLEVEL_CHUNKS) {
       if (top[i])
@@ -88,11 +78,6 @@ void AddressSpace::freemap(AddressSpace::spat_t top) {
     }
     std::free(top);
   }
-#else
-  if (top) {
-    std::free(top);
-  }
-#endif
 }
 
 void AddressSpace::reset() {

@@ -196,12 +196,10 @@ bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
     current_bbcache_dump_filename = config.bbcache_dump_filename;
   }
 
-#ifdef PTLSIM_AMD64
   config.start_log_at_rip = signext64(config.start_log_at_rip, 48);
   config.log_backwards_from_trigger_rip = signext64(config.log_backwards_from_trigger_rip, 48);
   config.start_at_rip = signext64(config.start_at_rip, 48);
   config.stop_at_rip = signext64(config.stop_at_rip, 48);
-#endif
 
   if (first_time) {
     if (!config.quiet) {

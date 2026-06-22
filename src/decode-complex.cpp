@@ -22,11 +22,7 @@ void assist_int(Context& ctx) {
 
 void assist_syscall(Context& ctx) {
   if (ctx.use64) {
-#ifdef PTLSIM_AMD64
     handle_syscall_64bit();
-#endif
-  } else {
-    handle_syscall_32bit(SYSCALL_SEMANTICS_SYSCALL);
   }
   // REG_rip is filled out for us
 }

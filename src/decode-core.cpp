@@ -2234,11 +2234,8 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
   return bb;
 }
 
-#ifdef PTLSIM_AMD64
+
 #define MAX_RIP 0xffffffffffffffffULL
-#else
-#define MAX_RIP 0xffffffffU
-#endif
 
 //
 // Translate one basic block, just to get the uops: do not

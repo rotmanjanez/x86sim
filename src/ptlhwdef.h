@@ -1019,11 +1019,7 @@ typedef void (*uopimpl_func_t)(IssueState& state, W64 ra, W64 rb, W64 rc, W16 ra
 // With 60 (or 62 on 32-bit PTLsim) 32-bit entries per page,
 // this comes out to exactly 256 bytes per chunk.
 //
-#ifdef PTLSIM_AMD64
 #define BB_PTRS_PER_CHUNK 60
-#else
-#define BB_PTRS_PER_CHUNK 62
-#endif
 
 // We don't have this defined outside the PTLsim build process:
 #ifdef PTLSIM_PUBLIC_ONLY
