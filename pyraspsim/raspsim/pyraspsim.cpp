@@ -254,7 +254,6 @@ AddrRef PyRaspsim::memmap(Waddr start, Prot prot, W64 length, py::bytes data) {
 
 void PyRaspsim::run(unsigned long long ninstr) {
   setTimeout(ninstr);
-  PTLsimMachine* machine = getMachine();
 
   if (!machine) {
     throw py::value_error(std::string("Cannot find core named '") + getCoreName() + "'");

@@ -10,6 +10,9 @@
 #ifndef _OOOCORE_H_
 #define _OOOCORE_H_
 
+#include "ptlsim.h"
+
+#include <bitset>
 #include <format>
 
 // With these disabled, simulation is faster
@@ -38,6 +41,24 @@ static const int MAX_THREADS_PER_CORE = 1;
   stats.ooocore.total.expr, per_context_ooocore_stats_ref(vcpuid).expr
 
 namespace OutOfOrderModel {
+struct OutOfOrderCore;
+
+#define MAX_SMT_CORES 1
+
+struct OutOfOrderMachine : public PTLsimMachine {
+  OutOfOrderCore* cores[MAX_SMT_CORES];
+  std::bitset<MAX_CONTEXTS> stopped;
+  std::string_view name() const override;
+  virtual bool init(PTLsimConfig& config);
+  virtual int run(PTLsimConfig& config);
+  virtual void reset();
+  virtual void dump_state();
+  virtual void update_stats(PTLsimStats& stats);
+  virtual void flush_tlb(Context& ctx);
+  virtual void flush_tlb_virt(Context& ctx, Waddr virtaddr);
+  void flush_all_pipelines();
+};
+
 //
 // Operand formats
 //
@@ -394,9 +415,6 @@ static const char* short_physreg_state_names[MAX_PHYSREG_STATE] = {"-", "free", 
 
 #ifdef INSIDE_OOOCORE
 
-struct OutOfOrderCore;
-OutOfOrderCore& coreof(int coreid);
-
 struct ReorderBufferEntry;
 
 //
@@ -436,6 +454,7 @@ struct IssueQueue {
   std::bitset<size> allready;
   int count;
   byte coreid;
+  OutOfOrderCore* core = nullptr;
   int shared_entries;
   int reserved_entries;
 
@@ -464,8 +483,8 @@ struct IssueQueue {
 
   int slotof(int uopid) const { return uopids.search(uopid); }
 
-  void reset(int coreid);
-  void reset(int coreid, int threadid);
+  void reset(OutOfOrderCore& core);
+  void reset(OutOfOrderCore& core, int threadid);
   void clock();
   bool insert(tag_t uopid, const tag_t* operands, const tag_t* preready);
   bool broadcast(tag_t uopid);
@@ -507,7 +526,10 @@ struct IssueQueue {
     return true;
   }
 
-  OutOfOrderCore& getcore() const { return coreof(coreid); }
+  OutOfOrderCore& getcore() const {
+    assert(core);
+    return *core;
+  }
 };
 
 //
@@ -660,6 +682,7 @@ struct ReorderBufferEntry : public selfqueuelink {
   W16 executable_on_cluster_mask;
   W8s cluster;
   W8 coreid;
+  OutOfOrderCore* core = nullptr;
 
   W8 threadid;
   byte fu;
@@ -720,7 +743,10 @@ struct ReorderBufferEntry : public selfqueuelink {
   bool release_mem_lock(bool forced = false);
   std::string get_operand_info(int operand) const;
 
-  OutOfOrderCore& getcore() const { return coreof(coreid); }
+  OutOfOrderCore& getcore() const {
+    assert(core);
+    return *core;
+  }
 
   ThreadContext& getthread() const;
   issueq_tag_t get_tag();
@@ -744,6 +770,7 @@ struct LoadStoreQueueEntry : public SFR {
   ReorderBufferEntry* rob;
   W16 idx;
   byte coreid;
+  OutOfOrderCore* core = nullptr;
   W8s mbtag;
   W8 store : 1, lfence : 1, sfence : 1, entry_valid : 1;
   W32 padding;
@@ -771,7 +798,10 @@ struct LoadStoreQueueEntry : public SFR {
     return *this;
   }
 
-  OutOfOrderCore& getcore() const { return coreof(coreid); }
+  OutOfOrderCore& getcore() const {
+    assert(core);
+    return *core;
+  }
 };
 
 struct PhysicalRegisterOperandInfo {
@@ -794,6 +824,7 @@ struct PhysicalRegister : public selfqueuelink {
   W16 flags;
   W16 idx;
   W8 coreid;
+  OutOfOrderCore* core = nullptr;
   W8 rfid;
   W8 state;
   W8 archreg;
@@ -811,12 +842,7 @@ struct PhysicalRegister : public selfqueuelink {
     get_state_list(state).enqueue(this);
   }
 
-  void init(int coreid, int rfid, int idx) {
-    this->coreid = coreid;
-    this->rfid = rfid;
-    this->idx = idx;
-    reset();
-  }
+  void init(OutOfOrderCore& core, int rfid, int idx);
 
 private:
   void addref() { refcount++; }
@@ -873,11 +899,15 @@ public:
 
   void fill_operand_info(PhysicalRegisterOperandInfo& opinfo);
 
-  OutOfOrderCore& getcore() const { return coreof(coreid); }
+  OutOfOrderCore& getcore() const {
+    assert(core);
+    return *core;
+  }
 };
 
 struct PhysicalRegisterFile : public std::array<PhysicalRegister, MAX_PHYS_REG_FILE_SIZE> {
   byte coreid;
+  OutOfOrderCore* core = nullptr;
   byte rfid;
   W16 size;
   const char* name;
@@ -887,24 +917,27 @@ struct PhysicalRegisterFile : public std::array<PhysicalRegister, MAX_PHYS_REG_F
 
   PhysicalRegisterFile() {}
 
-  PhysicalRegisterFile(const char* name, int coreid, int rfid, int size) {
-    init(name, coreid, rfid, size);
+  PhysicalRegisterFile(const char* name, OutOfOrderCore& core, int rfid, int size) {
+    init(name, core, rfid, size);
     reset();
   }
 
-  PhysicalRegisterFile& operator()(const char* name, int coreid, int rfid, int size) {
-    init(name, coreid, rfid, size);
+  PhysicalRegisterFile& operator()(const char* name, OutOfOrderCore& core, int rfid, int size) {
+    init(name, core, rfid, size);
     reset();
     return *this;
   }
 
-  void init(const char* name, int coreid, int rfid, int size);
+  void init(const char* name, OutOfOrderCore& core, int rfid, int size);
   bool remaining() const { return (!states[PHYSREG_FREE].empty()); }
 
   PhysicalRegister* alloc(W8 threadid, int r = -1);
   void reset(W8 threadid);
 
-  OutOfOrderCore& getcore() const { return coreof(coreid); }
+  OutOfOrderCore& getcore() const {
+    assert(core);
+    return *core;
+  }
 
 private:
   void reset();
@@ -1457,7 +1490,7 @@ struct ThreadContext {
 struct OutOfOrderCore {
   OutOfOrderMachine& machine;
   int coreid;
-  OutOfOrderCore& getcore() const { return coreof(coreid); }
+  OutOfOrderCore& getcore() { return *this; }
 
   int threadcount;
   ThreadContext* threads[MAX_THREADS_PER_CORE];
@@ -1593,10 +1626,10 @@ struct OutOfOrderCore {
     //
     // Physical register files
     //
-    physregfiles[0]("int", coreid, 0, PHYS_REG_FILE_SIZE);
-    physregfiles[1]("fp", coreid, 1, PHYS_REG_FILE_SIZE);
-    physregfiles[2]("st", coreid, 2, STQ_SIZE * MAX_THREADS_PER_CORE);
-    physregfiles[3]("br", coreid, 3, MAX_BRANCHES_IN_FLIGHT * MAX_THREADS_PER_CORE);
+    physregfiles[0]("int", *this, 0, PHYS_REG_FILE_SIZE);
+    physregfiles[1]("fp", *this, 1, PHYS_REG_FILE_SIZE);
+    physregfiles[2]("st", *this, 2, STQ_SIZE * MAX_THREADS_PER_CORE);
+    physregfiles[3]("br", *this, 3, MAX_BRANCHES_IN_FLIGHT * MAX_THREADS_PER_CORE);
   }
 
   //
@@ -1648,23 +1681,6 @@ struct OutOfOrderCore {
   void check_refcounts();
   void check_rob();
 };
-
-#define MAX_SMT_CORES 1
-
-struct OutOfOrderMachine : public PTLsimMachine {
-  OutOfOrderCore* cores[MAX_SMT_CORES];
-  std::bitset<MAX_CONTEXTS> stopped;
-  OutOfOrderMachine(const char* name);
-  virtual bool init(PTLsimConfig& config);
-  virtual int run(PTLsimConfig& config);
-  virtual void reset();
-  virtual void dump_state();
-  virtual void update_stats(PTLsimStats& stats);
-  virtual void flush_tlb(Context& ctx);
-  virtual void flush_tlb_virt(Context& ctx, Waddr virtaddr);
-  void flush_all_pipelines();
-};
-
 
 //
 // The following configuration has two integer/store clusters with a single cycle

@@ -2,6 +2,8 @@
 #define _RASPSIM_HWSETUP_H_
 
 #include "typedefs.h"
+#include "addrspace.h"
+#include <memory>
 #include <string>
 
 class AddressSpace;
@@ -17,17 +19,15 @@ W64 lengthofSyscallNames();
 // Wrapper to static or global state for better binding support
 // TODO: (JR) add lock so only a single instance of raspsim can be used at a time
 class Raspsim {
+private:
+  std::unique_ptr<PTLsimMachine> machine;
+
 public:
   Raspsim();
   ~Raspsim();
 
   void run();
 
-protected:
-  PTLsimMachine* getMachine();
-  const std::string& getCoreName();
-
-public:
   int getRegisterIndex(const char* regname);
   void setRegisterValue(int reg, W64 value);
   W64 getRegisterValue(int reg);

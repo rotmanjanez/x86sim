@@ -1056,12 +1056,10 @@ struct SequentialCore {
       assert(false);
     }
 
-    if unlikely ((ctx.x86_exception == EXCEPTION_x86_page_fault) && (ctx.cr2 == 0xffffffff00000018))
-      eventlog.print(logfile);
-
-    if (logable(4)) {
-      logfile << ctx;
+    if unlikely ((ctx.x86_exception == EXCEPTION_x86_page_fault) && (ctx.cr2 == 0xffffffff00000018)) {
+      eventlog.print();
     }
+    logging::println(logging::DEBUG, "{}", ctx);
 
     ctx.propagate_x86_exception(ctx.x86_exception, ctx.error_code, ctx.cr2);
 
@@ -1476,45 +1474,31 @@ struct SequentialCore {
   }
 };
 
-struct SequentialMachine : public PTLsimMachine {
-  SequentialCore* cores[MAX_CONTEXTS];
-  bool init_done;
+std::string_view SequentialMachine::name() const {
+  return "seq";
+}
 
-  SequentialMachine(const char* name) {
-    // Add to the list of available core types
-    addmachine(name, this);
-    init_done = 0;
-  }
-
-  //
-  // Construct all the structures necessary to configure
-  // the cores. This function is only called once, after
-  // all other PTLsim subsystems are brought up.
-  //
-  virtual bool init(PTLsimConfig& config) {
-    if (init_done)
-      return true;
-
-    foreach (i, contextcount) {
-      cores[i] = new SequentialCore(contextof(i));
-      //
-      // Note: in a real cycle accurate model, config may
-      // specify various ways of slicing contextcount up
-      // into threads, cores and sockets; the appropriate
-      // interconnect and cache hierarchy parameters may
-      // be specified here.
-      //
-    }
-
-    init_done = 1;
+bool SequentialMachine::init(PTLsimConfig& config) {
+  if (init_done)
     return true;
+
+  foreach (i, contextcount) {
+    cores[i] = new SequentialCore(contextof(i));
+    //
+    // Note: in a real cycle accurate model, config may
+    // specify various ways of slicing contextcount up
+    // into threads, cores and sockets; the appropriate
+    // interconnect and cache hierarchy parameters may
+    // be specified here.
+    //
   }
 
-  //
-  // Run the processor model, until a stopping point
-  // is hit (as configured elsewhere in config).
-  //
-  virtual int run(PTLsimConfig& config) {
+  init_done = 1;
+  return true;
+}
+
+
+int SequentialMachine::run(PTLsimConfig& config) {
     logging::println("Starting sequential core toplevel loop at {} cycles and {} commits", sim_cycle,
                      total_user_insns_committed);
     logging::flush();
@@ -1567,12 +1551,9 @@ struct SequentialMachine : public PTLsimMachine {
         break;
     }
 
-    logfile << "Exiting sequential mode at ", total_user_insns_committed, " commits, ", total_uops_committed,
-        " uops and ", iterations, " iterations (cycles)", endl;
-
-    if (logable(1)) {
-      dump_state(logfile);
-    }
+    logging::println(logging::INFO, "Exiting sequential mode at {} commits, {} uops and {} iterations (cycles)",
+                     total_user_insns_committed, total_uops_committed, iterations);
+    // logging::println(logging::TRACE, "{}", *this);
 
     foreach (i, contextcount) {
       SequentialCore& core = *cores[i];
@@ -1587,7 +1568,7 @@ struct SequentialMachine : public PTLsimMachine {
     return exiting;
   }
 
-  virtual void dump_state() {
+  void SequentialMachine::dump_state() {
     logging::println("Dumping event log for sequential core:");
     eventlog.print();
 
@@ -1597,19 +1578,10 @@ struct SequentialMachine : public PTLsimMachine {
     }
   }
 
-  //
-  // Update any statistics in stats in preparation
-  // for writing it somewhere. The model may also
-  // directly update the global stats structure
-  // while it runs; this is only for cleanup tasks
-  // or computing derived values.
-  //
-  virtual void update_stats(PTLsimStats& stats) {
+  void SequentialMachine::update_stats(PTLsimStats& stats) {
     // (nop)
   }
-};
 
-SequentialMachine seqmodel("seq");
 
 
 auto std::formatter<CommitRecord>::format(const CommitRecord& cr, std::format_context& ctx) const {

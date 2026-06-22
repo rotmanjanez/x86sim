@@ -46,9 +46,6 @@ extern "C" void assert_fail(const char* __assertion, const char* __file, unsigne
   logging::println(logging::ERROR, "Assert {} failed in {}:{} ({}) at {} cycles, {} iterations, {} user commits\n",
                    __assertion, __file, __line, __function, sim_cycle, iterations, total_user_insns_committed);
 
-  if (auto* machine = PTLsimMachine::getcurrent(); machine) {
-    logging::println(logging::ERROR, "{}", *machine);
-  }
   logging::flush();
 
   sys_exit(1);

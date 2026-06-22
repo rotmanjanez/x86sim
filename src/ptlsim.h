@@ -71,15 +71,13 @@ struct PTLsimStats;
 struct PTLsimMachine {
   bool initialized;
   PTLsimMachine() { initialized = 0; }
+  virtual std::string_view name() const;
   virtual bool init(PTLsimConfig& config);
   virtual int run(PTLsimConfig& config);
   virtual void reset();
   virtual void update_stats(PTLsimStats& stats);
   virtual void flush_tlb(Context& ctx);
   virtual void flush_tlb_virt(Context& ctx, Waddr virtaddr);
-  static void addmachine(std::string&& name, PTLsimMachine* machine);
-  static PTLsimMachine* getmachine(const std::string& name);
-  static PTLsimMachine* getcurrent();
 };
 
 struct TransOpBuffer {
@@ -120,7 +118,7 @@ void print_sysinfo();
 void backup_and_reopen_logfile();
 void shutdown_subsystems();
 
-bool simulate(const std::string& machinename);
+bool simulate(PTLsimMachine& machine);
 int inject_events();
 bool check_for_async_sim_break();
 void update_progress();

@@ -32,10 +32,10 @@ using namespace OutOfOrderModel;
 // Issue Queue
 //
 template<int size, int operandcount>
-void IssueQueue<size, operandcount>::reset(int coreid) {
-  this->coreid = coreid;
+void IssueQueue<size, operandcount>::reset(OutOfOrderCore& core) {
+  this->core = &core;
+  this->coreid = core.coreid;
 
-  OutOfOrderCore& core = getcore();
   count = 0;
   valid = 0;
   issued = 0;
@@ -54,15 +54,14 @@ void IssueQueue<size, operandcount>::reset(int coreid) {
 }
 
 template<int size, int operandcount>
-void IssueQueue<size, operandcount>::reset(int coreid, int threadid) {
-  OutOfOrderCore& core = getcore();
-
+void IssueQueue<size, operandcount>::reset(OutOfOrderCore& core, int threadid) {
   if unlikely (core.threadcount == 1) {
-    reset(coreid);
+    reset(core);
     return;
   }
 #ifndef MULTI_IQ
-  this->coreid = coreid;
+  this->core = &core;
+  this->coreid = core.coreid;
 
   foreach (i, size) {
     if likely (valid[i]) {

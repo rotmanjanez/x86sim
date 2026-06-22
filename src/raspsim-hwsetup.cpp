@@ -2,7 +2,10 @@
 #include "addrspace.h"
 #include "ptlsim.h"
 #include "logging.h"
+#include "seqcore.h"
+#include "ooocore.h"
 #include <format>
+#include <memory>
 
 struct PTLsimConfig;
 extern PTLsimConfig config;
@@ -58,15 +61,8 @@ Raspsim::~Raspsim() {
   total_basic_blocks_committed = 0;
   requested_switch_to_native = 0;
 
-  getMachine()->reset();
-}
-
-PTLsimMachine* Raspsim::getMachine() {
-  return PTLsimMachine::getmachine(config.core_name);
-}
-
-const std::string& Raspsim::getCoreName() {
-  return config.core_name;
+  if (machine)
+    machine->reset();
 }
 
 void Raspsim::setLogfile(const char* filename) {
@@ -151,7 +147,17 @@ void Raspsim::stutdown() {
 }
 
 void Raspsim::run() {
-  simulate(config.core_name);
+  if (config.core_name == "seq")
+    machine = std::make_unique<SequentialMachine>();
+  else if (config.core_name == "ooo")
+    machine = std::make_unique<OutOfOrderModel::OutOfOrderMachine>();
+  else
+    logging::println(logging::ERROR, "Cannot find core named '{}'", config.core_name);
+
+  if (!machine)
+    return;
+
+  simulate(*machine);
 }
 
 char* Raspsim::formatException(byte exception, W32 errorcode, Waddr virtaddr) {

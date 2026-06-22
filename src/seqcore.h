@@ -11,6 +11,39 @@
 
 #include "ptlsim.h"
 
+struct SequentialCore;
+
+struct SequentialMachine : public PTLsimMachine {
+  SequentialCore* cores[MAX_CONTEXTS];
+  bool init_done = false;
+
+  std::string_view name() const override;
+
+  //
+  // Construct all the structures necessary to configure
+  // the cores. This function is only called once, after
+  // all other PTLsim subsystems are brought up.
+  //
+  virtual bool init(PTLsimConfig& config) override;
+
+  //
+  // Run the processor model, until a stopping point
+  // is hit (as configured elsewhere in config).
+  //
+  virtual int run(PTLsimConfig& config) override;
+
+  virtual void dump_state();
+
+  //
+  // Update any statistics in stats in preparation
+  // for writing it somewhere. The model may also
+  // directly update the global stats structure
+  // while it runs; this is only for cleanup tasks
+  // or computing derived values.
+  //
+  virtual void update_stats(PTLsimStats& stats) override;
+};
+
 //
 // Free-standing sequential execution of one basic block
 //

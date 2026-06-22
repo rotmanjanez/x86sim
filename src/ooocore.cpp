@@ -154,7 +154,7 @@ void OutOfOrderCore::reset() {
   caches.reset();
   caches.callback = &cache_callbacks;
   setzero(robs_on_fu);
-  foreach_issueq(reset(coreid));
+  foreach_issueq(reset(*this));
 
   reserved_iq_entries = (int)std::sqrt((double)ISSUE_QUEUE_SIZE / MAX_THREADS_PER_CORE);
   assert(reserved_iq_entries && reserved_iq_entries < ISSUE_QUEUE_SIZE);
@@ -205,11 +205,20 @@ void StateList::checkvalid() {
 #endif
 }
 
-void PhysicalRegisterFile::init(const char* name, int coreid, int rfid, int size) {
+void PhysicalRegister::init(OutOfOrderCore& core, int rfid, int idx) {
+  this->core = &core;
+  this->coreid = core.coreid;
+  this->rfid = rfid;
+  this->idx = idx;
+  reset();
+}
+
+void PhysicalRegisterFile::init(const char* name, OutOfOrderCore& core, int rfid, int size) {
   assert(rfid < PHYS_REG_FILE_COUNT);
   assert(size <= MAX_PHYS_REG_FILE_SIZE);
   this->size = size;
-  this->coreid = coreid;
+  this->core = &core;
+  this->coreid = core.coreid;
   this->rfid = rfid;
   this->name = name;
   this->allocations = 0;
@@ -221,7 +230,7 @@ void PhysicalRegisterFile::init(const char* name, int coreid, int rfid, int size
   }
 
   foreach (i, size) {
-    (*this)[i].init(coreid, rfid, i);
+    (*this)[i].init(core, rfid, i);
   }
 }
 
@@ -1626,16 +1635,15 @@ auto std::formatter<OutOfOrderModel::OutOfOrderCoreEvent>::format(const OutOfOrd
   return out;
 }
 
-OutOfOrderMachine::OutOfOrderMachine(const char* name) {
-  // Add to the list of available core types
-  addmachine(name, this);
-}
-
 //
 // Construct all the structures necessary to configure
 // the cores. This function is only called once, after
 // all other PTLsim subsystems are brought up.
 //
+
+std::string_view OutOfOrderMachine::name() const {
+  return "ooo";
+}
 
 bool OutOfOrderMachine::init(PTLsimConfig& config) {
   // Note: we only create a single core for all contexts for now.
@@ -1903,12 +1911,6 @@ void OutOfOrderMachine::flush_all_pipelines() {
     ThreadContext* thread = core->threads[i];
     thread->invalidate_smc();
   }
-}
-
-OutOfOrderMachine ooomodel("ooo");
-
-OutOfOrderCore& OutOfOrderModel::coreof(int coreid) {
-  return *ooomodel.cores[coreid];
 }
 
 // Formatter implementations

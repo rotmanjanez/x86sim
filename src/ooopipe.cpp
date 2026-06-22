@@ -161,17 +161,19 @@ void ThreadContext::flush_pipeline() {
 
   ROB.reset();
   foreach (i, ROB_SIZE) {
+    ROB[i].core = &core;
     ROB[i].coreid = core.coreid;
     ROB[i].threadid = threadid;
     ROB[i].changestate(rob_free_list);
   }
   LSQ.reset();
   foreach (i, LSQ_SIZE) {
+    LSQ[i].core = &core;
     LSQ[i].coreid = core.coreid;
   }
   loads_in_flight = 0;
   stores_in_flight = 0;
-  foreach_issueq(reset(core.coreid, threadid));
+  foreach_issueq(reset(core, threadid));
 
   dispatch_deadlock_countdown = DISPATCH_DEADLOCK_COUNTDOWN_CYCLES;
   last_commit_at_cycle = sim_cycle;

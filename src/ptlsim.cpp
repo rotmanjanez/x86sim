@@ -215,11 +215,13 @@ bool handle_config_change(PTLsimConfig& config, int argc, char** argv) {
   return true;
 }
 
-std::unordered_map<std::string, PTLsimMachine*> machinetable{};
 
 // Make sure the vtable gets compiled:
 PTLsimMachine dummymachine;
 
+std::string_view PTLsimMachine::name() const {
+  return "unknown";
+}
 bool PTLsimMachine::init(PTLsimConfig& config) {
   return false;
 }
@@ -240,36 +242,14 @@ void PTLsimMachine::flush_tlb_virt(Context& ctx, Waddr virtaddr) {
   return;
 }
 
-void PTLsimMachine::addmachine(std::string&& name, PTLsimMachine* machine) {
-  machinetable.emplace(std::move(name), machine);
-}
-
-PTLsimMachine* PTLsimMachine::getmachine(const std::string& name) {
-  auto it = machinetable.find(name);
-  if (it == machinetable.end())
-    return nullptr;
-
-  return it->second;
-}
-
-// Currently executing machine model:
-PTLsimMachine* current_machine = null;
-
-PTLsimMachine* PTLsimMachine::getcurrent() {
-  return current_machine;
-}
-
-
 void simulateInitializedMachine(PTLsimMachine& machine) {
-  current_machine = &machine;
   machine.run(config);
   machine.update_stats(stats);
-  current_machine = null;
 }
 
-bool ensureMachineInitialized(PTLsimMachine& m, const std::string& machinename) {
+bool ensureMachineInitialized(PTLsimMachine& m) {
   if (!m.initialized) {
-    logging::println("Initializing core '{}'", machinename);
+    logging::println("Initializing core '{}'", m.name());
     if (!m.init(config)) {
       return 1;
     }
@@ -278,26 +258,19 @@ bool ensureMachineInitialized(PTLsimMachine& m, const std::string& machinename) 
   return 0;
 }
 
-bool simulate(const std::string& machinename) {
-  PTLsimMachine* machine = PTLsimMachine::getmachine(machinename);
-
-  if (!machine) {
-    logging::println(logging::ERROR, "Cannot find core named '{}'", machinename);
-    return 0;
-  }
-
-  if (ensureMachineInitialized(*machine, machinename)) {
+bool simulate(PTLsimMachine& machine) {
+  if (ensureMachineInitialized(machine)) {
     logging::println(logging::ERROR, "Cannot initialize core model; check its configuration!");
     return 0;
   }
 
-  logging::println(logging::INFO, "Switching to simulation core '{}'...", machinename);
+  logging::println(logging::INFO, "Switching to simulation core '{}'...", machine.name());
   logging::flush();
-  logging::eprintln("Switching to simulation core '{}'...", machinename);
+  logging::eprintln("Switching to simulation core '{}'...", machine.name());
   logging::println(logging::INFO, "Stopping after {} commits", config.stop_at_user_insns);
   logging::flush();
 
-  simulateInitializedMachine(*machine);
+  simulateInitializedMachine(machine);
 
   logging::println(logging::INFO, "Stopped after {} cycles, {} instructions", sim_cycle, total_user_insns_committed);
   logging::flush();
