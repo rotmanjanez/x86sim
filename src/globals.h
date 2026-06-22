@@ -16,9 +16,6 @@
 #include <cstddef>
 #include <limits>
 #include <type_traits>
-extern "C" {
-#include <sys/ptrace.h>
-}
 
 #include "typedefs.h"
 
@@ -372,25 +369,12 @@ asmlinkage{
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <fcntl.h>
-
-#include <sys/mman.h>
-#include <sys/utsname.h>
-#include <sys/ptrace.h>
-#include <signal.h>
-#include <sys/resource.h>
-#include <sys/user.h>
 };
 
 #include <stdarg.h>
 
-#include "syscalls.h"
-
-#ifdef PAGE_SIZE
-#undef PAGE_SIZE
-// We're on x86 or x86-64, so pages are always 4096 bytes:
+// Simulated guest pages are always 4 KB (x86):
 #define PAGE_SIZE 4096
-#endif
 
 /*
  * Make these math functions available even inside of member functions with the same name:
