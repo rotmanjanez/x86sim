@@ -19,6 +19,8 @@
 #define BRANCH_HINT_CALL (1 << 2)
 #define BRANCH_HINT_RET (1 << 3)
 
+namespace vcore {
+
 struct ReturnAddressStackEntry {
   int idx;
   W32 uuid;
@@ -74,15 +76,17 @@ struct BranchPredictorInterface {
 
 extern BranchPredictorInterface branchpred;
 
+} // namespace vcore
+
 //
 // std::formatter specialization for ReturnAddressStackEntry
 //
 template<>
-struct std::formatter<ReturnAddressStackEntry> {
+struct std::formatter<vcore::ReturnAddressStackEntry> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const ReturnAddressStackEntry& e, std::format_context& ctx) const {
-    return std::format_to(ctx.out(), "  {:>4}: uuid {:>16}, rip {}\n", e.idx, e.uuid, (void*)(Waddr)e.rip);
+  auto format(const vcore::ReturnAddressStackEntry& e, std::format_context& ctx) const {
+    return std::format_to(ctx.out(), "  {:>4}: uuid {:>16}, rip {}\n", e.idx, e.uuid, (void*)(vcore::Waddr)e.rip);
   }
 };
 

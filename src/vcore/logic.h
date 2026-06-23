@@ -12,6 +12,8 @@
 #include "globals.h"
 #include "superstl.h"
 
+namespace vcore {
+
 using namespace superstl;
 
 //
@@ -166,11 +168,14 @@ struct FixedQueue : public std::array<T, SIZE> {
   }
 };
 
+} // namespace vcore
+
 template<class T, int SIZE>
-struct std::formatter<FixedQueue<T, SIZE>> {
+struct std::formatter<vcore::FixedQueue<T, SIZE>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const FixedQueue<T, SIZE>& q, std::format_context& ctx) const {
+  auto format(const vcore::FixedQueue<T, SIZE>& q, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     out = std::format_to(out, "Queue<{}>: head {} to tail {} ({} entries):\n", SIZE, q.head, q.tail, q.count);
 
@@ -182,6 +187,8 @@ struct std::formatter<FixedQueue<T, SIZE>> {
     return out;
   }
 };
+
+namespace vcore {
 
 template<class T, int SIZE>
 struct Queue : public FixedQueue<T, SIZE> {
@@ -204,10 +211,14 @@ struct Queue : public FixedQueue<T, SIZE> {
   }
 };
 
+} // namespace vcore
+
 template<class T, int Size>
-struct std::formatter<Queue<T, Size>> : std::formatter<FixedQueue<T, Size>> {
-  // Inherits parse and format from FixedQueue formatter
+struct std::formatter<vcore::Queue<T, Size>> : std::formatter<vcore::FixedQueue<T, Size>> {
+  // Inherits parse and format from vcore::FixedQueue formatter
 };
+
+namespace vcore {
 
 //
 // Fully Associative Arrays
@@ -332,11 +343,14 @@ struct FullyAssociativeTags {
 
 };
 
+} // namespace vcore
+
 template<typename T, int ways>
-struct std::formatter<FullyAssociativeTags<T, ways>> {
+struct std::formatter<vcore::FullyAssociativeTags<T, ways>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const FullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
+  auto format(const vcore::FullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     for (int i = 0; i < ways; i++) {
       out = std::format_to(out, "  way {:<2}: ", i);
@@ -352,6 +366,8 @@ struct std::formatter<FullyAssociativeTags<T, ways>> {
     return out;
   }
 };
+
+namespace vcore {
 
 
 //
@@ -543,11 +559,14 @@ struct FullyAssociativeTagsNbitOneHot {
   }
 };
 
+} // namespace vcore
+
 template<int Size, int Width, int PadSize>
-struct std::formatter<FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>> {
+struct std::formatter<vcore::FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>& tags, std::format_context& ctx) const {
+  auto format(const vcore::FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>& tags, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     for (int i = 0; i < Size; i++) {
       out = std::format_to(out, "{}\n", tags.slotid(i));
@@ -555,6 +574,8 @@ struct std::formatter<FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>> {
     return out;
   }
 };
+
+namespace vcore {
 
 template<typename T, typename V>
 struct NullAssociativeArrayStatisticsCollector {
@@ -643,11 +664,14 @@ struct FullyAssociativeArray {
   V* operator()(T tag) { return select(tag); }
 };
 
+} // namespace vcore
+
 template<typename T, typename V, int ways, typename stats>
-struct std::formatter<FullyAssociativeArray<T, V, ways, stats>> {
+struct std::formatter<vcore::FullyAssociativeArray<T, V, ways, stats>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const FullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
+  auto format(const vcore::FullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     for (int i = 0; i < ways; i++) {
       std::string waystr = std::format("  way {:<2}: ", i);
@@ -664,6 +688,8 @@ struct std::formatter<FullyAssociativeArray<T, V, ways, stats>> {
     return out;
   }
 };
+
+namespace vcore {
 
 template<typename T, typename V, int setcount, int waycount, int linesize,
          typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
@@ -695,13 +721,16 @@ struct AssociativeArray {
   void invalidate(T addr) { sets[setof(addr)].invalidate(tagof(addr)); }
 };
 
+} // namespace vcore
+
 template<typename T, typename V, int setcount, int waycount, int linesize, typename stats>
-struct std::formatter<AssociativeArray<T, V, setcount, waycount, linesize, stats>> {
+struct std::formatter<vcore::AssociativeArray<T, V, setcount, waycount, linesize, stats>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const AssociativeArray<T, V, setcount, waycount, linesize, stats>& arr, std::format_context& ctx) const {
+  auto format(const vcore::AssociativeArray<T, V, setcount, waycount, linesize, stats>& arr, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
-    out = std::format_to(out, "AssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount, linesize);
+    out = std::format_to(out, "vcore::AssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount, linesize);
     for (int set = 0; set < setcount; set++) {
       out = std::format_to(out, "  Set {}:\n", set);
       out = std::format_to(out, "{}", arr.sets[set]);
@@ -709,6 +738,8 @@ struct std::formatter<AssociativeArray<T, V, setcount, waycount, linesize, stats
     return out;
   }
 };
+
+namespace vcore {
 
 //
 // Lockable version of associative arrays:
@@ -833,11 +864,14 @@ struct LockableFullyAssociativeTags {
 
 };
 
+} // namespace vcore
+
 template<typename T, int ways>
-struct std::formatter<LockableFullyAssociativeTags<T, ways>> {
+struct std::formatter<vcore::LockableFullyAssociativeTags<T, ways>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const LockableFullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
+  auto format(const vcore::LockableFullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     for (int i = 0; i < ways; i++) {
       out = std::format_to(out, "  way {:<2}: ", i);
@@ -855,6 +889,8 @@ struct std::formatter<LockableFullyAssociativeTags<T, ways>> {
     return out;
   }
 };
+
+namespace vcore {
 
 template<typename T, typename V, int ways, typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
 struct LockableFullyAssociativeArray {
@@ -988,11 +1024,14 @@ struct LockableFullyAssociativeArray {
   V* operator()(T tag) { return select(tag); }
 };
 
+} // namespace vcore
+
 template<typename T, typename V, int ways, typename stats>
-struct std::formatter<LockableFullyAssociativeArray<T, V, ways, stats>> {
+struct std::formatter<vcore::LockableFullyAssociativeArray<T, V, ways, stats>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const LockableFullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
+  auto format(const vcore::LockableFullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     for (int i = 0; i < ways; i++) {
       std::string waystr = std::format("  way {:<2}: ", i);
@@ -1011,6 +1050,8 @@ struct std::formatter<LockableFullyAssociativeArray<T, V, ways, stats>> {
     return out;
   }
 };
+
+namespace vcore {
 
 template<typename T, typename V, int setcount, int waycount, int linesize,
          typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
@@ -1057,14 +1098,17 @@ struct LockableAssociativeArray {
   }
 };
 
+} // namespace vcore
+
 template<typename T, typename V, int setcount, int waycount, int linesize, typename stats>
-struct std::formatter<LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>> {
+struct std::formatter<vcore::LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>& arr,
+  auto format(const vcore::LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>& arr,
               std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
-    out = std::format_to(out, "LockableAssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount,
+    out = std::format_to(out, "vcore::LockableAssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount,
                          linesize);
     for (int set = 0; set < setcount; set++) {
       out = std::format_to(out, "  Set {}:\n", set);
@@ -1073,6 +1117,8 @@ struct std::formatter<LockableAssociativeArray<T, V, setcount, waycount, linesiz
     return out;
   }
 };
+
+namespace vcore {
 
 template<int size, int width, int padsize = 0>
 struct FullyAssociativeTagsNbit {
@@ -1210,11 +1256,14 @@ using FullyAssociativeTags8bit = FullyAssociativeTagsNbit<size, 8, padsize>;
 template<int size, int padsize = 0>
 using FullyAssociativeTags16bit = FullyAssociativeTagsNbit<size, 16, padsize>;
 
+} // namespace vcore
+
 template<int Size, int Width, int PadSize>
-struct std::formatter<FullyAssociativeTagsNbit<Size, Width, PadSize>> {
+struct std::formatter<vcore::FullyAssociativeTagsNbit<Size, Width, PadSize>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const FullyAssociativeTagsNbit<Size, Width, PadSize>& tags, std::format_context& ctx) const {
+  auto format(const vcore::FullyAssociativeTagsNbit<Size, Width, PadSize>& tags, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     for (int i = 0; i < Size; i++) {
       out = std::format_to(out, "{} ", tags.slotid(i));

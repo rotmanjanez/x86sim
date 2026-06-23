@@ -9,6 +9,8 @@
 #include "ptlsim.h"
 #include "dcache.h"
 
+namespace vcore {
+
 //
 // Micro-operation (uop) definitions
 //
@@ -536,7 +538,10 @@ std::string nameof(const TransOpBase& uop) {
   return result;
 }
 
-auto std::formatter<UserContext>::format(const UserContext& arf, std::format_context& ctx) const {
+} // namespace vcore
+
+auto std::formatter<vcore::UserContext>::format(const vcore::UserContext& arf, std::format_context& ctx) const {
+  using namespace vcore;
   static const int width = 4;
   auto out = ctx.out();
   foreach (i, ARCHREG_COUNT) {
@@ -546,6 +551,8 @@ auto std::formatter<UserContext>::format(const UserContext& arf, std::format_con
   }
   return out;
 }
+
+namespace vcore {
 
 std::string format_value_and_flags(W64 value, W16 flags) {
   std::string flagstr;
@@ -571,3 +578,5 @@ std::string format_value_and_flags(W64 value, W16 flags) {
   result += std::format("|{:<5}", flagstr);
   return result;
 }
+
+} // namespace vcore

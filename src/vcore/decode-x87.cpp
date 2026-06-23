@@ -11,6 +11,8 @@
 #include <cmath>
 #include <numbers>
 
+namespace vcore {
+
 //
 // x87 assists
 //
@@ -1162,3 +1164,5 @@ bool TraceDecoder::decode_x87() {
 
   return true;
 }
+
+} // namespace vcore

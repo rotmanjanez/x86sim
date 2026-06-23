@@ -23,6 +23,8 @@
 #include "ooocore.h"
 #include "stats.h"
 
+namespace vcore {
+
 #ifndef ENABLE_CHECKS
 #undef assert
 #define assert(x) (x)
@@ -304,7 +306,7 @@ bool OutOfOrderCore::runcycle() {
   int total_issueq_reserved_free = 0;
 
   foreach (i, MAX_THREADS_PER_CORE) {
-    ThreadContext* thread = threads[i];
+    auto& thread = threads[i];
 
     if unlikely (!thread) {
       total_issueq_reserved_free += reserved_iq_entries;
@@ -335,7 +337,7 @@ bool OutOfOrderCore::runcycle() {
 
   foreach (permute, threadcount) {
     int tid = add_index_modulo(round_robin_tid, +permute, threadcount);
-    ThreadContext* thread = threads[tid];
+    auto& thread = threads[tid];
     if unlikely (!thread->ctx.running)
       continue;
 
@@ -365,7 +367,7 @@ bool OutOfOrderCore::runcycle() {
   dispatchcount = 0;
   foreach (permute, threadcount) {
     int tid = add_index_modulo(round_robin_tid, +permute, threadcount);
-    ThreadContext* thread = threads[tid];
+    auto& thread = threads[tid];
     if unlikely (!thread->ctx.running)
       continue;
 
@@ -397,7 +399,7 @@ bool OutOfOrderCore::runcycle() {
   } else {
     foreach (i, threadcount) {
       priority_index[i] = i;
-      ThreadContext* thread = threads[i];
+      auto& thread = threads[i];
       priority_value[i] = thread->get_priority();
       if unlikely (!thread->ctx.running)
         priority_value[i] = std::numeric_limits<int>::max();
@@ -416,7 +418,7 @@ bool OutOfOrderCore::runcycle() {
   //
   foreach (j, threadcount) {
     int i = priority_index[j];
-    ThreadContext* thread = threads[i];
+    auto& thread = threads[i];
     assert(thread);
     if unlikely (!thread->ctx.running) {
       continue;
@@ -449,7 +451,7 @@ bool OutOfOrderCore::runcycle() {
 #endif
 
   foreach (i, threadcount) {
-    ThreadContext* thread = threads[i];
+    auto& thread = threads[i];
     if unlikely (!thread->ctx.running)
       continue;
     int rc = commitrc[i];
@@ -480,7 +482,7 @@ bool OutOfOrderCore::runcycle() {
       // but their memory is not freed until the lock is released.
       //
       foreach (i, threadcount) {
-        ThreadContext* t = threads[i];
+        auto& t = threads[i];
         if unlikely (!t)
           continue;
 
@@ -519,7 +521,7 @@ bool OutOfOrderCore::runcycle() {
   }
 
   foreach (i, threadcount) {
-    ThreadContext* thread = threads[i];
+    auto& thread = threads[i];
     if unlikely (!thread->ctx.running)
       break;
 
@@ -661,7 +663,7 @@ void OutOfOrderCore::print_smt_state() {
   logging::println("Print SMT statistics:");
 
   foreach (i, threadcount) {
-    ThreadContext* thread = threads[i];
+    auto& thread = threads[i];
     logging::println("Thread {}:", i);
     logging::println("  total_uops_committed {}", thread->total_uops_committed);
     logging::println("  uipc {}", double(thread->total_uops_committed) / double(iterations));
@@ -670,8 +672,11 @@ void OutOfOrderCore::print_smt_state() {
   }
 }
 
-auto std::formatter<OutOfOrderModel::ThreadContext>::format(const OutOfOrderModel::ThreadContext& thread,
+} // namespace vcore
+
+auto std::formatter<vcore::OutOfOrderModel::ThreadContext>::format(const vcore::OutOfOrderModel::ThreadContext& thread,
                                                             std::format_context& fctx) const {
+  using namespace vcore;
   auto out = fctx.out();
   out = std::format_to(out, "SMT per-thread state for t{}:\n", thread.threadid);
   out = std::format_to(out, "SpecRRT:\n");
@@ -683,8 +688,10 @@ auto std::formatter<OutOfOrderModel::ThreadContext>::format(const OutOfOrderMode
   return out;
 }
 
-auto std::formatter<OutOfOrderModel::OutOfOrderCore>::format(const OutOfOrderModel::OutOfOrderCore& core,
+
+auto std::formatter<vcore::OutOfOrderModel::OutOfOrderCore>::format(const vcore::OutOfOrderModel::OutOfOrderCore& core,
                                                              std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
 
   out = std::format_to(out, "SMT common structures:\n");
@@ -707,6 +714,8 @@ auto std::formatter<OutOfOrderModel::OutOfOrderCore>::format(const OutOfOrderMod
   }
   return out;
 }
+
+namespace vcore {
 
 //
 // Validate the physical register reference counters against what
@@ -789,7 +798,7 @@ void OutOfOrderCore::check_rob() {
   }
 
   foreach (i, threadcount) {
-    ThreadContext* thread = threads[i];
+    auto& thread = threads[i];
     foreach (i, rob_states.count) {
       StateList& list = *(thread->rob_states[i]);
       ReorderBufferEntry* rob;
@@ -1015,8 +1024,11 @@ void EventLog::print(bool only_to_tail) {
     logging::println(logging::INFO, "#-------- End of event log --------");
 }
 
-auto std::formatter<OutOfOrderModel::OutOfOrderCoreEvent>::format(const OutOfOrderModel::OutOfOrderCoreEvent& ev,
+} // namespace vcore
+
+auto std::formatter<vcore::OutOfOrderModel::OutOfOrderCoreEvent>::format(const vcore::OutOfOrderModel::OutOfOrderCoreEvent& ev,
                                                                   std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
   bool ld = isload(ev.uop.opcode);
   bool st = isstore(ev.uop.opcode);
@@ -1634,6 +1646,8 @@ auto std::formatter<OutOfOrderModel::OutOfOrderCoreEvent>::format(const OutOfOrd
   return out;
 }
 
+namespace vcore {
+
 //
 // Construct all the structures necessary to configure
 // the cores. This function is only called once, after
@@ -1644,16 +1658,17 @@ std::string_view OutOfOrderMachine::name() const {
   return "ooo";
 }
 
-bool OutOfOrderMachine::init(PTLsimConfig& config) {
+OutOfOrderMachine::~OutOfOrderMachine() = default;
+
+OutOfOrderMachine::OutOfOrderMachine(const PTLsimConfig& config) : CoreImpl(config) {
   // Note: we only create a single core for all contexts for now.
-  cores[0] = new OutOfOrderCore(0, *this);
+  cores[0] = std::make_unique<OutOfOrderCore>(0, *this);
 
   foreach (i, contextcount) {
     OutOfOrderCore& core = *cores[0];
     core.threadcount++;
-    ThreadContext* thread = new ThreadContext(core, i, contextof(i));
-    core.threads[i] = thread;
-    thread->init();
+    core.threads[i] = std::make_unique<ThreadContext>(core, i, contextof(i));
+    core.threads[i]->init();
 
     //
     // Note: in a multi-processor model, config may
@@ -1666,14 +1681,13 @@ bool OutOfOrderMachine::init(PTLsimConfig& config) {
 
   cores[0]->init();
   init_luts();
-  return true;
 }
 
 //
 // Run the processor model, until a stopping point
 // is hit (as configured elsewhere in config).
 //
-int OutOfOrderMachine::run(PTLsimConfig& config) {
+int OutOfOrderMachine::run() {
   logging::println("Starting out-of-order core toplevel loop");
   logging::flush();
 
@@ -1713,7 +1727,7 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
     OutOfOrderCore& core = *cores[0]; // only one core for now
     int running_thread_count = 0;
     foreach (i, core.threadcount) {
-      ThreadContext* thread = core.threads[i];
+      auto& thread = core.threads[i];
     }
 
     exiting |= core.runcycle();
@@ -1755,7 +1769,7 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
   OutOfOrderCore& core = *cores[0]; /// only one core for now.
 
   foreach (i, core.threadcount) {
-    ThreadContext* thread = core.threads[i];
+    auto& thread = core.threads[i];
 
     thread->core_to_external_state();
 
@@ -1773,15 +1787,6 @@ int OutOfOrderMachine::run(PTLsimConfig& config) {
   flush_all_pipelines();
 
   return exiting;
-}
-
-void OutOfOrderMachine::reset() {
-  PTLsimMachine::reset();
-  stopped.reset();
-  foreach (i, MAX_SMT_CORES) {
-    if (cores[i])
-      cores[i]->reset();
-  }
 }
 
 void OutOfOrderCore::flush_tlb(Context& ctx, int threadid, bool selective, Waddr virtaddr) {
@@ -1851,7 +1856,7 @@ void OutOfOrderMachine::dump_state() {
   // For debugging only:
   //
   foreach (i, cores[0]->threadcount) {
-    ThreadContext* thread = cores[0]->threads[i];
+    auto& thread = cores[0]->threads[i];
     logging::println(logging::TRACE, "Thread {}:", i);
     logging::println(logging::TRACE, "  rip:                                 {}",
                      (void*)thread->ctx.commitarf[REG_rip]);
@@ -1896,7 +1901,7 @@ void OutOfOrderMachine::update_stats(PTLsimStats& stats) {
 //
 void OutOfOrderMachine::flush_all_pipelines() {
   assert(cores[0]);
-  OutOfOrderCore* core = cores[0];
+  OutOfOrderCore* core = cores[0].get();
 
   //
   // Make sure all pipelines are flushed BEFORE
@@ -1907,14 +1912,17 @@ void OutOfOrderMachine::flush_all_pipelines() {
   core->flush_pipeline_all();
 
   foreach (i, core->threadcount) {
-    ThreadContext* thread = core->threads[i];
+    auto& thread = core->threads[i];
     thread->invalidate_smc();
   }
 }
 
 // Formatter implementations
-auto std::formatter<OutOfOrderModel::PhysicalRegister>::format(const OutOfOrderModel::PhysicalRegister& physreg,
+} // namespace vcore
+
+auto std::formatter<vcore::OutOfOrderModel::PhysicalRegister>::format(const vcore::OutOfOrderModel::PhysicalRegister& physreg,
                                                                std::format_context& ctx) const {
+  using namespace vcore;
   using namespace OutOfOrderModel;
   std::string vf = format_value_and_flags(physreg.data, physreg.flags);
   auto out = std::format_to(ctx.out(), "TH {} rfid {}", physreg.threadid, physreg.rfid);
@@ -1925,8 +1933,10 @@ auto std::formatter<OutOfOrderModel::PhysicalRegister>::format(const OutOfOrderM
   return out;
 }
 
-auto std::formatter<OutOfOrderModel::PhysicalRegisterFile>::format(const OutOfOrderModel::PhysicalRegisterFile& prf,
+
+auto std::formatter<vcore::OutOfOrderModel::PhysicalRegisterFile>::format(const vcore::OutOfOrderModel::PhysicalRegisterFile& prf,
                                                                    std::format_context& ctx) const {
+  using namespace vcore;
   auto out = std::format_to(ctx.out(), "PhysicalRegisterFile<{}, rfid {}, size {}>:\n", prf.name, prf.rfid, prf.size);
   for (int i = 0; i < prf.size; i++) {
     out = std::format_to(out, "{}\n", prf[i]);
@@ -1934,8 +1944,10 @@ auto std::formatter<OutOfOrderModel::PhysicalRegisterFile>::format(const OutOfOr
   return out;
 }
 
-auto std::formatter<OutOfOrderModel::ReorderBufferEntry>::format(const OutOfOrderModel::ReorderBufferEntry& rob,
+
+auto std::formatter<vcore::OutOfOrderModel::ReorderBufferEntry>::format(const vcore::OutOfOrderModel::ReorderBufferEntry& rob,
                                                                  std::format_context& ctx) const {
+  using namespace vcore;
   using namespace OutOfOrderModel;
   std::string name = nameof(rob.uop);
   std::string rainfo = rob.get_operand_info(0);
@@ -1959,8 +1971,10 @@ auto std::formatter<OutOfOrderModel::ReorderBufferEntry>::format(const OutOfOrde
   return out;
 }
 
-auto std::formatter<OutOfOrderModel::LoadStoreQueueEntry>::format(const OutOfOrderModel::LoadStoreQueueEntry& lsq,
+
+auto std::formatter<vcore::OutOfOrderModel::LoadStoreQueueEntry>::format(const vcore::OutOfOrderModel::LoadStoreQueueEntry& lsq,
                                                                   std::format_context& ctx) const {
+  using namespace vcore;
   using namespace OutOfOrderModel;
   auto out = std::format_to(ctx.out(), "{}{:<3} uuid {:>10} rob {:<3} r{:<3}", (lsq.store ? "st" : "ld"), lsq.index(),
                             lsq.rob->uop.uuid, lsq.rob->index(), lsq.rob->physreg->index());

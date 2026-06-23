@@ -16,17 +16,7 @@
 #include "ptlhwdef.h"
 #include "vcore/logging.h"
 
-// With these disabled, simulation is faster
-#define ENABLE_CHECKS
-#define ENABLE_LOGGING
-
-#ifndef ENABLE_CHECKS
-#undef assert
-#define assert(x) (x)
-#endif
-
-#ifndef ENABLE_LOGGING
-#endif
+namespace vcore {
 
 W64 suppress_total_user_insn_count_updates_in_seqcore;
 
@@ -263,17 +253,21 @@ struct TransactionalMemory {
   }
 };
 
-template<int N, int setcount>
-struct std::formatter<TransactionalMemory<N, setcount>> {
-  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const TransactionalMemory<N, setcount>& tm, std::format_context& ctx) const;
-};
+} // namespace vcore
 
 template<int N, int setcount>
-auto std::formatter<TransactionalMemory<N, setcount>>::format(const TransactionalMemory<N, setcount>& tm,
+struct std::formatter<vcore::TransactionalMemory<N, setcount>> {
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+  auto format(const vcore::TransactionalMemory<N, setcount>& tm, std::format_context& ctx) const;
+};
+
+
+template<int N, int setcount>
+auto std::formatter<vcore::TransactionalMemory<N, setcount>>::format(const vcore::TransactionalMemory<N, setcount>& tm,
                                                               std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
-  out = std::format_to(out, "TransactionalMemory containing {} stores:\n", tm.count);
+  out = std::format_to(out, "vcore::TransactionalMemory containing {} stores:\n", tm.count);
   foreach (i, tm.count) {
     W64 data = tm.data_list[i];
     out = std::format_to(out, "  {:>4}: 0x{:x} <= {}\n", i, W64(tm.addr_list[i]),
@@ -293,6 +287,8 @@ auto std::formatter<TransactionalMemory<N, setcount>>::format(const Transactiona
   }
   return out;
 }
+
+namespace vcore {
 
 template<int N, int setcount>
 W64 TransactionalMemory<N, setcount>::loadimpl(W64 physaddr) {
@@ -382,10 +378,13 @@ struct SequentialCoreEvent {
   };
 };
 
+} // namespace vcore
+
 template<>
-struct std::formatter<SequentialCoreEvent> {
+struct std::formatter<vcore::SequentialCoreEvent> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const SequentialCoreEvent& ev, std::format_context& ctx) const {
+  auto format(const vcore::SequentialCoreEvent& ev, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
 
     if (ev.uuid > 0)
@@ -417,7 +416,7 @@ struct std::formatter<SequentialCoreEvent> {
       if (ev.loadstore.origaddr != ev.loadstore.virtaddr)
         out = std::format_to(out, " (orig 0x{:012x})", ev.loadstore.origaddr);
       if (ev.loadstore.sfr.invalid)
-        out = std::format_to(out, " (PFEC {}, PTE {})", PageFaultErrorCode(ev.loadstore.pfec),
+        out = std::format_to(out, " (PFEC {}, PTE {})", vcore::PageFaultErrorCode(ev.loadstore.pfec),
                              Level1PTE(ev.loadstore.pteused));
       break;
     }
@@ -469,6 +468,8 @@ struct std::formatter<SequentialCoreEvent> {
     return out;
   }
 };
+
+namespace vcore {
 
 struct SequentialCoreEventLog {
   SequentialCoreEvent* start;
@@ -1486,12 +1487,9 @@ std::string_view SequentialMachine::name() const {
   return "seq";
 }
 
-bool SequentialMachine::init(PTLsimConfig& config) {
-  if (init_done)
-    return true;
-
+SequentialMachine::SequentialMachine(const PTLsimConfig& config) : CoreImpl(config) {
   foreach (i, contextcount) {
-    cores[i] = new SequentialCore(contextof(i));
+    cores[i] = std::make_unique<SequentialCore>(contextof(i));
     //
     // Note: in a real cycle accurate model, config may
     // specify various ways of slicing contextcount up
@@ -1500,13 +1498,10 @@ bool SequentialMachine::init(PTLsimConfig& config) {
     // be specified here.
     //
   }
-
-  init_done = 1;
-  return true;
 }
 
 
-int SequentialMachine::run(PTLsimConfig& config) {
+int SequentialMachine::run() {
     logging::println("Starting sequential core toplevel loop at {} cycles and {} commits", sim_cycle,
                      total_user_insns_committed);
     logging::flush();
@@ -1592,9 +1587,12 @@ int SequentialMachine::run(PTLsimConfig& config) {
 
 
 
-auto std::formatter<CommitRecord>::format(const CommitRecord& cr, std::format_context& ctx) const {
+} // namespace vcore
+
+auto std::formatter<vcore::CommitRecord>::format(const vcore::CommitRecord& cr, std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
-  out = std::format_to(out, "CommitRecord: {} stores, {} PTE updates\n", cr.store_count, cr.pte_update_count);
+  out = std::format_to(out, "vcore::CommitRecord: {} stores, {} PTE updates\n", cr.store_count, cr.pte_update_count);
   foreach (i, cr.store_count) {
     out = std::format_to(out, "  Store {:>3}: {}\n", i, cr.stores[i]);
   }

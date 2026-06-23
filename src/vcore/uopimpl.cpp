@@ -14,6 +14,8 @@
 #include <functional>
 
 
+namespace vcore {
+
 //
 // Flags generation (all but CF and OF)
 //
@@ -2196,3 +2198,5 @@ UopImpl get_synthcode_for_cond_branch(int opcode, int cond, int size, bool excep
 void init_uops() {}
 
 void shutdown_uops() {}
+
+} // namespace vcore

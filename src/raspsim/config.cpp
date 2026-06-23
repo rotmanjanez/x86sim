@@ -5,8 +5,13 @@
 // Copyright 2000-2008 Matt T. Yourst <yourst@yourst.com>
 //
 
+#include "ptlsim.h"
 #include "config.h"
 #include "vcore/logging.h"
+
+namespace logging = vcore::logging;
+
+ConfigurationParser<vcore::PTLsimConfig> configparser;
 
 std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr) const {
   std::string result = "Options are:\n";
@@ -20,7 +25,7 @@ std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr)
 
   option = options;
   while (option) {
-    void* variable = (baseptr) ? ((void*)((Waddr)baseptr + option->offset)) : null;
+    void* variable = (baseptr) ? ((void*)((vcore::Waddr)baseptr + option->offset)) : nullptr;
     if (option->type == OPTION_TYPE_SECTION) {
       result += std::format("{}:\n", option->description);
       option = option->next;
@@ -33,7 +38,7 @@ std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr)
     case OPTION_TYPE_NONE:
       break;
     case OPTION_TYPE_W64: {
-      W64 v = *((W64*)(variable));
+      vcore::W64 v = *((vcore::W64*)(variable));
       if (v == infinity)
         result += "inf";
       else
@@ -78,9 +83,9 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
           option = option->next;
           continue;
         }
-        if (strequal(name, option->name)) {
+        if (vcore::strequal(name, option->name)) {
           found = true;
-          void* variable = (void*)((Waddr)baseptr + option->offset);
+          void* variable = (void*)((vcore::Waddr)baseptr + option->offset);
           if ((option->type != OPTION_TYPE_NONE) && (option->type != OPTION_TYPE_BOOL) && (i == (argc + 1))) {
             logging::eprintln("Warning: missing value for option '{}'", argv[i - 1]);
             break;
@@ -89,7 +94,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
           case OPTION_TYPE_NONE:
             break;
           case OPTION_TYPE_W64: {
-            char* p = (i < argc) ? argv[i] : null;
+            char* p = (i < argc) ? argv[i] : nullptr;
             int len = (p) ? strlen(p) : 0;
             if (!len) {
               logging::eprintln("Warning: option {} had no argument; ignoring", argv[i - 1]);
@@ -100,7 +105,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             strncpy(buf, p, sizeof(buf));
             p = buf;
 
-            W64 multiplier = 1;
+            vcore::W64 multiplier = 1;
             char* endp = p;
             bool isinf = (strncmp(p, "inf", 3) == 0);
             if (len > 1) {
@@ -128,12 +133,12 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
                 break;
               }
             }
-            W64 v = (isinf) ? infinity : strtoull(p, &endp, 0);
+            vcore::W64 v = (isinf) ? infinity : strtoull(p, &endp, 0);
             if ((!isinf) && (endp[0] != 0)) {
               logging::eprintln("Warning: invalid value '{}' for option {}; ignoring", p, argv[i - 1]);
             }
             v *= multiplier;
-            *((W64*)variable) = v;
+            *((vcore::W64*)variable) = v;
             i++;
 
             break;
@@ -166,7 +171,8 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
         option = option->next;
       }
       if (!found) {
-        logging::eprintln("Warning: invalid option '{}'", (inrange(i - 1, 0, argc - 1) ? argv[i - 1] : "<missing>"));
+        logging::eprintln("Warning: invalid option '{}'",
+                          (vcore::inrange(i - 1, 0, argc - 1) ? argv[i - 1] : "<missing>"));
         i++;
       }
     } else {
@@ -183,7 +189,7 @@ std::string ConfigurationParserBase::format_to_string_config(const void* baseptr
 
   ConfigurationOption* option = options;
   while (option) {
-    void* variable = (baseptr) ? ((void*)((Waddr)baseptr + option->offset)) : null;
+    void* variable = (baseptr) ? ((void*)((vcore::Waddr)baseptr + option->offset)) : nullptr;
 
     if (option->type == OPTION_TYPE_SECTION) {
       option = option->next;
@@ -195,7 +201,7 @@ std::string ConfigurationParserBase::format_to_string_config(const void* baseptr
     case OPTION_TYPE_SECTION:
       break;
     case OPTION_TYPE_W64: {
-      W64 v = *((W64*)(variable));
+      vcore::W64 v = *((vcore::W64*)(variable));
       if (v == 0) {
         result += "0";
       } else if (v == infinity) {
@@ -227,4 +233,63 @@ std::string ConfigurationParserBase::format_to_string_config(const void* baseptr
   }
 
   return result;
+}
+
+
+
+template<>
+void ConfigurationParser<vcore::PTLsimConfig>::setup() {
+  section("Simulation Control");
+
+  add(core_name, "core", "Run using specified core (-core <corename>)");
+
+  section("General Logging Control");
+  add(quiet, "quiet", "Do not print PTLsim system information banner");
+  add(log_filename, "logfile", "Log filename (use /dev/fd/1 for stdout, /dev/fd/2 for stderr)");
+  add(loglevel, "loglevel", "Log level (0 to 99)");
+  add(start_log_at_iteration, "startlog", "Start logging after iteration <startlog>");
+  add(start_log_at_rip, "startlogrip", "Start logging after first translation of basic block starting at rip");
+  add(log_on_console, "consolelog", "Replicate log file messages to console");
+  add(log_ptlsim_boot, "bootlog", "Log PTLsim early boot and injection process (for debugging)");
+  add(log_buffer_size, "logbufsize", "Size of PTLsim logfile buffer (not related to -ringbuf)");
+  add(dump_state_now, "dump-state-now", "Dump the event log ring buffer and internal state of the active core");
+  add(abort_at_end, "abort-at-end", "Abort current simulation after next command (don't wait for next x86 boundary)");
+  add(mm_logfile, "mm-logfile", "Log PTLsim memory manager requests (alloc, free) to this file (use with ptlmmlog)");
+  add(mm_log_buffer_size, "mm-logbuf-size", "Size of PTLsim memory manager log buffer (in events, not bytes)");
+  add(enable_inline_mm_logging, "mm-log-inline", "Print every memory manager request in the main log file");
+  add(enable_mm_validate, "mm-validate", "Validate every memory manager request against internal structures (slow)");
+
+  section("Event Ring Buffer Logging Control");
+  add(event_log_enabled, "ringbuf", "Log all core events to the ring buffer for backwards-in-time debugging");
+  add(event_log_ring_buffer_size, "ringbuf-size", "Core event log ring buffer size: only save last <ringbuf> entries");
+  add(flush_event_log_every_cycle, "flush-events", "Flush event log ring buffer to logfile after every cycle");
+  add(log_backwards_from_trigger_rip, "ringbuf-trigger-rip",
+      "Print event ring buffer when first uop in this rip is committed");
+
+  // Userspace only
+  section("Start Point");
+  add(start_at_rip, "startrip", "Start at rip <startrip>");
+  add(include_dyn_linker, "excludeld", "Exclude dynamic linker execution");
+  add(trigger_mode, "trigger", "Trigger mode: wait for user process to do simcall before entering PTL mode");
+  add(pause_at_startup, "pause-at-startup", "Pause for N seconds after starting up (to allow debugger to attach)");
+
+  section("Trace Stop Point");
+  add(stop_at_user_insns, "stopinsns", "Stop after executing <stopinsns> user instructions");
+  add(stop_at_iteration, "stopiter", "Stop after <stop> iterations (does not apply to cycle-accurate cores)");
+  add(stop_at_rip, "stoprip", "Stop before rip <stoprip> is translated for the first time");
+
+  section("Out of Order Core (ooocore)");
+  add(perfect_cache, "perfect-cache", "Perfect cache performance: all loads and stores hit in L1");
+
+  section("Miscellaneous");
+  add(bbcache_dump_filename, "bbdump", "Basic block cache dump filename");
+  add(sequential_mode_insns, "seq", "Run in sequential mode for <seq> instructions before switching to out of order");
+  add(exit_after_fullsim, "exitend", "Kill the thread after full simulation completes rather than going native");
+};
+
+void print_usage(int argc, char** argv) {
+  logging::eprintln("Syntax: ptlsim <executable> <arguments...>");
+  logging::eprintln("All other options come from file /home/<username>/.ptlsim/path/to/executable");
+  logging::eprintln("");
+  logging::eprint("{}", configparser.options.format_to_string_usage(&vcore::config));
 }

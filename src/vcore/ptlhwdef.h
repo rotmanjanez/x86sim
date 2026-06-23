@@ -77,9 +77,9 @@
 //
 
 #include "globals.h"
-extern W64 sim_cycle;
 #include "logic.h"
-#include "config.h"
+
+namespace vcore {
 
 //
 // Exceptions:
@@ -232,11 +232,15 @@ struct UserContext : public std::array<W64, ARCHREG_COUNT> {
   using std::array<W64, ARCHREG_COUNT>::array;
 };
 
+} // namespace vcore
+
 template<>
-struct std::formatter<UserContext> {
+struct std::formatter<vcore::UserContext> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const UserContext& arf, std::format_context& ctx) const;
+  auto format(const vcore::UserContext& arf, std::format_context& ctx) const;
 };
+
+namespace vcore {
 
 typedef byte X87Reg[10];
 
@@ -256,14 +260,19 @@ struct X87ControlWord {
   operator W16() const { return *((W16*)this); }
 };
 
+} // namespace vcore
+
 template<>
-struct std::formatter<X87ControlWord> {
+struct std::formatter<vcore::X87ControlWord> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const X87ControlWord& cw, std::format_context& ctx) const {
+  auto format(const vcore::X87ControlWord& cw, std::format_context& ctx) const {
+    using namespace vcore;
     return std::format_to(ctx.out(), "0x{:04x}", static_cast<W16>(cw));
   }
 };
+
+namespace vcore {
 
 struct X87State {
   X87ControlWord cw;
@@ -684,7 +693,25 @@ struct Context : public ContextBase {
   void fxsave(FXSAVEStruct& state);
   void fxrstor(const FXSAVEStruct& state);
 
-  Context() {}
+  Context() {
+    setzero(static_cast<ContextBase&>(*this));
+
+    use32 = 1;
+    use64 = 1;
+    commitarf[REG_rip] = 0x100000;
+
+    seg[SEGID_CS].selector = 0x33;
+    seg[SEGID_SS].selector = 0x2b;
+    seg[SEGID_DS].selector = 0x00;
+    seg[SEGID_ES].selector = 0x00;
+    seg[SEGID_FS].selector = 0x00;
+    seg[SEGID_GS].selector = 0x00;
+    update_shadow_segment_descriptors();
+
+    running = 1;
+    commitarf[REG_ctx] = reinterpret_cast<Waddr>(this);
+    commitarf[REG_fpstack] = reinterpret_cast<Waddr>(&fpstack);
+  }
 
   void update_pte_acc_dirty(W64 rawvirt, const PTEUpdate& update) {}
   void update_shadow_segment_descriptors();
@@ -1291,11 +1318,14 @@ int assist_index(assist_func_t func);
 //
 // std::formatter specializations for C++23 std::print/std::format support
 //
+} // namespace vcore
+
 template<>
-struct std::formatter<flagstring> {
+struct std::formatter<vcore::flagstring> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const flagstring& bs, std::format_context& ctx) const {
+  auto format(const vcore::flagstring& bs, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     for (int i = 31; i >= 0; i--) {
       if (bit(bs.bits, i)) {
@@ -1306,11 +1336,13 @@ struct std::formatter<flagstring> {
   }
 };
 
+
 template<>
-struct std::formatter<SFR> {
+struct std::formatter<vcore::SFR> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const SFR& sfr, std::format_context& ctx) const {
+  auto format(const vcore::SFR& sfr, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     if (sfr.invalid) {
       out = std::format_to(out, "< Invalid: fault {:02x} > ", sfr.data);
@@ -1323,11 +1355,13 @@ struct std::formatter<SFR> {
   }
 };
 
+
 template<>
-struct std::formatter<SegmentDescriptorCache> {
+struct std::formatter<vcore::SegmentDescriptorCache> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const SegmentDescriptorCache& seg, std::format_context& ctx) const {
+  auto format(const vcore::SegmentDescriptorCache& seg, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     out = std::format_to(out, "{:04x}: ", seg.selector);
     out = std::format_to(out, "base {:016x}, limit {:016x}, ring {}:", seg.base, seg.limit, seg.dpl);
@@ -1340,11 +1374,13 @@ struct std::formatter<SegmentDescriptorCache> {
   }
 };
 
+
 template<>
-struct std::formatter<PageFaultErrorCode> {
+struct std::formatter<vcore::PageFaultErrorCode> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const PageFaultErrorCode& pfec, std::format_context& ctx) const {
+  auto format(const vcore::PageFaultErrorCode& pfec, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     out = std::format_to(out, "[");
     out = std::format_to(out, "{}", pfec.p ? " present" : " not-present");
@@ -1359,11 +1395,13 @@ struct std::formatter<PageFaultErrorCode> {
   }
 };
 
+
 template<>
-struct std::formatter<SegmentDescriptor> {
+struct std::formatter<vcore::SegmentDescriptor> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const SegmentDescriptor& seg, std::format_context& ctx) const {
+  auto format(const vcore::SegmentDescriptor& seg, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     out = std::format_to(out, "base {:08x}, limit {:08x}, ring {}", seg.getbase(), seg.getlimit(), seg.dpl);
     out = std::format_to(out, "{}", seg.s ? " sys" : " usr");
@@ -1376,11 +1414,13 @@ struct std::formatter<SegmentDescriptor> {
   }
 };
 
+
 template<>
-struct std::formatter<Context> {
+struct std::formatter<vcore::Context> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const Context& ctx, std::format_context& fctx) const {
+  auto format(const vcore::Context& ctx, std::format_context& fctx) const {
+    using namespace vcore;
     auto out = fctx.out();
     static const int arfwidth = 4;
 
@@ -1402,7 +1442,7 @@ struct std::formatter<Context> {
 
     out = std::format_to(out, "  FPU:\n");
     out = std::format_to(out, "    FP Control Word: {}\n", ctx.fpcw);
-    out = std::format_to(out, "    MXCSR:           {}\n", ctx.mxcsr);
+    out = std::format_to(out, "    vcore::MXCSR:           {}\n", ctx.mxcsr);
 
     for (int i = 7; i >= 0; i--) {
       int stackid = (i - (ctx.commitarf[REG_fptos] >> 3)) & 0x7;
@@ -1418,11 +1458,13 @@ struct std::formatter<Context> {
   }
 };
 
+
 template<>
-struct std::formatter<TransOpBase> {
+struct std::formatter<vcore::TransOpBase> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const TransOpBase& op, std::format_context& fctx) const {
+  auto format(const vcore::TransOpBase& op, std::format_context& fctx) const {
+    using namespace vcore;
     auto out = fctx.out();
     static const char* size_names[4] = {"b", "w", "d", ""};
     static const char* fptype_names[4] = {".s", ".vs", ".d", ".d"};
@@ -1524,36 +1566,44 @@ struct std::formatter<TransOpBase> {
   }
 };
 
+
 template<>
-struct std::formatter<TransOp> : std::formatter<TransOpBase> {
-  auto format(const TransOp& op, std::format_context& fctx) const {
-    return std::formatter<TransOpBase>::format(static_cast<const TransOpBase&>(op), fctx);
+struct std::formatter<vcore::TransOp> : std::formatter<vcore::TransOpBase> {
+  auto format(const vcore::TransOp& op, std::format_context& fctx) const {
+    using namespace vcore;
+    return std::formatter<vcore::TransOpBase>::format(static_cast<const vcore::TransOpBase&>(op), fctx);
   }
 };
 
+
 template<>
-struct std::formatter<RIPVirtPhysBase> {
+struct std::formatter<vcore::RIPVirtPhysBase> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const RIPVirtPhysBase& rvp, std::format_context& ctx) const {
+  auto format(const vcore::RIPVirtPhysBase& rvp, std::format_context& ctx) const {
+    using namespace vcore;
     return std::format_to(ctx.out(), "{}", (void*)(Waddr)rvp.rip);
   }
 };
 
+
 template<>
-struct std::formatter<RIPVirtPhys> : std::formatter<RIPVirtPhysBase> {
-  auto format(const RIPVirtPhys& rvp, std::format_context& ctx) const {
-    return std::formatter<RIPVirtPhysBase>::format(static_cast<const RIPVirtPhysBase&>(rvp), ctx);
+struct std::formatter<vcore::RIPVirtPhys> : std::formatter<vcore::RIPVirtPhysBase> {
+  auto format(const vcore::RIPVirtPhys& rvp, std::format_context& ctx) const {
+    using namespace vcore;
+    return std::formatter<vcore::RIPVirtPhysBase>::format(static_cast<const vcore::RIPVirtPhysBase&>(rvp), ctx);
   }
 };
 
+
 template<>
-struct std::formatter<BasicBlock> {
+struct std::formatter<vcore::BasicBlock> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const BasicBlock& bb, std::format_context& ctx) const {
+  auto format(const vcore::BasicBlock& bb, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
 
-    out = std::format_to(out, "BasicBlock {} of type {}: {} bytes, {} transops ({}t {}m {}s", (void*)(Waddr)bb.rip,
+    out = std::format_to(out, "vcore::BasicBlock {} of type {}: {} bytes, {} transops ({}t {}m {}s", (void*)(Waddr)bb.rip,
                          branch_type_names[bb.brtype], bb.bytes, bb.count, bb.tagcount, bb.memcount, bb.storecount);
 
     if (bb.repblock)
@@ -1565,8 +1615,8 @@ struct std::formatter<BasicBlock> {
     Waddr rip = bb.rip;
     int bytes_in_insn = 0;
     for (int i = 0; i < bb.count; ++i) {
-      const TransOp& transop = bb.transops[i];
-      // assuming std::formatter<TransOp,CharT> exists:
+      const vcore::TransOp& transop = bb.transops[i];
+      // assuming std::formatter<vcore::TransOp,CharT> exists:
       out = std::format_to(out, "  {}: {}\n", (void*)rip, transop);
       if (transop.som)
         bytes_in_insn = transop.bytes;

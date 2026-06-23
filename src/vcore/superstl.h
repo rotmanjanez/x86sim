@@ -23,6 +23,8 @@
 #include <string_view>
 #include <vector>
 
+namespace vcore {
+
 //
 // Formatting
 //
@@ -1095,17 +1097,19 @@ bool div_rem_s(T& quotient, T& remainder, T dividend_hi, T dividend_lo, T diviso
 //
 // std::formatter specializations
 //
+} // namespace vcore
+
 namespace std {
 
 template<typename K, typename T, typename LM, int setcount, typename KM>
-struct formatter<superstl::SelfHashtable<K, T, setcount, LM, KM>> {
+struct formatter<vcore::superstl::SelfHashtable<K, T, setcount, LM, KM>> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const superstl::SelfHashtable<K, T, setcount, LM, KM>& ht, format_context& ctx) const {
+  auto format(const vcore::superstl::SelfHashtable<K, T, setcount, LM, KM>& ht, format_context& ctx) const {
     auto out = ctx.out();
     out = format_to(out, "Hashtable of {} sets containing {} entries:\n", setcount, ht.count);
     for (int i = 0; i < setcount; i++) {
-      superstl::selflistlink* tlink = ht.sets[i];
+      vcore::superstl::selflistlink* tlink = ht.sets[i];
       if (!tlink)
         continue;
       out = format_to(out, "  Set {}:\n", i);
@@ -1120,10 +1124,10 @@ struct formatter<superstl::SelfHashtable<K, T, setcount, LM, KM>> {
 };
 
 template<>
-struct formatter<superstl::bitstring> {
+struct formatter<vcore::superstl::bitstring> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const superstl::bitstring& bs, format_context& ctx) const {
+  auto format(const vcore::superstl::bitstring& bs, format_context& ctx) const {
     auto out = ctx.out();
     if (bs.reverse) {
       for (int i = 0; i < bs.n; i++)
@@ -1137,20 +1141,20 @@ struct formatter<superstl::bitstring> {
 };
 
 template<>
-struct formatter<superstl::hexstring> {
+struct formatter<vcore::superstl::hexstring> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const superstl::hexstring& hs, format_context& ctx) const {
+  auto format(const vcore::superstl::hexstring& hs, format_context& ctx) const {
     int n = (hs.n + 3) / 4;
     return format_to(ctx.out(), "{:0{}x}", hs.value & ((1ULL << hs.n) - 1), n);
   }
 };
 
 template<>
-struct formatter<superstl::bytemaskstring> {
+struct formatter<vcore::superstl::bytemaskstring> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const superstl::bytemaskstring& bs, format_context& ctx) const {
+  auto format(const vcore::superstl::bytemaskstring& bs, format_context& ctx) const {
     auto out = ctx.out();
     for (int i = 0; i < bs.n; i++) {
       if ((bs.mask >> i) & 1)

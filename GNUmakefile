@@ -14,15 +14,24 @@ GEN ?= Ninja
 export CMAKE_GENERATOR := $(GEN)
 
 PRESETS := debug release relwithdeb
+CMAKE_TARGETS := raspsim vcore vcore_defaults
 
-.PHONY: all $(PRESETS) clean distclean
+.PHONY: all $(PRESETS) $(CMAKE_TARGETS) test clean distclean
 
 all: debug
 
 $(PRESETS):
 	$(CMAKE) --preset $@
 	$(CMAKE) --build --preset $@
-	@ln -sf build/$@/compile_commands.json compile_commands.json
+	@ln -sfn build/$@/compile_commands.json compile_commands.json
+
+$(CMAKE_TARGETS):
+	$(CMAKE) --preset debug
+	$(CMAKE) --build --preset debug --target $@
+	@ln -sfn build/debug/compile_commands.json compile_commands.json
+
+test: debug
+	ctest --test-dir build/debug --output-on-failure
 
 # Run the configured build's clean target for every preset that exists.
 clean:

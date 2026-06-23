@@ -11,6 +11,8 @@
 // Total: 17 bits       + 19 bits                + 12 bits       = 48 bits virtual address space
 //
 
+namespace vcore {
+
 byte& AddressSpace::pageid_to_map_byte(spat_t top, Waddr pageid) {
   W64 chunkid = pageid >> log2(SPAT_PAGES_PER_CHUNK);
 
@@ -80,48 +82,52 @@ void AddressSpace::freemap(AddressSpace::spat_t top) {
   }
 }
 
-void AddressSpace::reset() {
+AddressSpace::AddressSpace() : readmap(allocmap()), writemap(allocmap()), execmap(allocmap()), dirtymap(allocmap()) {}
+
+AddressSpace::~AddressSpace() {
   freemap(readmap);
   freemap(writemap);
   freemap(execmap);
   freemap(dirtymap);
-  mapped_mem.clear();
-
-  readmap = allocmap();
-  writemap = allocmap();
-  execmap = allocmap();
-  dirtymap = allocmap();
 }
 
-void AddressSpace::setattr(void* start, Waddr length, int prot) {
+void AddressSpace::setattr(void* start, Waddr length, Protection prot) {
   logging::println("setattr: region {} to {} ({} KB) has user-visible attributes {}{}{}", start,
-                   (void*)((char*)start + length), length >> 10, ((prot & PROT_READ) ? 'r' : '-'),
-                   ((prot & PROT_WRITE) ? 'w' : '-'), ((prot & PROT_EXEC) ? 'x' : '-'));
+                   (void*)((char*)start + length), length >> 10,
+                   (has_protection(prot, Protection::read) ? 'r' : '-'),
+                   (has_protection(prot, Protection::write) ? 'w' : '-'),
+                   (has_protection(prot, Protection::execute) ? 'x' : '-'));
 
-  if (prot & PROT_READ)
+  if (has_protection(prot, Protection::read))
     allow_read(start, length);
   else
     disallow_read(start, length);
 
-  if (prot & PROT_WRITE)
+  if (has_protection(prot, Protection::write))
     allow_write(start, length);
   else
     disallow_write(start, length);
 
-  if (prot & PROT_EXEC)
+  if (has_protection(prot, Protection::execute))
     allow_exec(start, length);
   else
     disallow_exec(start, length);
 }
 
-int AddressSpace::getattr(void* addr) {
+Protection AddressSpace::getattr(void* addr) {
   Waddr address = lowbits((Waddr)addr, ADDRESS_SPACE_BITS);
 
   Waddr page = pageid(address);
 
-  int prot = (bit(pageid_to_map_byte(readmap, page), lowbits(page, 3)) ? PROT_READ : 0) |
-             (bit(pageid_to_map_byte(writemap, page), lowbits(page, 3)) ? PROT_WRITE : 0) |
-             (bit(pageid_to_map_byte(execmap, page), lowbits(page, 3)) ? PROT_EXEC : 0);
+  Protection prot = Protection::none;
+  if (bit(pageid_to_map_byte(readmap, page), lowbits(page, 3)))
+    prot = prot | Protection::read;
+  if (bit(pageid_to_map_byte(writemap, page), lowbits(page, 3)))
+    prot = prot | Protection::write;
+  if (bit(pageid_to_map_byte(execmap, page), lowbits(page, 3)))
+    prot = prot | Protection::execute;
 
   return prot;
 }
+
+} // namespace vcore

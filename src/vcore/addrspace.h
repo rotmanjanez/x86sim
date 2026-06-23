@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <memory>
 
+#include "vcore/vcore.hpp"
 #include "globals.h"
 #include "superstl.h"
 
@@ -22,6 +23,7 @@
 //
 // Address space management
 //
+namespace vcore {
 
 // Each chunk covers 2 GB of virtual address space:
 #define SPAT_TOPLEVEL_CHUNK_BITS 17
@@ -33,24 +35,16 @@
 #define ADDRESS_SPACE_SIZE (1LL << ADDRESS_SPACE_BITS)
 
 
-#ifndef PROT_NONE
-#define PROT_NONE 0x0
-#define PROT_READ 0x1
-#define PROT_WRITE 0x2
-#define PROT_EXEC 0x4
-#endif
-
 class AddressSpace {
 public:
-  AddressSpace() {}
-  ~AddressSpace() {}
-  void reset();
+  AddressSpace();
+  ~AddressSpace();
 
 public:
   using Page = std::array<W8, PAGE_SIZE>;
   std::unordered_map<Waddr, std::unique_ptr<Page>> mapped_mem;
 
-  void map(Waddr start, Waddr length, int prot) {
+  void map(Waddr start, Waddr length, Protection prot) {
     start = floor(start, PAGE_SIZE);
     length = ceil(length, PAGE_SIZE);
     Waddr num_pages = length / PAGE_SIZE;
@@ -66,7 +60,7 @@ public:
     foreach (i, num_pages) {
       mapped_mem.erase(start + i * PAGE_SIZE);
     }
-    setattr((byte*)start, length, PROT_NONE);
+    setattr((byte*)start, length, Protection::none);
   }
 
   void* page_virt_to_mapped(Waddr addr) {
@@ -84,10 +78,10 @@ public:
   typedef byte SPATChunk[SPAT_BYTES_PER_CHUNK];
   typedef SPATChunk** spat_t;
 
-  spat_t readmap;
-  spat_t writemap;
-  spat_t execmap;
-  spat_t dirtymap;
+  spat_t readmap = nullptr;
+  spat_t writemap = nullptr;
+  spat_t execmap = nullptr;
+  spat_t dirtymap = nullptr;
 
   spat_t allocmap();
   void freemap(spat_t top);
@@ -121,8 +115,8 @@ public:
   //
   // Memory management passthroughs
   //
-  void setattr(void* start, Waddr length, int prot);
-  int getattr(void* start);
+  void setattr(void* start, Waddr length, Protection prot);
+  Protection getattr(void* start);
 
   bool fastcheck(Waddr addr, spat_t top) const {
 
@@ -143,14 +137,14 @@ public:
 
   bool fastcheck(void* addr, spat_t top) const { return fastcheck((Waddr)addr, top); }
 
-  bool check(void* p, int prot) const {
-    if unlikely ((prot & PROT_READ) && (!fastcheck(p, readmap)))
+  bool check(void* p, Protection prot) const {
+    if unlikely (has_protection(prot, Protection::read) && (!fastcheck(p, readmap)))
       return false;
 
-    if unlikely ((prot & PROT_WRITE) && (!fastcheck(p, writemap)))
+    if unlikely (has_protection(prot, Protection::write) && (!fastcheck(p, writemap)))
       return false;
 
-    if unlikely ((prot & PROT_EXEC) && (!fastcheck(p, execmap)))
+    if unlikely (has_protection(prot, Protection::execute) && (!fastcheck(p, execmap)))
       return false;
 
     return true;
@@ -162,5 +156,7 @@ public:
 
   void resync_with_process_maps();
 };
+
+} // namespace vcore
 
 #endif

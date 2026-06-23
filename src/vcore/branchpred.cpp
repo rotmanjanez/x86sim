@@ -12,6 +12,8 @@
 #include "stats.h"
 #include "vcore/logging.h"
 
+namespace vcore {
+
 template<int SIZE>
 struct BimodalPredictor {
   std::array<byte, SIZE> table;
@@ -174,10 +176,14 @@ struct ReturnAddressStack : public Queue<ReturnAddressStackEntry, SIZE> {
 };
 
 // std::formatter for ReturnAddressStack<SIZE> - inherits from Queue formatter
+} // namespace vcore
+
 namespace std {
 template<int SIZE>
-struct formatter<ReturnAddressStack<SIZE>> : formatter<Queue<ReturnAddressStackEntry, SIZE>> {};
+struct formatter<vcore::ReturnAddressStack<SIZE>> : formatter<vcore::Queue<vcore::ReturnAddressStackEntry, SIZE>> {};
 } // namespace std
+
+namespace vcore {
 
 template<int METASIZE, int BIMODSIZE, int L1SIZE, int L2SIZE, int SHIFTWIDTH, bool HISTORYXOR, int BTBSETS, int BTBWAYS,
          int RASSIZE>
@@ -391,3 +397,5 @@ void BranchPredictorInterface::annulras(const PredictorUpdate& predinfo) {
 };
 
 void BranchPredictorInterface::flush() {}
+
+} // namespace vcore

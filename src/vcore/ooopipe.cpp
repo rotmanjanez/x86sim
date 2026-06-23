@@ -17,6 +17,8 @@
 #include "ooocore.h"
 #include "stats.h"
 
+namespace vcore {
+
 #ifndef ENABLE_CHECKS
 #undef assert
 #define assert(x) (x)
@@ -29,7 +31,7 @@ using namespace OutOfOrderModel;
 
 void OutOfOrderCoreCacheCallbacks::icache_wakeup(LoadStoreInfo lsi, W64 physaddr) {
   foreach (i, core.threadcount) {
-    ThreadContext* thread = core.threads[i];
+    auto& thread = core.threads[i];
     if unlikely (thread && thread->waiting_for_icache_fill &&
                  (floor(thread->waiting_for_icache_fill_physaddr, CacheSubsystem::L1_LINE_SIZE) == physaddr)) {
       logging::println(logging::TRACE, "[vcpu {}] i-cache wakeup of physaddr {}", thread->ctx.vcpuid,
@@ -92,7 +94,7 @@ void ThreadContext::annul_fetchq() {
 void OutOfOrderCore::flush_pipeline_all() {
   // Clear per-thread state:
   foreach (i, threadcount) {
-    ThreadContext* thread = threads[i];
+    auto& thread = threads[i];
     thread->flush_pipeline();
   }
   // Clear out everything global:
@@ -2166,3 +2168,5 @@ const byte archdest_can_commit[TRANSREG_COUNT] = {
     1,
 };
 }; // namespace OutOfOrderModel
+
+} // namespace vcore

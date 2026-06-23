@@ -7,6 +7,8 @@
 
 #include "decode.h"
 
+namespace vcore {
+
 static const byte sse_float_datatype_to_ptl_datatype[4] = {DATATYPE_FLOAT, DATATYPE_VEC_FLOAT, DATATYPE_DOUBLE,
                                                            DATATYPE_VEC_DOUBLE};
 
@@ -1447,3 +1449,5 @@ bool TraceDecoder::decode_sse() {
 
   return true;
 }
+
+} // namespace vcore

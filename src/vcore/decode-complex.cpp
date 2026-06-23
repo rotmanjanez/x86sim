@@ -8,6 +8,8 @@
 #include "decode.h"
 #include "vcore/logging.h"
 
+namespace vcore {
+
 void assist_int(Context& ctx) {
   byte intid = ctx.commitarf[REG_ar1];
   if (intid == 0x80) {
@@ -230,14 +232,19 @@ struct IRETStackFrame {
   W64 rip, cs, rflags, rsp, ss;
 };
 
+} // namespace vcore
+
 template<>
-struct std::formatter<IRETStackFrame> {
+struct std::formatter<vcore::IRETStackFrame> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const IRETStackFrame& iretctx, std::format_context& ctx) const {
+  auto format(const vcore::IRETStackFrame& iretctx, std::format_context& ctx) const {
+    using namespace vcore;
     return std::format_to(ctx.out(), "cs:rip {}:{}, ss:rsp {}:{}, rflags {}", (void*)iretctx.cs, (void*)iretctx.rip,
                           (void*)iretctx.ss, (void*)iretctx.rsp, (void*)iretctx.rflags);
   }
 };
+
+namespace vcore {
 
 void assist_iret64(Context& ctx) {
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_selfrip];
@@ -1954,3 +1961,5 @@ bool TraceDecoder::decode_complex() {
 
   return true;
 }
+
+} // namespace vcore

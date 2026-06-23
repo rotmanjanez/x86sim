@@ -12,26 +12,26 @@
 #include "superstl.h"
 #include <stdarg.h>
 
-static const W64 infinity = std::numeric_limits<W64s>::max();
+static const vcore::W64 infinity = std::numeric_limits<vcore::W64s>::max();
 
 struct ConfigurationOption {
   const char* name;
   const char* description;
   int type;
   int fieldsize;
-  Waddr offset;
+  vcore::Waddr offset;
 
   ConfigurationOption* next;
 
   ConfigurationOption() {}
 
-  ConfigurationOption(const char* name, const char* description, int type, Waddr offset, int fieldsize = 0) {
+  ConfigurationOption(const char* name, const char* description, int type, vcore::Waddr offset, int fieldsize = 0) {
     this->name = name;
     this->description = description;
     this->type = type;
     this->offset = offset;
     this->fieldsize = fieldsize;
-    this->next = null;
+    this->next = nullptr;
   }
 };
 
@@ -50,7 +50,7 @@ struct ConfigurationParserBase {
   ConfigurationOption* lastoption;
 
   void addentry(void* baseptr, void* field, int type, const char* name, const char* description) {
-    Waddr offset = ((Waddr)field) - ((Waddr)baseptr);
+    vcore::Waddr offset = ((vcore::Waddr)field) - ((vcore::Waddr)baseptr);
     ConfigurationOption* option = new ConfigurationOption(name, description, type, offset);
     if (lastoption)
       lastoption->next = option;
@@ -60,8 +60,8 @@ struct ConfigurationParserBase {
   }
 
   ConfigurationParserBase() {
-    options = null;
-    lastoption = null;
+    options = nullptr;
+    lastoption = nullptr;
   }
 
   int parse(void* baseptr, int argc, char* argv[]);
@@ -75,7 +75,7 @@ struct ConfigurationParser : public T {
 
   ConfigurationParser() {}
 
-  void add(W64& field, const char* name, const char* description) {
+  void add(vcore::W64& field, const char* name, const char* description) {
     options.addentry(this, &field, OPTION_TYPE_W64, name, description);
   }
 
@@ -91,7 +91,7 @@ struct ConfigurationParser : public T {
     options.addentry(this, &field, OPTION_TYPE_STRING, name, description);
   }
 
-  void section(const char* name) { options.addentry(this, null, OPTION_TYPE_SECTION, name, name); }
+  void section(const char* name) { options.addentry(this, nullptr, OPTION_TYPE_SECTION, name, name); }
 
   int parse(T& config, int argc, char* argv[]) { return options.parse(&config, argc, argv); }
 

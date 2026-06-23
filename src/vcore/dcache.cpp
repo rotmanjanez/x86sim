@@ -9,6 +9,8 @@
 #include "stats.h"
 #include "vcore/logging.h"
 
+namespace vcore {
+
 using namespace CacheSubsystem;
 
 #if 0
@@ -209,8 +211,11 @@ LoadFillReq::LoadFillReq(W64 addr, W64 data, byte mask, LoadStoreInfo lsi) {
   this->mbidx = -1;
 }
 
-auto std::formatter<CacheSubsystem::LoadFillReq>::format(const CacheSubsystem::LoadFillReq& req,
+} // namespace vcore
+
+auto std::formatter<vcore::CacheSubsystem::LoadFillReq>::format(const vcore::CacheSubsystem::LoadFillReq& req,
                                                          std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
   out = std::format_to(out, "0x{:016x} @ {} -> rob {} @ t{}", req.data, (void*)(Waddr)req.addr, req.lsi.rob,
                        req.lsi.threadid);
@@ -218,6 +223,8 @@ auto std::formatter<CacheSubsystem::LoadFillReq>::format(const CacheSubsystem::L
                        bitstring(req.mask, 8, true));
   return out;
 }
+
+namespace vcore {
 
 //
 // Miss Buffer
@@ -526,27 +533,34 @@ void MissBuffer<SIZE>::annul_lfrq(int slot) {
   }
 }
 
+} // namespace vcore
+
 template<int linesize>
-auto std::formatter<std::pair<CacheSubsystem::CacheLine<linesize>, W64>>::format(
-    const std::pair<CacheSubsystem::CacheLine<linesize>, W64>& p, std::format_context& ctx) const {
+auto std::formatter<std::pair<vcore::CacheSubsystem::CacheLine<linesize>, vcore::W64>>::format(
+    const std::pair<vcore::CacheSubsystem::CacheLine<linesize>, vcore::W64>& p, std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
-  const ::byte* data = (const ::byte*)&p.first;
+  const vcore::byte* data = (const vcore::byte*)&p.first;
   foreach (i, linesize / 8) {
     out = std::format_to(out, "    {} \n", bytemaskstring(data + i * 8, (W64)-1LL, 8, 8));
   }
   return out;
 }
 
+
 template<int linesize>
-auto std::formatter<std::pair<CacheSubsystem::CacheLineWithValidMask<linesize>, W64>>::format(
-    const std::pair<CacheSubsystem::CacheLineWithValidMask<linesize>, W64>& p, std::format_context& ctx) const {
+auto std::formatter<std::pair<vcore::CacheSubsystem::CacheLineWithValidMask<linesize>, vcore::W64>>::format(
+    const std::pair<vcore::CacheSubsystem::CacheLineWithValidMask<linesize>, vcore::W64>& p, std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
-  const ::byte* data = (const ::byte*)&p.first;
+  const vcore::byte* data = (const vcore::byte*)&p.first;
   foreach (i, linesize / 8) {
     out = std::format_to(out, "    {} \n", bytemaskstring(data + i * 8, p.first.valid(i * 8, 8).integer(), 8, 8));
   }
   return out;
 }
+
+namespace vcore {
 
 int CacheHierarchy::issueload_slowpath(Waddr physaddr, SFR& sfra, LoadStoreInfo lsi, bool& L2hit) {
   starttimer(load_slowpath_timer);
@@ -834,8 +848,11 @@ void CacheHierarchy::reset() {
   dtlb.reset();
 }
 
-auto std::formatter<CacheSubsystem::CacheHierarchy>::format(const CacheSubsystem::CacheHierarchy& ch,
+} // namespace vcore
+
+auto std::formatter<vcore::CacheSubsystem::CacheHierarchy>::format(const vcore::CacheSubsystem::CacheHierarchy& ch,
                                                             std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
   out = std::format_to(out, "Data Cache Subsystem:\n");
   out = std::format_to(out, "{}", ch.lfrq);
@@ -846,6 +863,8 @@ auto std::formatter<CacheSubsystem::CacheHierarchy>::format(const CacheSubsystem
                        CacheSubsystem::L2_WAY_COUNT, CacheSubsystem::L2_LINE_SIZE);
   return out;
 }
+
+namespace vcore {
 
 //
 // Make sure the templates and vtables get instantiated:
@@ -873,3 +892,5 @@ logging::print(logging::INFO, "  0x{:016x}, ", expand_8bit_to_64bit_lut[i]);
 if ((i & 3) == 3) logging::println(logging::INFO, "")
 }
 */
+
+} // namespace vcore

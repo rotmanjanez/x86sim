@@ -9,8 +9,12 @@
 #ifndef _PTLSIM_API_H_
 #define _PTLSIM_API_H_
 
+#include "vcore/vcore.hpp"
+
 #include "globals.h"
 #include "ptlhwdef.h"
+
+namespace vcore {
 
 extern bool asp_check_exec(void* addr);
 
@@ -27,13 +31,6 @@ static const Waddr INVALID_PHYSADDR = 0;
 
 extern W64 loadphys(Waddr addr);
 extern W64 storemask(Waddr addr, W64 data, byte bytemask);
-
-struct CpuidResult {
-  W32 eax;
-  W32 ebx;
-  W32 ecx;
-  W32 edx;
-};
 
 inline CpuidResult default_cpuid(W32 func, W32, int vcpuid) {
   static const char cpuid_vendor[12 + 1] = "GenuineIntel";
@@ -125,5 +122,8 @@ CpuidResult handle_cpuid(W32 func, W32 subfunc);
 
 // Used to determine whether to exit emulation.
 extern bool requested_switch_to_native;
+
+
+} // namespace vcore
 
 #endif // _PTLSIM_API_H_

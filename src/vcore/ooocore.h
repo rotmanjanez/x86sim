@@ -14,6 +14,9 @@
 
 #include <bitset>
 #include <format>
+#include <memory>
+
+namespace vcore {
 
 // With these disabled, simulation is faster
 #define ENABLE_CHECKS
@@ -45,17 +48,17 @@ struct OutOfOrderCore;
 
 #define MAX_SMT_CORES 1
 
-struct OutOfOrderMachine : public PTLsimMachine {
-  OutOfOrderCore* cores[MAX_SMT_CORES];
+struct OutOfOrderMachine : public CoreImpl {
+  std::unique_ptr<OutOfOrderCore> cores[MAX_SMT_CORES];
   std::bitset<MAX_CONTEXTS> stopped;
+  explicit OutOfOrderMachine(const PTLsimConfig& config);
+  ~OutOfOrderMachine() override;
   std::string_view name() const override;
-  virtual bool init(PTLsimConfig& config) override;
-  virtual int run(PTLsimConfig& config) override;
-  virtual void reset() override;
-  virtual void dump_state();
+  int run() override;
   virtual void update_stats(PTLsimStats& stats) override;
   virtual void flush_tlb(Context& ctx) override;
   virtual void flush_tlb_virt(Context& ctx, Waddr virtaddr) override;
+  void dump_state();
   void flush_all_pipelines();
 };
 
@@ -1493,7 +1496,7 @@ struct OutOfOrderCore {
   OutOfOrderCore& getcore() { return *this; }
 
   int threadcount;
-  ThreadContext* threads[MAX_THREADS_PER_CORE];
+  std::unique_ptr<ThreadContext> threads[MAX_THREADS_PER_CORE];
 
   ListOfStateLists rob_states;
   ListOfStateLists lsq_states;
@@ -1607,7 +1610,6 @@ struct OutOfOrderCore {
   OutOfOrderCore(int coreid_, OutOfOrderMachine& machine_)
       : coreid(coreid_), machine(machine_), cache_callbacks(*this) {
     threadcount = 0;
-    setzero(threads);
   }
 
   ~OutOfOrderCore() {};
@@ -2041,80 +2043,83 @@ struct OutOfOrderCoreStats {
 
 #ifdef INSIDE_OOOCORE
 // std::formatter specializations for OutOfOrderModel types
+} // namespace vcore
+
 namespace std {
 template<>
-struct formatter<OutOfOrderModel::OutOfOrderCoreEvent> {
+struct formatter<vcore::OutOfOrderModel::OutOfOrderCoreEvent> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::OutOfOrderCoreEvent& ev, format_context& ctx) const;
+  auto format(const vcore::OutOfOrderModel::OutOfOrderCoreEvent& ev, format_context& ctx) const;
 };
 
 template<>
-struct formatter<OutOfOrderModel::PhysicalRegister> {
+struct formatter<vcore::OutOfOrderModel::PhysicalRegister> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::PhysicalRegister& physreg, format_context& ctx) const;
+  auto format(const vcore::OutOfOrderModel::PhysicalRegister& physreg, format_context& ctx) const;
 };
 
 template<>
-struct formatter<OutOfOrderModel::PhysicalRegisterFile> {
+struct formatter<vcore::OutOfOrderModel::PhysicalRegisterFile> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::PhysicalRegisterFile& prf, format_context& ctx) const;
+  auto format(const vcore::OutOfOrderModel::PhysicalRegisterFile& prf, format_context& ctx) const;
 };
 
 template<>
-struct formatter<OutOfOrderModel::ReorderBufferEntry> {
+struct formatter<vcore::OutOfOrderModel::ReorderBufferEntry> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::ReorderBufferEntry& rob, format_context& ctx) const;
+  auto format(const vcore::OutOfOrderModel::ReorderBufferEntry& rob, format_context& ctx) const;
 };
 
 template<>
-struct formatter<OutOfOrderModel::LoadStoreQueueEntry> {
+struct formatter<vcore::OutOfOrderModel::LoadStoreQueueEntry> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::LoadStoreQueueEntry& lsq, format_context& ctx) const;
+  auto format(const vcore::OutOfOrderModel::LoadStoreQueueEntry& lsq, format_context& ctx) const;
 };
 
 template<>
-struct formatter<OutOfOrderModel::ThreadContext> {
+struct formatter<vcore::OutOfOrderModel::ThreadContext> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::ThreadContext& thread, format_context& ctx) const;
+  auto format(const vcore::OutOfOrderModel::ThreadContext& thread, format_context& ctx) const;
 };
 
 template<>
-struct formatter<OutOfOrderModel::OutOfOrderCore> {
+struct formatter<vcore::OutOfOrderModel::OutOfOrderCore> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::OutOfOrderCore& core, format_context& ctx) const;
+  auto format(const vcore::OutOfOrderModel::OutOfOrderCore& core, format_context& ctx) const;
 };
 
 template<>
-struct formatter<OutOfOrderModel::MemoryInterlockEntry> {
+struct formatter<vcore::OutOfOrderModel::MemoryInterlockEntry> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::MemoryInterlockEntry& entry, format_context& ctx) const {
+  auto format(const vcore::OutOfOrderModel::MemoryInterlockEntry& entry, format_context& ctx) const {
     return std::format_to(ctx.out(), "vcpu {}, threadid {}, uuid {}, rob {}", entry.vcpuid, entry.threadid,
                           entry.uuid, entry.rob);
   }
 };
 
 template<>
-struct formatter<OutOfOrderModel::MemoryInterlockBuffer> {
+struct formatter<vcore::OutOfOrderModel::MemoryInterlockBuffer> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::MemoryInterlockBuffer& interlocks, format_context& ctx) const {
-    using base_t = LockableAssociativeArray<W64, OutOfOrderModel::MemoryInterlockEntry, 16, 4, 8>;
+  auto format(const vcore::OutOfOrderModel::MemoryInterlockBuffer& interlocks, format_context& ctx) const {
+    using base_t =
+        vcore::LockableAssociativeArray<vcore::W64, vcore::OutOfOrderModel::MemoryInterlockEntry, 16, 4, 8>;
     return formatter<base_t>{}.format(static_cast<const base_t&>(interlocks), ctx);
   }
 };
 
 template<>
-struct formatter<OutOfOrderModel::PhysicalRegisterOperandInfo> {
+struct formatter<vcore::OutOfOrderModel::PhysicalRegisterOperandInfo> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::PhysicalRegisterOperandInfo& opinfo, format_context& ctx) const {
-    return std::format_to(ctx.out(), "r{} (rob {} uuid {} {} rf{})", arch_reg_names[opinfo.archreg], opinfo.rob,
-                          opinfo.uuid, OutOfOrderModel::physreg_state_names[opinfo.state], opinfo.rfid);
+  auto format(const vcore::OutOfOrderModel::PhysicalRegisterOperandInfo& opinfo, format_context& ctx) const {
+    return std::format_to(ctx.out(), "r{} (rob {} uuid {} {} rf{})", vcore::arch_reg_names[opinfo.archreg], opinfo.rob,
+                          opinfo.uuid, vcore::OutOfOrderModel::physreg_state_names[opinfo.state], opinfo.rfid);
   }
 };
 
 template<int Size, int OperandCount>
-struct formatter<OutOfOrderModel::IssueQueue<Size, OperandCount>> {
+struct formatter<vcore::OutOfOrderModel::IssueQueue<Size, OperandCount>> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::IssueQueue<Size, OperandCount>& iq, format_context& ctx) const {
+  auto format(const vcore::OutOfOrderModel::IssueQueue<Size, OperandCount>& iq, format_context& ctx) const {
     auto out = ctx.out();
     out = std::format_to(out, "IssueQueue: count = {}:\n", iq.count);
     for (int i = 0; i < Size; i++) {
@@ -2132,14 +2137,14 @@ struct formatter<OutOfOrderModel::IssueQueue<Size, OperandCount>> {
 };
 
 template<>
-struct formatter<OutOfOrderModel::RegisterRenameTable> {
+struct formatter<vcore::OutOfOrderModel::RegisterRenameTable> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const OutOfOrderModel::RegisterRenameTable& rrt, format_context& ctx) const {
+  auto format(const vcore::OutOfOrderModel::RegisterRenameTable& rrt, format_context& ctx) const {
     auto out = ctx.out();
     for (int i = 0; i < TRANSREG_COUNT; ++i) {
       if ((i % 8) == 0)
         out = std::format_to(out, " ");
-      out = std::format_to(out, " {:<6} r{:3d} | ", arch_reg_names[i], rrt[i]->index());
+      out = std::format_to(out, " {:<6} r{:3d} | ", vcore::arch_reg_names[i], rrt[i]->index());
       if ((i % 8) == 7)
         out = std::format_to(out, "\n");
     }
@@ -2147,6 +2152,8 @@ struct formatter<OutOfOrderModel::RegisterRenameTable> {
   }
 };
 } // namespace std
+#else
+} // namespace vcore
 #endif // INSIDE_OOOCORE
 
 #endif // _OOOCORE_H_

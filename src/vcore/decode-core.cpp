@@ -13,6 +13,8 @@
 #include "vcore/logging.h"
 
 
+namespace vcore {
+
 BasicBlockCache bbcache;
 
 struct BasicBlockChunkListHashtableLinkManager {
@@ -662,7 +664,10 @@ bool TraceDecoder::flush() {
   return (!overflow);
 }
 
-auto std::formatter<DecodedOperand>::format(const DecodedOperand& op, std::format_context& ctx) const {
+} // namespace vcore
+
+auto std::formatter<vcore::DecodedOperand>::format(const vcore::DecodedOperand& op, std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
   switch (op.type) {
   case OPTYPE_REG:
@@ -681,6 +686,8 @@ auto std::formatter<DecodedOperand>::format(const DecodedOperand& op, std::forma
   }
   return out;
 }
+
+namespace vcore {
 
 bool DecodedOperand::gform_ext(TraceDecoder& state, int bytemode, int regfield, bool def64, bool in_rex_base) {
   int add = ((in_rex_base) ? state.rex.extbase : state.rex.extreg) ? 8 : 0;
@@ -1658,7 +1665,7 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
     // The allocator is so strapped for memory, we need to free
     // everything possible at all costs:
     //
-    average = infinity;
+    average = std::numeric_limits<W64s>::max();
   }
 
   logging::println(logging::DEBUG, "Before:");
@@ -2312,12 +2319,15 @@ BasicBlock* BasicBlockCache::translate_and_clone(Context& ctx, Waddr rip) {
 
 #undef MAX_RIP
 
-auto std::formatter<BasicBlockCache>::format(BasicBlockCache& bbc, std::format_context& ctx) const {
+} // namespace vcore
+
+auto std::formatter<vcore::BasicBlockCache>::format(vcore::BasicBlockCache& bbc, std::format_context& ctx) const {
+  using namespace vcore;
   auto out = ctx.out();
   auto bblist = bbc.getentries();
 
   for (const auto* ptr : bblist) {
-    const BasicBlock& bb = *ptr;
+    const vcore::BasicBlock& bb = *ptr;
     double percent_of_total_uops = ((double)(bb.hitcount * bb.tagcount) / (double)total_uops_committed);
     double percent_of_total_bbs = ((double)(bb.hitcount) / (double)total_basic_blocks_committed);
 
@@ -2337,6 +2347,8 @@ auto std::formatter<BasicBlockCache>::format(BasicBlockCache& bbc, std::format_c
   return out;
 }
 
+namespace vcore {
+
 void shutdown_decode() {
   bbcache.flush();
   if (bbcache_dump_file) {
@@ -2344,3 +2356,5 @@ void shutdown_decode() {
     bbcache_dump_file = nullptr;
   }
 }
+
+} // namespace vcore

@@ -18,6 +18,8 @@
 #include "ooocore.h"
 #include "stats.h"
 
+namespace vcore {
+
 #ifndef ENABLE_CHECKS
 #undef assert
 #define assert(x) (x)
@@ -46,7 +48,7 @@ void IssueQueue<size, operandcount>::reset(OutOfOrderCore& core) {
   uopids.reset();
 
   foreach (i, core.threadcount) {
-    ThreadContext* thread = core.threads[i];
+    auto& thread = core.threads[i];
     if unlikely (!thread)
       continue;
     thread->issueq_count = 0;
@@ -71,7 +73,7 @@ void IssueQueue<size, operandcount>::reset(OutOfOrderCore& core, int threadid) {
         // Now i+1 is moved to position of where i used to be:
         i--;
 
-        ThreadContext* thread = core.threads[threadid];
+        auto& thread = core.threads[threadid];
         if (thread->issueq_count > core.reserved_iq_entries) {
           issueq_operation_on_cluster(core, cluster, free_shared_entry());
         }
@@ -125,7 +127,7 @@ void IssueQueue<size, operandcount>::tally_broadcast_matches(IssueQueue<size, op
   OutOfOrderCore& core = getcore();
   int threadid, rob_idx;
   decode_tag(sourceid, threadid, rob_idx);
-  ThreadContext* thread = core.threads[threadid];
+  auto& thread = core.threads[threadid];
   const ReorderBufferEntry* source = &thread->ROB[rob_idx];
 
   std::bitset<size> temp = mask;
@@ -1683,7 +1685,7 @@ void ReorderBufferEntry::issueprefetch(IssueState& state, W64 ra, W64 rb, W64 rc
 //
 void OutOfOrderCoreCacheCallbacks::dcache_wakeup(LoadStoreInfo lsi, W64 physaddr) {
   int idx = lsi.rob;
-  ThreadContext* thread = core.threads[lsi.threadid];
+  auto& thread = core.threads[lsi.threadid];
   assert(inrange(idx, 0, ROB_SIZE - 1));
   ReorderBufferEntry& rob = thread->ROB[idx];
 
@@ -1895,7 +1897,7 @@ int OutOfOrderCore::issue(int cluster) {
     issueq_operation_on_cluster_with_result(getcore(), cluster, robid, uopof(iqslot));
     int threadid, idx;
     decode_tag(robid, threadid, idx);
-    ThreadContext* thread = threads[threadid];
+    auto& thread = threads[threadid];
     assert(inrange(idx, 0, ROB_SIZE - 1));
     ReorderBufferEntry& rob = thread->ROB[idx];
 
@@ -2386,3 +2388,5 @@ int ReorderBufferEntry::pseudocommit() {
 
   return COMMIT_RESULT_OK;
 }
+
+} // namespace vcore

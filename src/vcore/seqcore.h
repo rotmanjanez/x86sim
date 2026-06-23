@@ -11,26 +11,23 @@
 
 #include "ptlsim.h"
 
+#include <memory>
+
+namespace vcore {
+
 struct SequentialCore;
 
-struct SequentialMachine : public PTLsimMachine {
-  SequentialCore* cores[MAX_CONTEXTS];
-  bool init_done = false;
+struct SequentialMachine : public CoreImpl {
+  std::unique_ptr<SequentialCore> cores[MAX_CONTEXTS];
 
+  explicit SequentialMachine(const PTLsimConfig& config);
   std::string_view name() const override;
-
-  //
-  // Construct all the structures necessary to configure
-  // the cores. This function is only called once, after
-  // all other PTLsim subsystems are brought up.
-  //
-  virtual bool init(PTLsimConfig& config) override;
 
   //
   // Run the processor model, until a stopping point
   // is hit (as configured elsewhere in config).
   //
-  virtual int run(PTLsimConfig& config) override;
+  int run() override;
 
   virtual void dump_state();
 
@@ -92,12 +89,14 @@ int execute_sequential(Context& ctx, CommitRecord* cmtrec = null, W64 bbcount = 
 
 extern W64 suppress_total_user_insn_count_updates_in_seqcore;
 
+} // namespace vcore
+
 //
 // std::formatter specialization
 template<>
-struct std::formatter<CommitRecord> {
+struct std::formatter<vcore::CommitRecord> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const CommitRecord& cr, std::format_context& ctx) const;
+  auto format(const vcore::CommitRecord& cr, std::format_context& ctx) const;
 };
 
 #endif // _SEQCORE_H_

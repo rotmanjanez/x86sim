@@ -25,6 +25,8 @@
 #include <math.h>
 #include <float.h>
 
+namespace vcore {
+
 #define __stringify_1(x) #x
 #define stringify(x) __stringify_1(x)
 
@@ -197,10 +199,13 @@ typedef float v2df __attribute__((vector_size(16)));
 typedef v2df vec2d;
 
 // std::formatter specializations for vector types - must be declared early before any use
+} // namespace vcore
+
 template<>
-struct std::formatter<v16qi> {
+struct std::formatter<vcore::v16qi> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const v16qi& v, std::format_context& ctx) const {
+  auto format(const vcore::v16qi& v, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     const unsigned char* b = (const unsigned char*)&v;
     for (int i = 15; i >= 0; i--) {
@@ -212,10 +217,12 @@ struct std::formatter<v16qi> {
   }
 };
 
+
 template<>
-struct std::formatter<v8hi> {
+struct std::formatter<vcore::v8hi> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const v8hi& v, std::format_context& ctx) const {
+  auto format(const vcore::v8hi& v, std::format_context& ctx) const {
+    using namespace vcore;
     auto out = ctx.out();
     const W16* b = (const W16*)&v;
     for (int i = 0; i < 8; i++) {
@@ -226,6 +233,8 @@ struct std::formatter<v8hi> {
     return out;
   }
 };
+
+namespace vcore {
 
 union MXCSR {
   struct {
@@ -542,16 +551,21 @@ inline int add_index_modulo(int index, int increment, int bufsize) {
   return index;
 }
 
+} // namespace vcore
+
 #include "superstl.h"
 
+
 template<>
-struct std::formatter<MXCSR> {
+struct std::formatter<vcore::MXCSR> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const MXCSR& mxcsr, std::format_context& ctx) const {
+  auto format(const vcore::MXCSR& mxcsr, std::format_context& ctx) const {
+    using namespace vcore;
     return std::format_to(ctx.out(), "0x{:08x}", mxcsr.data);
   }
 };
+
 
 #endif // __cplusplus
 
