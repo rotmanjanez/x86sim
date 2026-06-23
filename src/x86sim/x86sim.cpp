@@ -293,15 +293,16 @@ RunResult Machine::run(RunOptions options) {
                                                  : std::numeric_limits<W64>::max();
   machine_->config.stop_at_user_insns = stop_at;
 
-
-    simulate(*machine_);
-    // todo: exception
+  try {
+    machine_->run();
+  } catch (const X86Exception& e) {
     return {
         .reason = StopReason::x86_exception,
         .stats = stats(),
-        .x86_exception = exception.exception,
-        .message = exception.exception.message,
+        .x86_exception = e,
+        .message = e.message,
     };
+  }
 
   if (options.instruction_limit && stats().instructions >= stop_at)
     return {.reason = StopReason::instruction_limit, .stats = stats(), .x86_exception = std::nullopt, .message = {}};
@@ -351,7 +352,7 @@ void Machine::set_pending_stop(RunResult result) {
 }
 
 [[noreturn]] void throw_x86_exception(Context& context, byte exception, W32 errorcode, Waddr virtaddr) {
-  X86Exception result{
+  X86Exception e{
       .vector = exception,
       .error_code = errorcode,
       .virtual_address = virtaddr,
@@ -362,7 +363,7 @@ void Machine::set_pending_stop(RunResult result) {
       .context = std::format("{}", context),
   };
 
-  throw InternalX86Exception{std::move(result)};
+  throw e;
 }
 
 void dispatch_syscall_64bit(Context& context) {
@@ -405,7 +406,7 @@ CpuidResult dispatch_cpuid(Context& context, W32 func, W32 subfunc) {
 namespace x86sim {
 
 void Context::propagate_x86_exception(byte exception, W32 errorcode, Waddr virtaddr) {
-  // todo: throw_x86_exception(*this, exception, errorcode, virtaddr);
+  throw_x86_exception(*this, exception, errorcode, virtaddr);
 }
 
 void handle_syscall_64bit(Context& context) {

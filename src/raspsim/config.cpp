@@ -51,6 +51,9 @@ std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr)
     case OPTION_TYPE_STRING:
       result += *(std::string*)variable;
       break;
+    case OPTION_TYPE_PATH:
+      result += ((std::filesystem::path*)variable)->string();
+      break;
     case OPTION_TYPE_BOOL:
       result += ((*(bool*)variable) ? "enabled" : "disabled");
       break;
@@ -165,6 +168,15 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             s = argv[i++];
             break;
           }
+          case OPTION_TYPE_PATH: {
+            if (i >= argc) {
+              logging::eprintln("Warning: option {} had no argument; ignoring", argv[i - 1]);
+              break;
+            }
+            std::filesystem::path& path = *((std::filesystem::path*)variable);
+            path = argv[i++];
+            break;
+          }
           case OPTION_TYPE_CORE_MODEL: {
             if (i >= argc) {
               logging::eprintln("Warning: option {} had no argument; ignoring", argv[i - 1]);
@@ -241,6 +253,9 @@ std::string ConfigurationParserBase::format_to_string_config(const void* baseptr
       break;
     case OPTION_TYPE_STRING:
       result += *((std::string*)(variable));
+      break;
+    case OPTION_TYPE_PATH:
+      result += ((std::filesystem::path*)variable)->string();
       break;
     case OPTION_TYPE_CORE_MODEL:
       result += std::format("{}", *((x86sim::CoreModel*)(variable)));

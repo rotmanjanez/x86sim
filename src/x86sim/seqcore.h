@@ -31,6 +31,8 @@ struct SequentialMachine : public MachineImpl {
   // is hit (as configured elsewhere in config).
   //
   int run() override;
+  void flush_tlb(Context& ctx) override;
+  void flush_tlb_virt(Context& ctx, Waddr virtaddr) override;
 
   virtual void dump_state();
 

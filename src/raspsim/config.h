@@ -44,6 +44,7 @@ enum {
   OPTION_TYPE_TRAILER = 4,
   OPTION_TYPE_BOOL = 5,
   OPTION_TYPE_CORE_MODEL = 6,
+  OPTION_TYPE_PATH = 7,
   OPTION_TYPE_SECTION = -1
 };
 
@@ -95,6 +96,10 @@ struct ConfigurationParser : public T {
 
   void add(std::string& field, const char* name, const char* description) {
     options.addentry(this, &field, OPTION_TYPE_STRING, name, description);
+  }
+
+  void add(std::filesystem::path& field, const char* name, const char* description) {
+    options.addentry(this, &field, OPTION_TYPE_PATH, name, description);
   }
 
   void section(const char* name) { options.addentry(this, nullptr, OPTION_TYPE_SECTION, name, name); }

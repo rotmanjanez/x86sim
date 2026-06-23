@@ -1525,6 +1525,10 @@ const RegisterFile& SequentialMachine::register_file(std::size_t core_index) con
   return cores[core_index]->ctx;
 }
 
+void SequentialMachine::flush_tlb(Context& ctx) {}
+
+void SequentialMachine::flush_tlb_virt(Context& ctx, Waddr virtaddr) {}
+
 int SequentialMachine::run() {
     eventlog.machine = this;
 
