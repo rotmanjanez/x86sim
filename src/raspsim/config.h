@@ -12,20 +12,20 @@
 #include "superstl.h"
 #include <stdarg.h>
 
-static const vcore::W64 infinity = std::numeric_limits<vcore::W64s>::max();
+static const x86sim::W64 infinity = std::numeric_limits<x86sim::W64s>::max();
 
 struct ConfigurationOption {
   const char* name;
   const char* description;
   int type;
   int fieldsize;
-  vcore::Waddr offset;
+  x86sim::Waddr offset;
 
   ConfigurationOption* next;
 
   ConfigurationOption() {}
 
-  ConfigurationOption(const char* name, const char* description, int type, vcore::Waddr offset, int fieldsize = 0) {
+  ConfigurationOption(const char* name, const char* description, int type, x86sim::Waddr offset, int fieldsize = 0) {
     this->name = name;
     this->description = description;
     this->type = type;
@@ -50,7 +50,7 @@ struct ConfigurationParserBase {
   ConfigurationOption* lastoption;
 
   void addentry(void* baseptr, void* field, int type, const char* name, const char* description) {
-    vcore::Waddr offset = ((vcore::Waddr)field) - ((vcore::Waddr)baseptr);
+    x86sim::Waddr offset = ((x86sim::Waddr)field) - ((x86sim::Waddr)baseptr);
     ConfigurationOption* option = new ConfigurationOption(name, description, type, offset);
     if (lastoption)
       lastoption->next = option;
@@ -75,7 +75,7 @@ struct ConfigurationParser : public T {
 
   ConfigurationParser() {}
 
-  void add(vcore::W64& field, const char* name, const char* description) {
+  void add(x86sim::W64& field, const char* name, const char* description) {
     options.addentry(this, &field, OPTION_TYPE_W64, name, description);
   }
 

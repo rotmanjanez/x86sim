@@ -200,10 +200,6 @@ private:
   std::optional<RunResult> pending_stop_;
 };
 
-namespace detail {
-[[nodiscard]] std::string format_cpu(const Machine&);
-} // namespace detail
-
 } // namespace x86sim
 
 template<>

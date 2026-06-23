@@ -455,7 +455,7 @@ struct LoadFillReqQueue {
 
   static const int SIZE = size;
 
-  LoadFillReqQueue(MachineImp& machine_, CacheHierarchy& hierarchy_) : machine(machine_), hierarchy(&hierarchy_) { reset(); }
+  LoadFillReqQueue(MachineImpl& machine_, CacheHierarchy& hierarchy_) : machine(machine_), hierarchy(&hierarchy_) { reset(); }
 
   // Clear entries belonging to one thread
   void reset(int threadid);
@@ -527,7 +527,7 @@ struct MissBuffer {
   MachineImpl& machine;
   CacheHierarchy* hierarchy = nullptr;
 
-  MissBuffer(MachineImp& machine_, CacheHierarchy& hierarchy_) : core(core_), hierarchy(&hierarchy_) { reset(); }
+  MissBuffer(MachineImpl& machine_, CacheHierarchy& hierarchy_) : machine(machine_), hierarchy(&hierarchy_) { reset(); }
   Entry missbufs[SIZE];
   std::bitset<SIZE> freemap;
   int count;
@@ -565,7 +565,7 @@ struct CacheHierarchy {
 
   PerCoreCacheCallbacks* callback;
 
-  explicit CacheHierarchy(MachineImp& machine_) : machine(machine_), lfrq(machine_, *this), missbuf(machine_, *this) { callback = null; }
+  explicit CacheHierarchy(MachineImpl& machine_) : machine(machine_), lfrq(machine_, *this), missbuf(machine_, *this) { callback = null; }
 
   bool probe_cache_and_sfr(W64 addr, const SFR* sfra, int sizeshift);
   bool covered_by_sfr(W64 addr, SFR* sfr, int sizeshift);

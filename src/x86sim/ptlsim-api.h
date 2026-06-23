@@ -16,12 +16,6 @@
 
 namespace x86sim {
 
-extern bool asp_check_exec(void* addr);
-
-extern bool smc_isdirty(Waddr mfn);
-extern void smc_setdirty(Waddr mfn);
-extern void smc_cleardirty(Waddr mfn);
-
 #define contextcount (1)
 #define MAX_CONTEXTS 1
 

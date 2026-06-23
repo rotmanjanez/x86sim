@@ -25,7 +25,7 @@ PTLsimStats stats;
 bool logenable = 0;
 #endif
 
-int MachineImp::run() {
+int MachineImpl::run() {
   return 0;
 }
 

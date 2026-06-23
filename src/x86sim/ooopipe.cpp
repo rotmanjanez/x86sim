@@ -12,6 +12,7 @@
 #include "branchpred.h"
 #include "logic.h"
 #include "dcache.h"
+#include "x86sim/addrspace.h"
 
 #define INSIDE_OOOCORE
 #include "ooocore.h"
@@ -209,10 +210,11 @@ void ThreadContext::reset_fetch_unit(W64 realrip) {
 //
 void ThreadContext::invalidate_smc() {
   if unlikely (smc_invalidate_pending) {
+    AddressSpace& asp = ctx.machine->address_space();
     logging::println(logging::DEBUG, "SMC invalidate pending on {}", smc_invalidate_rvp);
-    bbcache.invalidate_page(smc_invalidate_rvp.mfnlo, INVALIDATE_REASON_SMC);
+    bbcache.invalidate_page(asp, smc_invalidate_rvp.mfnlo, INVALIDATE_REASON_SMC);
     if unlikely (smc_invalidate_rvp.mfnlo != smc_invalidate_rvp.mfnhi)
-      bbcache.invalidate_page(smc_invalidate_rvp.mfnhi, INVALIDATE_REASON_SMC);
+      bbcache.invalidate_page(asp, smc_invalidate_rvp.mfnhi, INVALIDATE_REASON_SMC);
     smc_invalidate_pending = 0;
   }
 }
@@ -1659,10 +1661,11 @@ int ReorderBufferEntry::commit() {
    * SMC: check if any previous instruction has dirtied page(s) on which the next macroop
    * to execute resides, if so we do not execute it but invalidate all bb caches immediately
    * because the store has happened before the macroop started execution and thus needs to be retranslated.
-   */
+  */
   const bool page_crossing = ((lowbits(uop.rip.rip, 12) + (uop.bytes - 1)) >> 12);
+  AddressSpace& asp = ctx.machine->address_space();
 
-  if unlikely (uop.som && (smc_isdirty(uop.rip.mfnlo) | (page_crossing && smc_isdirty(uop.rip.mfnhi)))) {
+  if unlikely (uop.som && (asp.isdirty(uop.rip.mfnlo) | (page_crossing && asp.isdirty(uop.rip.mfnhi)))) {
     /* If we're at the start of a macroop and the macroop has already been invalidated
      * aport execution immediately, to make effects visible
      */
@@ -1709,7 +1712,7 @@ int ReorderBufferEntry::commit() {
   // store to overwrite its own instruction bytes, but this update only
   // becomes visible after the store has committed.
   //
-  if unlikely (uop.eom && (smc_isdirty(uop.rip.mfnlo) | (page_crossing && smc_isdirty(uop.rip.mfnhi)))) {
+  if unlikely (uop.eom && (asp.isdirty(uop.rip.mfnlo) | (page_crossing && asp.isdirty(uop.rip.mfnhi)))) {
     if unlikely (config.event_log_enabled)
       core.eventlog.add_commit(EVENT_COMMIT_SMC_DETECTED, this);
     //
@@ -1859,9 +1862,9 @@ int ReorderBufferEntry::commit() {
     /* lsq->physaddr is the fully computed memory pointer not the
      * actual physical address like the name would make one think,
      * For SMC detection we need the physical address that has been passed
-     * along in the appropiate format for smc_setdirty
+     * along in the appropiate format for AddressSpace::setdirty
      */
-    smc_setdirty(lsq->smc_mfn);
+    asp.setdirty(lsq->smc_mfn);
 
     if (lsq->bytemask)
       assert(core.caches.commitstore(*lsq, thread.threadid) == 0);

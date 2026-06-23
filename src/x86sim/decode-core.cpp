@@ -10,6 +10,7 @@
 #include "ptlsim.h"
 #include "decode.h"
 #include "stats.h"
+#include "x86sim/addrspace.h"
 #include "x86sim/logging.h"
 
 
@@ -1469,21 +1470,21 @@ void TraceDecoder::split(bool after) {
   end_of_block = 1;
 }
 
-void print_invalid_insns(int op, const byte* ripstart, const byte* rip, int valid_byte_count,
+void print_invalid_insns(MachineImpl& machine, int op, const byte* ripstart, const byte* rip, int valid_byte_count,
                          const PageFaultErrorCode& pfec, Waddr faultaddr) {
   if (pfec) {
     logging::println(
         logging::INFO,
         "translate: page fault at iteration {}, {}, commits: ripstart {}, rip {}: required {} more bytes but "
         "only fetched {} bytes; page fault error code: {}",
-        iterations, total_user_insns_committed, (const void*)ripstart, (const void*)rip, (rip - ripstart),
+        machine.iterations, machine.total_user_insns_committed, (const void*)ripstart, (const void*)rip, (rip - ripstart),
         valid_byte_count, pfec);
     logging::flush();
   } else {
     logging::println(
         logging::INFO,
         "translate: invalid opcode at iteration {}: {} commits (at ripstart {}, rip {}); may be speculative",
-        iterations, total_user_insns_committed, (const void*)ripstart, (const void*)rip);
+        machine.iterations, machine.total_user_insns_committed, (const void*)ripstart, (const void*)rip);
     logging::flush();
 #if 0
     if (!config.dumpcode_filename.empty()) {
@@ -1571,7 +1572,7 @@ int BasicBlockCache::get_page_bb_count(Waddr mfn) {
 // This function is suitable for calling from a reclaim handler
 // when we run out of memory (it may will allocate any memory).
 //
-bool BasicBlockCache::invalidate_page(Waddr mfn, int reason) {
+bool BasicBlockCache::invalidate_page(AddressSpace& asp, Waddr mfn, int reason) {
   //
   // We may try to invalidate the special invalid mfn if SMC
   // occurs on a page where the high virtual page is invalid.
@@ -1583,9 +1584,9 @@ bool BasicBlockCache::invalidate_page(Waddr mfn, int reason) {
 
   if (log_code_page_ops)
     logging::println(logging::INFO, "Invalidate page mfn {}: pagelist {} has {} entries (dirty? {})", mfn,
-                     (void*)pagelist, (pagelist ? pagelist->count() : 0), smc_isdirty(mfn));
+                     (void*)pagelist, (pagelist ? pagelist->count() : 0), asp.isdirty(mfn));
 
-  smc_cleardirty(mfn);
+  asp.cleardirty(mfn);
 
   /* In the event that there are no basicblocks for this page,
    * i.e. we have no pagelist, then this is a successfull NOP
@@ -1636,8 +1637,7 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
   if (!count)
     return 0;
 
-  logging::println(logging::DEBUG, "Reclaiming cached basic blocks at {} cycles, {} commits:", sim_cycle,
-                   total_user_insns_committed);
+  logging::println(logging::DEBUG, "Reclaiming cached basic blocks:");
 
   stats.decoder.reclaim_rounds++;
 
@@ -1743,8 +1743,7 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
 // references are allowed.
 //
 void BasicBlockCache::flush() {
-  logging::println(logging::DEBUG, "Flushing basic block cache at {} cycles, {} commits:", sim_cycle,
-                   total_user_insns_committed);
+  logging::println(logging::DEBUG, "Flushing basic block cache:");
 
   stats.decoder.reclaim_rounds++;
 
@@ -1785,12 +1784,13 @@ void assist_exec_page_fault(Context& ctx) {
   Waddr faultaddr = ctx.commitarf[REG_ar1];
   PageFaultErrorCode pfec = ctx.commitarf[REG_ar2];
 
-  bool page_now_valid = asp_check_exec((byte*)faultaddr);
+  bool page_now_valid = ctx.machine->address_space().check((byte*)faultaddr, Protection::execute);
   if unlikely (page_now_valid) {
     logging::println(
         logging::WARNING,
         "Spurious PageFaultOnExec detected at fault rip {} with faultaddr {} @ {} user commits ({} cycles)",
-        (void*)(Waddr)ctx.commitarf[REG_selfrip], (void*)faultaddr, total_user_insns_committed, sim_cycle);
+        (void*)(Waddr)ctx.commitarf[REG_selfrip], (void*)faultaddr, ctx.machine_impl->total_user_insns_committed,
+        ctx.machine_impl->sim_cycle);
     bbcache.invalidate(RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx), INVALIDATE_REASON_SPURIOUS);
     ctx.commitarf[REG_rip] = ctx.commitarf[REG_selfrip];
     return;
@@ -1827,7 +1827,7 @@ bool TraceDecoder::invalidate() {
       return false;
     } else {
       outcome = (faultaddr == bb.rip.rip) ? DECODE_OUTCOME_ENTRY_PAGE_FAULT : DECODE_OUTCOME_OVERLAP_PAGE_FAULT;
-      print_invalid_insns(op, (const byte*)ripstart, (const byte*)rip, valid_byte_count, pfec, faultaddr);
+      print_invalid_insns(*machine, op, (const byte*)ripstart, (const byte*)rip, valid_byte_count, pfec, faultaddr);
       abs_code_addr_immediate(REG_ar1, 3, faultaddr);
       immediate(REG_ar2, 3, pfec);
       microcode_assist(ASSIST_EXEC_PAGE_FAULT, ripstart, faultaddr);
@@ -1839,7 +1839,7 @@ bool TraceDecoder::invalidate() {
 
     logging::println(logging::WARNING, "Invalid opcode at {}: split_invalid_basic_blocks {}, first_insn_in_bb? {}",
                      (void*)ripstart, split_invalid_basic_blocks, first_insn_in_bb());
-    print_invalid_insns(op, (const byte*)ripstart, (const byte*)rip, valid_byte_count, 0, faultaddr);
+    print_invalid_insns(*machine, op, (const byte*)ripstart, (const byte*)rip, valid_byte_count, 0, faultaddr);
 
     if likely (split_invalid_basic_blocks && (!first_insn_in_bb())) {
       //
@@ -1948,6 +1948,8 @@ bool TraceDecoder::memory_fence_if_locked(bool end_of_x86_insn, int type) {
 //
 
 int TraceDecoder::fillbuf(Context& ctx, byte* insnbytes, int insnbytes_bufsize) {
+  machine = ctx.machine_impl;
+  assert(machine);
   this->insnbytes = insnbytes;
   this->insnbytes_bufsize = insnbytes_bufsize;
   byteoffset = 0;
@@ -2125,22 +2127,24 @@ std::string format_flags(W64 flags) {
 // references to some of the basic blocks.
 //
 BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
+  AddressSpace& asp = ctx.machine->address_space();
+
   if unlikely ((rvp.rip == config.start_log_at_rip) && (rvp.rip != 0xffffffffffffffffULL)) {
     config.start_log_at_iteration = 0;
     logenable = 1;
   }
 
-  if unlikely (smc_isdirty(rvp.mfnlo)) {
+  if unlikely (asp.isdirty(rvp.mfnlo)) {
     if (log_code_page_ops)
       logging::println(logging::TRACE, "Pre-invalidate low mfn for {}", rvp);
-    if unlikely (!invalidate_page(rvp.mfnlo, INVALIDATE_REASON_DIRTY))
+    if unlikely (!invalidate_page(asp, rvp.mfnlo, INVALIDATE_REASON_DIRTY))
       return null;
   }
 
-  if unlikely (smc_isdirty(rvp.mfnhi)) {
+  if unlikely (asp.isdirty(rvp.mfnhi)) {
     if (log_code_page_ops)
       logging::println(logging::TRACE, "Pre-invalidate high mfn for {}", rvp);
-    if unlikely (!invalidate_page(rvp.mfnhi, INVALIDATE_REASON_DIRTY))
+    if unlikely (!invalidate_page(asp, rvp.mfnhi, INVALIDATE_REASON_DIRTY))
       return null;
   }
 
@@ -2155,7 +2159,7 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
 
   if (log_code_page_ops) {
     logging::println(logging::INFO, "Translating {} ({} bytes valid) at {} cycles, {} commits", rvp,
-                     trans.valid_byte_count, sim_cycle, total_user_insns_committed);
+                     trans.valid_byte_count, ctx.machine_impl->sim_cycle, ctx.machine_impl->total_user_insns_committed);
   }
 
   if (rvp.mfnlo == RIPVirtPhys::INVALID) {
@@ -2186,7 +2190,7 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
 
   BasicBlockChunkList* pagelist;
 
-  smc_cleardirty(bb->rip.mfnlo);
+  asp.cleardirty(bb->rip.mfnlo);
   pagelist = bbpages.get(bb->rip.mfnlo);
   if (!pagelist) {
     pagelist = new BasicBlockChunkList(bb->rip.mfnlo);
@@ -2212,7 +2216,7 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
   int page_crossing = ((lowbits(bb->rip, 12) + (bb->bytes - 1)) >> 12);
 
   if (page_crossing) {
-    smc_cleardirty(bb->rip.mfnhi);
+    asp.cleardirty(bb->rip.mfnhi);
     BasicBlockChunkList* pagelisthi = bbpages.get(bb->rip.mfnhi);
     if (!pagelisthi) {
       pagelisthi = new BasicBlockChunkList(bb->rip.mfnhi);
@@ -2269,7 +2273,7 @@ void BasicBlockCache::translate_in_place(BasicBlock& targetbb, Context& ctx, Wad
 
   if (log_code_page_ops) {
     logging::println(logging::INFO, "Translating {} ({} bytes valid) at {} cycles, {} commits", W64(rvp),
-                     trans.valid_byte_count, sim_cycle, total_user_insns_committed);
+                     trans.valid_byte_count, ctx.machine_impl->sim_cycle, ctx.machine_impl->total_user_insns_committed);
   }
 
   for (;;) {
@@ -2305,7 +2309,7 @@ BasicBlock* BasicBlockCache::translate_and_clone(Context& ctx, Waddr rip) {
 
   if (log_code_page_ops) {
     logging::println(logging::INFO, "Translating {} ({} bytes valid) at {} cycles, {} commits", W64(rvp),
-                     trans.valid_byte_count, sim_cycle, total_user_insns_committed);
+                     trans.valid_byte_count, ctx.machine_impl->sim_cycle, ctx.machine_impl->total_user_insns_committed);
   }
 
   for (;;) {
@@ -2329,8 +2333,6 @@ auto std::formatter<x86sim::BasicBlockCache>::format(x86sim::BasicBlockCache& bb
 
   for (const auto* ptr : bblist) {
     const x86sim::BasicBlock& bb = *ptr;
-    double percent_of_total_uops = ((double)(bb.hitcount * bb.tagcount) / (double)total_uops_committed);
-    double percent_of_total_bbs = ((double)(bb.hitcount) / (double)total_basic_blocks_committed);
 
     out = std::format_to(out,
                          "  {}: {:>4}t {:>3}ld {:>3}st {:>3}u {:>10}h {:>10}pr {:>10}uu : taken 0x{:012x}, seq {:012x}",

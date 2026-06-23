@@ -82,7 +82,7 @@
 namespace x86sim {
 
 class Machine;
-struct MachineImp;
+struct MachineImpl;
 
 //
 // Exceptions:
@@ -166,7 +166,7 @@ struct RIPVirtPhys : public RIPVirtPhysBase {
 struct SFR {
   W64 data;
   W64 addrvalid : 1, invalid : 1, datavalid : 1, physaddr : 45, bytemask : 8, tag : 8;
-  W64 smc_mfn; /* hack to pass along the address for smc_setdirty */
+  W64 smc_mfn; /* hack to pass along the address for AddressSpace::setdirty */
 };
 
 struct IssueState {
@@ -617,6 +617,9 @@ typedef W64 Level1PTE;
 // hold their internal state.
 //
 struct ContextBase {
+  Machine* machine = nullptr;
+  MachineImpl* machine_impl = nullptr;
+
   W64 commitarf[64];
   int vcpuid;
   SegmentDescriptorCache seg[SEGID_COUNT];
@@ -653,6 +656,11 @@ struct ContextBase {
 // Round up to a full page:
 struct Context : public ContextBase {
   byte padding[PAGE_SIZE - sizeof(ContextBase)];
+
+  [[nodiscard]] RegisterRef operator[](Register reg) noexcept;
+  [[nodiscard]] word_t operator[](Register reg) const noexcept;
+  [[nodiscard]] XmmRegisterRef operator[](XmmRegister reg) noexcept;
+  [[nodiscard]] XmmValue operator[](XmmRegister reg) const noexcept;
 
   void propagate_x86_exception(byte exception, W32 errorcode = 0, Waddr virtaddr = 0);
 

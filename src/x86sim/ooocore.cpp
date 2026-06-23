@@ -1662,7 +1662,7 @@ std::string_view OutOfOrderMachine::name() const {
 
 OutOfOrderMachine::~OutOfOrderMachine() = default;
 
-OutOfOrderMachine::OutOfOrderMachine(Context& context, const PTLsimConfig& config) : MachineImp(context, config) {
+OutOfOrderMachine::OutOfOrderMachine(const PTLsimConfig& config) : MachineImpl(config) {
   // Note: we only create a single core for all contexts for now.
   cores[0] = std::make_unique<OutOfOrderCore>(0, *this);
 
@@ -1723,8 +1723,6 @@ int OutOfOrderMachine::run() {
       }
       logenable = 1;
     }
-
-    inject_events();
 
     OutOfOrderCore& core = *cores[0]; // only one core for now
     int running_thread_count = 0;

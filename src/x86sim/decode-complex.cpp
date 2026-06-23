@@ -58,7 +58,7 @@ void assist_cpuid(Context& ctx) {
 void assist_rdtsc(Context& ctx) {
   W64& rax = ctx.commitarf[REG_rax];
   W64& rdx = ctx.commitarf[REG_rdx];
-  W64 tsc = ctx.core->sim_cycle;
+  W64 tsc = ctx.machine_impl->sim_cycle;
   rax = LO32(tsc);
   rdx = HI32(tsc);
 
@@ -1930,8 +1930,8 @@ bool TraceDecoder::decode_complex() {
   case 0x131: {
     // rdtsc: put result into %edx:%eax
     EndOfDecode();
-    assert(core);
-    TransOp ldp1(OP_ld, REG_rdx, REG_zero, REG_imm, REG_zero, 3, (Waddr)&core->sim_cycle);
+    assert(machine);
+    TransOp ldp1(OP_ld, REG_rdx, REG_zero, REG_imm, REG_zero, 3, (Waddr)&machine->sim_cycle);
     ldp1.internal = 1;
     put(ldp1);
     put(TransOp(OP_mov, REG_rax, REG_zero, REG_rdx, REG_zero, 2));

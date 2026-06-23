@@ -7,11 +7,11 @@
 
 #include "ptlsim.h"
 #include "config.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
-namespace logging = vcore::logging;
+namespace logging = x86sim::logging;
 
-ConfigurationParser<vcore::PTLsimConfig> configparser;
+ConfigurationParser<x86sim::PTLsimConfig> configparser;
 
 std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr) const {
   std::string result = "Options are:\n";
@@ -25,7 +25,7 @@ std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr)
 
   option = options;
   while (option) {
-    void* variable = (baseptr) ? ((void*)((vcore::Waddr)baseptr + option->offset)) : nullptr;
+    void* variable = (baseptr) ? ((void*)((x86sim::Waddr)baseptr + option->offset)) : nullptr;
     if (option->type == OPTION_TYPE_SECTION) {
       result += std::format("{}:\n", option->description);
       option = option->next;
@@ -38,7 +38,7 @@ std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr)
     case OPTION_TYPE_NONE:
       break;
     case OPTION_TYPE_W64: {
-      vcore::W64 v = *((vcore::W64*)(variable));
+      x86sim::W64 v = *((x86sim::W64*)(variable));
       if (v == infinity)
         result += "inf";
       else
@@ -83,9 +83,9 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
           option = option->next;
           continue;
         }
-        if (vcore::strequal(name, option->name)) {
+        if (x86sim::strequal(name, option->name)) {
           found = true;
-          void* variable = (void*)((vcore::Waddr)baseptr + option->offset);
+          void* variable = (void*)((x86sim::Waddr)baseptr + option->offset);
           if ((option->type != OPTION_TYPE_NONE) && (option->type != OPTION_TYPE_BOOL) && (i == (argc + 1))) {
             logging::eprintln("Warning: missing value for option '{}'", argv[i - 1]);
             break;
@@ -105,7 +105,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             strncpy(buf, p, sizeof(buf));
             p = buf;
 
-            vcore::W64 multiplier = 1;
+            x86sim::W64 multiplier = 1;
             char* endp = p;
             bool isinf = (strncmp(p, "inf", 3) == 0);
             if (len > 1) {
@@ -133,12 +133,12 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
                 break;
               }
             }
-            vcore::W64 v = (isinf) ? infinity : strtoull(p, &endp, 0);
+            x86sim::W64 v = (isinf) ? infinity : strtoull(p, &endp, 0);
             if ((!isinf) && (endp[0] != 0)) {
               logging::eprintln("Warning: invalid value '{}' for option {}; ignoring", p, argv[i - 1]);
             }
             v *= multiplier;
-            *((vcore::W64*)variable) = v;
+            *((x86sim::W64*)variable) = v;
             i++;
 
             break;
@@ -172,7 +172,7 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
       }
       if (!found) {
         logging::eprintln("Warning: invalid option '{}'",
-                          (vcore::inrange(i - 1, 0, argc - 1) ? argv[i - 1] : "<missing>"));
+                          (x86sim::inrange(i - 1, 0, argc - 1) ? argv[i - 1] : "<missing>"));
         i++;
       }
     } else {
@@ -189,7 +189,7 @@ std::string ConfigurationParserBase::format_to_string_config(const void* baseptr
 
   ConfigurationOption* option = options;
   while (option) {
-    void* variable = (baseptr) ? ((void*)((vcore::Waddr)baseptr + option->offset)) : nullptr;
+    void* variable = (baseptr) ? ((void*)((x86sim::Waddr)baseptr + option->offset)) : nullptr;
 
     if (option->type == OPTION_TYPE_SECTION) {
       option = option->next;
@@ -201,7 +201,7 @@ std::string ConfigurationParserBase::format_to_string_config(const void* baseptr
     case OPTION_TYPE_SECTION:
       break;
     case OPTION_TYPE_W64: {
-      vcore::W64 v = *((vcore::W64*)(variable));
+      x86sim::W64 v = *((x86sim::W64*)(variable));
       if (v == 0) {
         result += "0";
       } else if (v == infinity) {
@@ -238,7 +238,7 @@ std::string ConfigurationParserBase::format_to_string_config(const void* baseptr
 
 
 template<>
-void ConfigurationParser<vcore::PTLsimConfig>::setup() {
+void ConfigurationParser<x86sim::PTLsimConfig>::setup() {
   section("Simulation Control");
 
   add(core_name, "core", "Run using specified core (-core <corename>)");
@@ -291,5 +291,5 @@ void print_usage(int argc, char** argv) {
   logging::eprintln("Syntax: ptlsim <executable> <arguments...>");
   logging::eprintln("All other options come from file /home/<username>/.ptlsim/path/to/executable");
   logging::eprintln("");
-  logging::eprint("{}", configparser.options.format_to_string_usage(&vcore::config));
+  logging::eprint("{}", configparser.options.format_to_string_usage(&x86sim::config));
 }

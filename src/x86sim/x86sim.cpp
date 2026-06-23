@@ -1,11 +1,12 @@
 #include "x86sim/x86sim.hpp"
 
-#include "addrspace.h"
+#include "x86sim/addrspace.h"
 #include "ooocore.h"
 #include "ptlhwdef.h"
 #include "ptlsim.h"
 #include "ptlsim-api.h"
 #include "seqcore.h"
+#include "stats.h"
 #include "x86sim/logging.h"
 
 #include <algorithm>

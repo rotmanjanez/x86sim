@@ -229,7 +229,7 @@ enum {
 };
 
 struct TraceDecoder {
-  MachineImp* machine;
+  MachineImpl* machine;
   BasicBlock bb;
   TransOp transbuf[MAX_TRANSOPS_PER_USER_INSN];
   int transbufcount;
@@ -618,7 +618,7 @@ struct BasicBlockCache : public SelfHashtable<RIPVirtPhys, BasicBlock, BB_CACHE_
   BasicBlock* translate_and_clone(Context& ctx, Waddr rip);
   bool invalidate(const RIPVirtPhys& rvp, int reason);
   bool invalidate(BasicBlock* bb, int reason);
-  bool invalidate_page(Waddr mfn, int reason);
+  bool invalidate_page(AddressSpace& asp, Waddr mfn, int reason);
   int get_page_bb_count(Waddr mfn);
   int reclaim(size_t reqbytes = 0, int urgency = 0);
   void flush();

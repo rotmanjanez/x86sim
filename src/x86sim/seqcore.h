@@ -17,7 +17,7 @@ namespace x86sim {
 
 struct SequentialCore;
 
-struct SequentialMachine : public MachineImp {
+struct SequentialMachine : public MachineImpl {
   std::unique_ptr<SequentialCore> cores[MAX_CONTEXTS];
 
   explicit SequentialMachine(Context& context, const PTLsimConfig& config);

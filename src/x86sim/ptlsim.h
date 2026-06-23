@@ -67,7 +67,7 @@ static const int MAX_TRANSOP_BUFFER_SIZE = 4;
 struct PTLsimConfig;
 struct PTLsimStats;
 
-struct MachineImp {
+struct MachineImpl {
   W64 sim_cycle = 0;
   W64 unhalted_cycle_count = 0;
   W64 iterations = 0;
@@ -76,8 +76,8 @@ struct MachineImp {
   W64 total_user_insns_committed = 0;
   W64 total_basic_blocks_committed = 0;
 
-  explicit MachineImp(const PTLsimConfig&) {}
-  virtual ~MachineImp() = default;
+  explicit MachineImpl(const PTLsimConfig&) {}
+  virtual ~MachineImpl() = default;
   virtual std::string_view name() const { return "unkown"; }
   virtual int run();
   virtual void update_stats(PTLsimStats& stats) { return; }
@@ -122,7 +122,6 @@ void split_unaligned(const TransOp& transop, TransOpBuffer& buf);
 void backup_and_reopen_logfile();
 void shutdown_subsystems();
 
-int inject_events();
 void update_progress();
 
 struct PTLsimBanner {

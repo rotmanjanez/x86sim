@@ -48,10 +48,10 @@ struct OutOfOrderCore;
 
 #define MAX_SMT_CORES 1
 
-struct OutOfOrderMachine : public MachineImp {
+struct OutOfOrderMachine : public MachineImpl {
   std::unique_ptr<OutOfOrderCore> cores[MAX_SMT_CORES];
   std::bitset<MAX_CONTEXTS> stopped;
-  explicit OutOfOrderMachine(Context& context, const PTLsimConfig& config);
+  explicit OutOfOrderMachine(const PTLsimConfig& config);
   ~OutOfOrderMachine() override;
   std::string_view name() const override;
   int run() override;
@@ -1288,7 +1288,7 @@ struct EventLog {
   OutOfOrderCoreEvent* end;
   OutOfOrderCoreEvent* tail;
 
-  explicit EventLog(MachineImp& machine_) : core(core_) {
+  explicit EventLog(MachineImpl& machine_) : machine(machine_) {
     start = null;
     end = null;
     tail = null;
@@ -1303,7 +1303,7 @@ struct EventLog {
       flush();
     }
     OutOfOrderCoreEvent* event = tail;
-    event->cycle = core.sim_cycle;
+    event->cycle = machine.sim_cycle;
     tail++;
     return event;
   }

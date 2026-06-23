@@ -14,6 +14,7 @@
 #include "dcache.h"
 #include "stats.h"
 #include "ptlhwdef.h"
+#include "x86sim/addrspace.h"
 #include "x86sim/logging.h"
 
 namespace x86sim {
@@ -472,14 +473,16 @@ struct std::formatter<x86sim::SequentialCoreEvent> {
 namespace x86sim {
 
 struct SequentialCoreEventLog {
-  MachineImp* machine = nullptr;
+  MachineImpl* machine = nullptr;
   SequentialCoreEvent* start;
-  SequentialCoreEvent* end;
-  SequentialCoreEvent* tail;
+	SequentialCoreEvent* end;
+	SequentialCoreEvent* tail;
 
-  explicit SequentialCoreEventLog(MachineImp& machine_): machine(&machine_) {
-    start = null;
-    end = null;
+  SequentialCoreEventLog() = default;
+
+	explicit SequentialCoreEventLog(MachineImpl& machine_): machine(&machine_) {
+		start = null;
+		end = null;
     tail = null;
   }
 
@@ -502,11 +505,11 @@ struct SequentialCoreEventLog {
   void clear() { tail = start; }
 
   SequentialCoreEvent* add(int type, int coreid, const TransOp& uop, W64 rip, int uopid, W64 uuid, W64 eomid) {
-    assert(core);
+    assert(machine);
 
     SequentialCoreEvent* event = add();
     event->type = type;
-    event->cycle = core->sim_cycle;
+    event->cycle = machine->sim_cycle;
     event->uuid = uuid;
     event->rip = rip;
     event->eomid = eomid;
@@ -1201,11 +1204,12 @@ struct SequentialCore {
       // store to overwrite its own instruction bytes, but this update only
       // becomes visible after the store has committed.
       //
-      if unlikely (smc_isdirty(rvp.mfnlo) | (smc_isdirty(rvp.mfnhi))) {
+      AddressSpace& asp = ctx.machine->address_space();
+      if unlikely (asp.isdirty(rvp.mfnlo) | (asp.isdirty(rvp.mfnhi))) {
         logging::println("Self-modifying code at rip {} detected: mfn was dirty (invalidate and retry)", rvp);
-        bbcache.invalidate_page(rvp.mfnlo, INVALIDATE_REASON_SMC);
+        bbcache.invalidate_page(asp, rvp.mfnlo, INVALIDATE_REASON_SMC);
         if (rvp.mfnlo != rvp.mfnhi)
-          bbcache.invalidate_page(rvp.mfnhi, INVALIDATE_REASON_SMC);
+          bbcache.invalidate_page(asp, rvp.mfnhi, INVALIDATE_REASON_SMC);
         return SEQEXEC_SMC;
       }
 
@@ -1365,7 +1369,7 @@ struct SequentialCore {
           }
 
           /* see ooopipe.cpp for a short comment why we can't use sfr->physaddr */
-          smc_setdirty(sfr.smc_mfn);
+          asp.setdirty(sfr.smc_mfn);
         }
       } else if likely (uop.rd != REG_zero) {
         arf[uop.rd] = state.reg.rddata;
@@ -1493,7 +1497,7 @@ std::string_view SequentialMachine::name() const {
 
 SequentialMachine::~SequentialMachine() = default;
 
-SequentialMachine::SequentialMachine(Context& context, const PTLsimConfig& config) : MachineImp(context, config) {
+SequentialMachine::SequentialMachine(Context& context, const PTLsimConfig& config) : MachineImpl(context, config) {
   foreach (i, contextcount) {
     cores[i] = std::make_unique<SequentialCore>(*this, this->context);
     //
@@ -1508,8 +1512,10 @@ SequentialMachine::SequentialMachine(Context& context, const PTLsimConfig& confi
 
 
 int SequentialMachine::run() {
-    logging::println("Starting sequential core toplevel loop at {} cycles and {} commits", machine.sim_cycle,
-                     machine.total_user_insns_committed);
+    eventlog.machine = this;
+
+    logging::println("Starting sequential core toplevel loop at {} cycles and {} commits", sim_cycle,
+                     total_user_insns_committed);
     logging::flush();
 
     if unlikely (config.event_log_enabled && (!eventlog.start)) {
@@ -1531,10 +1537,8 @@ int SequentialMachine::run() {
     logging::println(logging::INFO, "Current logenable = {}, start_log_at_iteration = {}, loglevel {}", logenable, config.start_log_at_iteration, config.loglevel);
 
     for (;;) {
-      if unlikely (machine.iterations >= config.start_log_at_iteration)
+      if unlikely (iterations >= config.start_log_at_iteration)
         logenable = 1;
-
-      inject_events();
 
       int running_thread_count = 0;
       foreach (i, contextcount) {
@@ -1544,16 +1548,16 @@ int SequentialMachine::run() {
         exiting |= core.execute();
       }
 
-      exiting |= machine.iterations >= config.stop_at_iteration ||
-                 machine.total_user_insns_committed >= config.stop_at_user_insns;
+      exiting |= iterations >= config.stop_at_iteration ||
+                 total_user_insns_committed >= config.stop_at_user_insns;
 
       if unlikely (config.event_log_enabled) {
         if unlikely (config.flush_event_log_every_cycle)
           eventlog.flush(true);
       }
 
-      machine.iterations++;
-      machine.sim_cycle++;
+      iterations++;
+      sim_cycle++;
       unhalted_cycle_count += (running_thread_count > 0);
       stats.summary.cycles++;
 
@@ -1562,7 +1566,7 @@ int SequentialMachine::run() {
     }
 
     logging::println(logging::INFO, "Exiting sequential mode at {} commits, {} uops and {} iterations (cycles)",
-                     machine.total_user_insns_committed, machine.total_uops_committed, machine.iterations);
+                     total_user_insns_committed, total_uops_committed, iterations);
     // logging::println(logging::TRACE, "{}", *this);
 
     foreach (i, contextcount) {
