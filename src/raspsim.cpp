@@ -48,7 +48,7 @@ extern "C" void assert_fail(const char* __assertion, const char* __file, unsigne
 
   logging::flush();
 
-  sys_exit(1);
+  std::exit(1);
 }
 
 // Saved and restored by asm code:
@@ -71,7 +71,7 @@ void Raspsim::propagate_x86_exception(byte exception, W32 errorcode, Waddr virta
 
   logging::eprintln("End state:");
   logging::eprintln("{}", ctx);
-  sys_exit(1);
+  std::exit(1);
 }
 
 //
@@ -286,7 +286,7 @@ int main(int argc, char** argv) {
   }
   if (parse_err) {
     logging::eprintln("Error: could not parse all arguments");
-    sys_exit(1);
+    std::exit(1);
   }
 
   logging::println("\n=== Switching to simulation mode at rip {} ===\n", (void*)(Waddr)sim.getRegisterValue(REG_rip));
@@ -321,5 +321,5 @@ int main(int argc, char** argv) {
 
   Raspsim::stutdown();
 
-  sys_exit(0);
+  std::exit(0);
 }
