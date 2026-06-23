@@ -4,29 +4,35 @@
 //
 // Copyright 2020-2020 Alexis Engelke <engelke@in.tum.de>
 //
+#include "x86sim-support/defaults.hpp"
+#include "x86sim/x86sim.hpp"
+#include "x86sim/logging.h"
+
+#include "ptlsim.h"
+#include "config.h"
+
 #include <charconv>
-#include <vector>
-#include <ranges>
-#include <string_view>
-#include <span>
-
+#include <cstddef>
 #include <fstream>
-#include <sstream>
+#include <optional>
+#include <ranges>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
-#include "raspsim/globals.h"
-#include "raspsim/logging.h"
+extern ConfigurationParser<x86sim::Options> configparser;
 
+namespace {
 
-#include "raspsim/ptlsim.h"
-#include "raspsim/ptlsim-api.h"
-#include "raspsim/ptlhwdef.h"
-#include "raspsim/config.h"
-#include "raspsim/stats.h"
-#include "raspsim/raspsim-hwsetup.h"
+namespace logging = x86sim::logging;
 
-static void print_hex_bytes(std::span<const byte> bytes, size_t splitat = 16) {
+using std::operator""sv;
+
+void print_hex_bytes(std::span<const std::byte> bytes, size_t splitat = 16) {
   for (size_t i = 0; i < bytes.size(); i++) {
-    logging::eprint("{:02x}", static_cast<unsigned>(bytes[i]));
+    logging::eprint("{:02x}", std::to_integer<unsigned>(bytes[i]));
     if (((i % splitat) == (splitat - 1)) && (i != bytes.size() - 1))
       logging::eprint("\n");
     else if (i != bytes.size() - 1)
@@ -35,104 +41,83 @@ static void print_hex_bytes(std::span<const byte> bytes, size_t splitat = 16) {
   logging::eprintln("");
 }
 
-struct PTLsimConfig;
-extern PTLsimConfig config;
-
-extern ConfigurationParser<PTLsimConfig> configparser;
-
-
-extern "C" void assert_fail(const char* __assertion, const char* __file, unsigned int __line, const char* __function) {
-  logging::println(logging::ERROR, "Assert {} failed in {}:{} ({}) at {} cycles, {} iterations, {} user commits\n",
-                   __assertion, __file, __line, __function, sim_cycle, iterations, total_user_insns_committed);
-
-  logging::flush();
-
-  std::exit(1);
+[[nodiscard]] std::optional<x86sim::word_t> parse_hex(std::string_view str) {
+  x86sim::word_t value;
+  if (str.starts_with("0x"))
+    str = str.substr(2);
+  auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), value, 16);
+  if (ec == std::errc())
+    return value;
+  return std::nullopt;
 }
 
-// Saved and restored by asm code:
-FXSAVEStruct x87state;
-W16 saved_cs;
-W16 saved_ss;
-W16 saved_ds;
-W16 saved_es;
-W16 saved_fs;
-W16 saved_gs;
+[[nodiscard]] std::optional<x86sim::Register> register_from_name(std::string_view name) {
+  using enum x86sim::Register;
+  static constexpr std::pair<std::string_view, x86sim::Register> names[] = {
+      {"rax", rax}, {"rcx", rcx}, {"rdx", rdx}, {"rbx", rbx}, {"rsp", rsp}, {"rbp", rbp}, {"rsi", rsi}, {"rdi", rdi},
+      {"r8", r8},   {"r9", r9},   {"r10", r10}, {"r11", r11}, {"r12", r12}, {"r13", r13}, {"r14", r14}, {"r15", r15},
+      {"rip", rip}, {"flags", flags},
+  };
 
-void Raspsim::propagate_x86_exception(byte exception, W32 errorcode, Waddr virtaddr) {
-  Context& ctx{Raspsim::getContext()};
-
-  const char* msg = Raspsim::formatException(exception, errorcode, virtaddr);
-  logging::println("{}", msg);
-  logging::flush();
-  logging::eprintln("{}", msg);
-  free((void*)msg);
-
-  logging::eprintln("End state:");
-  logging::eprintln("{}", ctx);
-  std::exit(1);
+  for (auto [reg_name, reg] : names) {
+    if (name == reg_name)
+      return reg;
+  }
+  return std::nullopt;
 }
 
-//
-// SYSCALL instruction from x86-64 mode
-//
-void Raspsim::handle_syscall_64bit() {
-  bool DEBUG = 1; //analyze_in_detail();
-  //
-  // Handle an x86-64 syscall:
-  // (This is called from the assist_syscall ucode assist)
-  //
-  Context& ctx{Raspsim::getContext()};
-
-  size_t syscallid = ctx.commitarf[REG_rax];
-  W64 arg1 = ctx.commitarf[REG_rdi];
-  W64 arg2 = ctx.commitarf[REG_rsi];
-  W64 arg3 = ctx.commitarf[REG_rdx];
-  W64 arg4 = ctx.commitarf[REG_r10];
-  W64 arg5 = ctx.commitarf[REG_r8];
-  W64 arg6 = ctx.commitarf[REG_r9];
-
-
-  logging::println(logging::DEBUG, "handle_syscall -> (#{} {}) from {} args  ({}, {}, {}, {}, {}, {}) at iteration {}",
-                   syscallid, ((syscallid < lengthofSyscallNames()) ? syscall_names_64bit[syscallid] : "???"),
-                   (void*)ctx.commitarf[REG_rcx], (void*)arg1, (void*)arg2, (void*)arg3, (void*)arg4, (void*)arg5,
-                   (void*)arg6, iterations);
-
-  ctx.commitarf[REG_rax] = -ENOSYS;
-  ctx.commitarf[REG_rip] = ctx.commitarf[REG_rcx];
-
-  logging::println(logging::DEBUG, "handle_syscall: result {} ({}); returning to {}", ctx.commitarf[REG_rax],
-                   (void*)ctx.commitarf[REG_rax], (void*)ctx.commitarf[REG_rip]);
-  logging::flush();
-}
-
-void Raspsim::handle_syscall_32bit(int semantics) {
-  Context& ctx{Raspsim::getContext()};
-
-  bool DEBUG = 1; //analyze_in_detail();
-  //
-  // Handle a 32-bit syscall:
-  // (This is called from the assist_syscall ucode assist)
-  //
-  if (semantics == SYSCALL_SEMANTICS_INT80) {
-    // Our exit operation.
-    requested_switch_to_native = 1;
+[[nodiscard]] std::optional<std::pair<x86sim::XmmRegister, bool>> xmm_half_from_name(std::string_view name) {
+  bool high = false;
+  if (name.starts_with("xmml"))
+    name = name.substr(4);
+  else if (name.starts_with("xmmh")) {
+    high = true;
+    name = name.substr(4);
   } else {
-    // But don't clobber RAX when we want out guest to quit.
-    ctx.commitarf[REG_rax] = -ENOSYS;
+    return std::nullopt;
   }
 
-  ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
+  unsigned value = 0;
+  auto [ptr, ec] = std::from_chars(name.data(), name.data() + name.size(), value, 10);
+  if (ec != std::errc() || ptr != name.data() + name.size() || value > 15)
+    return std::nullopt;
+
+  const auto reg = static_cast<x86sim::XmmRegister>(static_cast<int>(x86sim::XmmRegister::xmm0) + value * 2);
+  return std::pair{reg, high};
 }
 
-CpuidResult Raspsim::handle_cpuid(W32 func, W32 subfunc) {
-  return default_cpuid(func, subfunc, Raspsim::getContext().vcpuid);
+[[nodiscard]] std::optional<x86sim::Protection> protection_from_string(std::string_view prot) {
+  using enum x86sim::Protection;
+  if (prot == "ro")
+    return read;
+  if (prot == "rw")
+    return read | write;
+  if (prot == "rx")
+    return read | execute;
+  if (prot == "rwx")
+    return read | write | execute;
+  return std::nullopt;
 }
 
+[[nodiscard]] std::optional<std::vector<std::byte>> parse_hex_bytes(std::string_view hex) {
+  if ((hex.size() & 1) != 0)
+    return std::nullopt;
 
-bool handle_config_arg(Raspsim& sim, const std::string_view line, std::vector<Waddr>& dump_pages) {
-  using std::operator""sv;
+  std::vector<std::byte> bytes(hex.size() / 2);
+  for (size_t i = 0; i < bytes.size(); ++i) {
+    unsigned value = 0;
+    auto byte = hex.substr(i * 2, 2);
+    auto [ptr, ec] = std::from_chars(byte.data(), byte.data() + byte.size(), value, 16);
+    if (ec != std::errc())
+      return std::nullopt;
+    bytes[i] = static_cast<std::byte>(value);
+  }
 
+  return bytes;
+}
+
+bool handle_config_arg(x86sim::Machine* machine, x86sim::RegisterFile* registers, x86sim::Options& options,
+                       std::string_view line, std::vector<x86sim::address_t>* dump_pages) {
   if (line.empty())
     return false;
 
@@ -142,131 +127,108 @@ bool handle_config_arg(Raspsim& sim, const std::string_view line, std::vector<Wa
     if (!sv.empty())
       toks.push_back(sv);
   }
-  if (toks.empty())
+  if (toks.empty() || toks[0][0] == '#')
     return false;
 
-  if (toks[0][0] == '#') {
+  if (toks[0] == "Fnox87") {
+    options.x87 = false;
+  } else if (toks[0] == "Fnosse") {
+    options.sse = false;
+  } else if (toks[0] == "Fnocache") {
+    options.perfect_cache = true;
+  } else if (toks[0] == "Fstbrpred") {
+    options.static_branchpred = true;
+  } else if (machine == nullptr || registers == nullptr) {
     return false;
-  }
-
-  auto parse_hex = [](std::string_view str) -> std::optional<W64> {
-    W64 v;
-    if (str.starts_with("0x"))
-      str = str.substr(2);
-    auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), v, 16);
-    if (ec == std::errc())
-      return v;
-    return std::nullopt;
-  };
-
-  if (toks[0][0] == 'M') { // allocate page M<addr> <prot>
+  } else if (toks[0][0] == 'M') {
     if (toks.size() != 2) {
       logging::eprintln("Error: option {} has wrong number of arguments", line);
       return true;
     }
-    auto addrOpt = parse_hex(toks[0].substr(1));
-    if (!addrOpt || lowbits(*addrOpt, 12)) {
+    auto addr = parse_hex(toks[0].substr(1));
+    auto prot = protection_from_string(toks[1]);
+    if (!addr || (*addr & (x86sim::Machine::kPageSize - 1)) != 0) {
       logging::eprintln("Error: invalid value {}", toks[0]);
       return true;
     }
-    int prot = 0;
-    if (toks[1] == "ro")
-      prot = PROT_READ;
-    else if (toks[1] == "rw")
-      prot = PROT_READ | PROT_WRITE;
-    else if (toks[1] == "rx")
-      prot = PROT_READ | PROT_EXEC;
-    else if (toks[1] == "rwx")
-      prot = PROT_READ | PROT_WRITE | PROT_EXEC;
-    else {
+    if (!prot) {
       logging::eprintln("Error: invalid mem prot {}", toks[1]);
       return true;
     }
-    sim.map(*addrOpt, Raspsim::getPageSize(), prot);
-  } else if (toks[0][0] == 'W') { // write to mem W<addr> <hexbytes>, may not cross page boundaries
+    if (auto result = machine->map(*addr, x86sim::Machine::kPageSize, *prot); !result) {
+      logging::eprintln("Error: {}", result.error());
+      return true;
+    }
+  } else if (toks[0][0] == 'W') {
     if (toks.size() != 2) {
       logging::eprintln("Error: option {} has wrong number of arguments", line);
       return true;
     }
-    auto addrOpt = parse_hex(toks[0].substr(1));
-    if (!addrOpt) {
+    auto addr = parse_hex(toks[0].substr(1));
+    auto bytes = parse_hex_bytes(toks[1]);
+    if (!addr) {
       logging::eprintln("Error: invalid value {}", toks[0]);
       return true;
     }
-    byte* mapped = sim.getMappedPage(*addrOpt);
-    if (!mapped) {
-      logging::eprintln("Error: page not mapped {}", (void*)*addrOpt);
+    if (!bytes || bytes->size() > x86sim::Machine::kPageSize - (*addr & (x86sim::Machine::kPageSize - 1))) {
+      logging::eprintln("Error: arg has odd size or crosses page boundary {}", (void*)*addr);
       return true;
     }
-    Waddr addr = *addrOpt;
-    Waddr arglen = toks[1].length();
-    if ((arglen & 1) || arglen / 2 > 4096 - lowbits(addr, 12)) {
-      logging::eprintln("Error: arg has odd size or crosses page boundary {}", (void*)addr);
+    if (auto result = machine->write_memory(*addr, std::as_bytes(std::span(*bytes))); !result) {
+      logging::eprintln("Error: {}", result.error());
       return true;
     }
-    unsigned n = std::min((Waddr)(4096 - lowbits(addr, 12)), arglen / 2);
-    foreach (i, n) {
-      char hex_byte[3] = {toks[1][i * 2], toks[1][i * 2 + 1], 0};
-      mapped[i] = strtoul(hex_byte, NULL, 16);
-    }
-  } else if (toks[0][0] == 'D') { // dump page D<page>
+  } else if (toks[0][0] == 'D') {
     if (toks.size() != 1) {
       logging::eprintln("Error: option {} has wrong number of arguments", line);
       return true;
     }
-    auto addrOpt = parse_hex(toks[0].substr(1));
-    if (!addrOpt) {
+    auto addr = parse_hex(toks[0].substr(1));
+    if (!addr) {
       logging::eprintln("Error: invalid value {}", toks[0]);
       return true;
     }
-    dump_pages.push_back(floor(*addrOpt, PAGE_SIZE));
-  } else if (toks[0] == "Fnox87") {
-    sim.disableX87();
-  } else if (toks[0] == "Fnosse") {
-    sim.disableSSE();
-  } else if (toks[0] == "Fnocache") {
-    sim.enablePerfectCache();
-  } else if (toks[0] == "Fstbrpred") {
-    sim.enableStaticBranchPrediction();
+    dump_pages->push_back(*addr & ~(x86sim::Machine::kPageSize - 1));
   } else {
     if (toks.size() != 2) {
       logging::eprintln("Error: option {} has wrong number of arguments", line);
       return true;
     }
-    std::string reg_str(toks[0]);
-    int reg = sim.getRegisterIndex(reg_str.c_str());
-    if (reg < 0) {
-      logging::eprintln("Error: invalid register {}", toks[0]);
-      return true;
-    }
-    auto valOpt = parse_hex(toks[1]);
-    if (!valOpt) {
+    auto value = parse_hex(toks[1]);
+    if (!value) {
       logging::eprintln("Error: invalid value {}", toks[1]);
       return true;
     }
-    sim.setRegisterValue(reg, *valOpt);
+    if (auto reg = register_from_name(toks[0])) {
+      (*registers)[*reg] = *value;
+    } else if (auto xmm = xmm_half_from_name(toks[0])) {
+      auto current = static_cast<x86sim::XmmValue>((*registers)[xmm->first]);
+      if (xmm->second)
+        current.hi = *value;
+      else
+        current.lo = *value;
+      (*registers)[xmm->first] = current;
+    } else {
+      logging::eprintln("Error: invalid register {}", toks[0]);
+      return true;
+    }
   }
 
   return false;
 }
 
-//
-// PTLsim main: called after ptlsim_preinit() brings up boot subsystems
-//
+} // namespace
+
 int main(int argc, char** argv) {
   configparser.setup();
-  config.reset();
 
-  int ptlsim_arg_count = 1 + configparser.parse(config, argc - 1, argv + 1);
+  x86sim::Options options;
+  int ptlsim_arg_count = 1 + configparser.parse(options, argc - 1, argv + 1);
   if (ptlsim_arg_count == 0)
     ptlsim_arg_count = argc;
-  handle_config_change(config, ptlsim_arg_count - 1, argv + 1);
 
-  Raspsim sim{};
-  std::vector<Waddr> dump_pages;
-  // TODO(AE): set seccomp filter before parsing arguments
-  bool parse_err = false;
-  for (unsigned i = ptlsim_arg_count; i < argc; i++) {
+  std::vector<std::string> commands;
+  for (unsigned i = ptlsim_arg_count; i < static_cast<unsigned>(argc); i++) {
     if (argv[i][0] == '@') {
       std::ifstream is(argv[i] + 1);
       if (!is) {
@@ -274,55 +236,58 @@ int main(int argc, char** argv) {
         continue;
       }
       std::string line;
-      for (;;) {
-        if (!std::getline(is, line))
-          break;
-        // Remove comments
+      while (std::getline(is, line)) {
         size_t comment_pos = line.find('#');
         if (comment_pos != std::string::npos)
           line.erase(comment_pos);
-        parse_err |= handle_config_arg(sim, line, dump_pages);
+        commands.push_back(std::move(line));
       }
     } else {
-      parse_err |= handle_config_arg(sim, argv[i], dump_pages);
+      commands.emplace_back(argv[i]);
     }
   }
+
+  for (const std::string& command : commands)
+    handle_config_arg(nullptr, nullptr, options, command, nullptr);
+
+  x86sim::defaults::CliHost host;
+  x86sim::Machine machine(host, options);
+  x86sim::RegisterFile& registers = machine.register_file(0);
+  std::vector<x86sim::address_t> dump_pages;
+
+  bool parse_err = false;
+  for (const std::string& command : commands)
+    parse_err |= handle_config_arg(&machine, &registers, options, command, &dump_pages);
+
   if (parse_err) {
     logging::eprintln("Error: could not parse all arguments");
-    std::exit(1);
+    return 1;
   }
 
-  logging::println("\n=== Switching to simulation mode at rip {} ===\n", (void*)(Waddr)sim.getRegisterValue(REG_rip));
+  logging::println("\n=== Switching to simulation mode at rip {} ===\n", registers[x86sim::Register::rip]);
   logging::flush();
-  logging::println("Baseline state:");
-  logging::println("{}", sim.getContext());
+  logging::println("Baseline state:\n{}", registers);
 
-  sim.run();
+  x86sim::RunResult result = machine.run();
 
-  logging::eprintln("End state:");
-  logging::eprintln("{}", sim.getContext());
+  if (result.reason == x86sim::StopReason::x86_exception) {
+    logging::eprintln("{}", result);
+    return 1;
+  }
 
-  for (Waddr addr : dump_pages) {
-    byte* mapped = sim.getMappedPage(addr);
-    if (!mapped) {
-      logging::eprintln("Error dumping memory: page not mapped {}", (void*)addr);
-    } else {
+  logging::eprintln("End state:\n{}", registers);
+
+  for (x86sim::address_t addr : dump_pages) {
+    if (auto page = machine.read_page(addr)) {
       logging::eprintln("Dump of memory at {}:", (void*)addr);
-      print_hex_bytes(std::span<const byte>(mapped, PAGE_SIZE));
+      print_hex_bytes(*page);
+    } else {
+      logging::eprintln("Error dumping memory at {}: {}", (void*)addr, page.error());
     }
   }
 
-  logging::eprint("Decoder stats:");
-  foreach (i, DECODE_TYPE_COUNT) {
-    logging::eprint(" {}={}", decode_type_names[i], stats.decoder.x86_decode_type[i]);
-  }
-  logging::eprintln("");
+  logging::eprintln("\n=== Exiting after full simulation at rip {} ({}) ===\n", registers[x86sim::Register::rip],
+                    result.stats);
 
-  logging::eprintln("\n=== Exiting after full simulation at rip {} ({} cycles, {} user commits, {} iterations) ===\n",
-                    (void*)(Waddr)sim.getRegisterValue(REG_rip), sim_cycle,
-                    total_user_insns_committed, iterations);
-
-  Raspsim::stutdown();
-
-  std::exit(0);
+  return 0;
 }

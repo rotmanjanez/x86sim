@@ -11,7 +11,7 @@
 
 namespace logging = x86sim::logging;
 
-ConfigurationParser<x86sim::PTLsimConfig> configparser;
+ConfigurationParser<x86sim::Options> configparser;
 
 std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr) const {
   std::string result = "Options are:\n";
@@ -53,6 +53,9 @@ std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr)
       break;
     case OPTION_TYPE_BOOL:
       result += ((*(bool*)variable) ? "enabled" : "disabled");
+      break;
+    case OPTION_TYPE_CORE_MODEL:
+      result += std::format("{}", *(x86sim::CoreModel*)variable);
       break;
     default:
       assert(false);
@@ -162,6 +165,21 @@ int ConfigurationParserBase::parse(void* baseptr, int argc, char* argv[]) {
             s = argv[i++];
             break;
           }
+          case OPTION_TYPE_CORE_MODEL: {
+            if (i >= argc) {
+              logging::eprintln("Warning: option {} had no argument; ignoring", argv[i - 1]);
+              break;
+            }
+            std::string_view model = argv[i++];
+            if (model == "seq" || model == "sequential") {
+              *((x86sim::CoreModel*)variable) = x86sim::CoreModel::sequential;
+            } else if (model == "ooo" || model == "out_of_order") {
+              *((x86sim::CoreModel*)variable) = x86sim::CoreModel::out_of_order;
+            } else {
+              logging::eprintln("Warning: invalid core model '{}'; ignoring", model);
+            }
+            break;
+          }
           default:
             assert(false);
           }
@@ -224,6 +242,9 @@ std::string ConfigurationParserBase::format_to_string_config(const void* baseptr
     case OPTION_TYPE_STRING:
       result += *((std::string*)(variable));
       break;
+    case OPTION_TYPE_CORE_MODEL:
+      result += std::format("{}", *((x86sim::CoreModel*)(variable)));
+      break;
     default:
       break;
     }
@@ -238,10 +259,11 @@ std::string ConfigurationParserBase::format_to_string_config(const void* baseptr
 
 
 template<>
-void ConfigurationParser<x86sim::PTLsimConfig>::setup() {
+void ConfigurationParser<x86sim::Options>::setup() {
   section("Simulation Control");
 
-  add(core_name, "core", "Run using specified core (-core <corename>)");
+  add(core, "core", "Run using specified core (-core <corename>)");
+  add(core_count, "cores", "Number of simulated cores/contexts");
 
   section("General Logging Control");
   add(quiet, "quiet", "Do not print PTLsim system information banner");
@@ -280,6 +302,7 @@ void ConfigurationParser<x86sim::PTLsimConfig>::setup() {
 
   section("Out of Order Core (ooocore)");
   add(perfect_cache, "perfect-cache", "Perfect cache performance: all loads and stores hit in L1");
+  add(static_branchpred, "static-branchpred", "Use static branch prediction when there is no BTB entry");
 
   section("Miscellaneous");
   add(bbcache_dump_filename, "bbdump", "Basic block cache dump filename");
@@ -291,5 +314,6 @@ void print_usage(int argc, char** argv) {
   logging::eprintln("Syntax: ptlsim <executable> <arguments...>");
   logging::eprintln("All other options come from file /home/<username>/.ptlsim/path/to/executable");
   logging::eprintln("");
-  logging::eprint("{}", configparser.options.format_to_string_usage(&x86sim::config));
+  x86sim::Options defaults;
+  logging::eprint("{}", configparser.options.format_to_string_usage(&defaults));
 }

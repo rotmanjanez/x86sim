@@ -6,11 +6,14 @@
 #include <expected>
 #include <filesystem>
 #include <format>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <vector>
+
+#include "x86sim/registerfile.hpp"
 
 namespace x86sim {
 
@@ -19,48 +22,9 @@ struct Context;
 struct MachineImpl;
 
 using address_t = std::uint64_t;
-using word_t = std::uint64_t;
-
 enum class Protection : std::uint8_t { none = 0, read = 1, write = 2, execute = 4 };
 enum class CoreModel { out_of_order, sequential };
-enum class Register {
-  rax = 0,
-  rcx = 1,
-  rdx = 2,
-  rbx = 3,
-  rsp = 4,
-  rbp = 5,
-  rsi = 6,
-  rdi = 7,
-  r8 = 8,
-  r9 = 9,
-  r10 = 10,
-  r11 = 11,
-  r12 = 12,
-  r13 = 13,
-  r14 = 14,
-  r15 = 15,
-  rip = 56,
-  flags = 57
-};
-enum class XmmRegister {
-  xmm0 = 16,
-  xmm1 = 18,
-  xmm2 = 20,
-  xmm3 = 22,
-  xmm4 = 24,
-  xmm5 = 26,
-  xmm6 = 28,
-  xmm7 = 30,
-  xmm8 = 32,
-  xmm9 = 34,
-  xmm10 = 36,
-  xmm11 = 38,
-  xmm12 = 40,
-  xmm13 = 42,
-  xmm14 = 44,
-  xmm15 = 46
-};
+
 enum class SyscallKind { int80, syscall64, sysenter };
 enum class StopReason { guest_exit, instruction_limit, x86_exception, host_request, unsupported_syscall };
 enum class MemoryError { unaligned_address, zero_size, unmapped_address, out_of_memory, mapping_failed };
@@ -77,10 +41,6 @@ enum class MemoryError { unaligned_address, zero_size, unmapped_address, out_of_
   return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) == static_cast<std::uint8_t>(flag);
 }
 
-struct XmmValue {
-  word_t lo = 0;
-  word_t hi = 0;
-};
 
 struct CpuidRequest {
   std::uint32_t function = 0;
@@ -110,12 +70,48 @@ public:
 };
 
 struct Options {
+  static constexpr address_t invalid_rip = std::numeric_limits<address_t>::max();
+
   CoreModel core = CoreModel::out_of_order;
+  std::uint64_t core_count = 1;
   bool sse = true;
   bool x87 = true;
+
+  bool quiet = false;
+  std::filesystem::path log_filename = "ptlsim.log";
+  std::uint64_t loglevel = 0;
+  std::uint64_t start_log_at_iteration = std::numeric_limits<std::uint64_t>::max();
+  address_t start_log_at_rip = invalid_rip;
+  bool log_on_console = false;
+  bool log_ptlsim_boot = false;
+  std::uint64_t log_buffer_size = 524288;
+  std::string mm_logfile;
+  std::uint64_t mm_log_buffer_size = 16384;
+  bool enable_inline_mm_logging = false;
+  bool enable_mm_validate = false;
+
+  bool event_log_enabled = false;
+  std::uint64_t event_log_ring_buffer_size = 32768;
+  bool flush_event_log_every_cycle = false;
+  address_t log_backwards_from_trigger_rip = invalid_rip;
+  bool dump_state_now = false;
+  bool abort_at_end = false;
+
+  address_t start_at_rip = 0;
+  bool include_dyn_linker = false;
+  bool trigger_mode = false;
+  std::uint64_t pause_at_startup = 0;
+
+  std::uint64_t stop_at_user_insns = std::numeric_limits<std::uint64_t>::max();
+  std::uint64_t stop_at_iteration = std::numeric_limits<std::uint64_t>::max();
+  address_t stop_at_rip = invalid_rip;
+
   bool perfect_cache = false;
-  bool static_branch_prediction = false;
-  std::filesystem::path log_file{};
+  bool static_branchpred = false;
+
+  std::string bbcache_dump_filename;
+  std::uint64_t sequential_mode_insns = 0;
+  bool exit_after_fullsim = false;
 };
 
 struct RunOptions {
@@ -143,31 +139,6 @@ struct RunResult {
   std::string message;
 };
 
-class RegisterRef {
-public:
-  RegisterRef& operator=(word_t value) noexcept;
-  [[nodiscard]] operator word_t() const noexcept;
-
-private:
-  friend struct Context;
-  constexpr RegisterRef(Context& context, Register reg) noexcept : context_(&context), reg_(reg) {}
-
-  Context* context_;
-  Register reg_;
-};
-
-class XmmRegisterRef {
-public:
-  XmmRegisterRef& operator=(XmmValue value) noexcept;
-  [[nodiscard]] operator XmmValue() const noexcept;
-
-private:
-  friend struct Context;
-  constexpr XmmRegisterRef(Context& context, XmmRegister reg) noexcept : context_(&context), reg_(reg) {}
-
-  Context* context_;
-  XmmRegister reg_;
-};
 
 class Machine {
 public:
@@ -182,17 +153,19 @@ public:
 
   [[nodiscard]] std::expected<std::span<const std::byte>, MemoryError> read_page(address_t page_aligned_address) const noexcept;
 
-  [[nodiscard]] RunResult run(Context&, RunOptions = {});
+  [[nodiscard]] RunResult run(RunOptions = {});
 
+  [[nodiscard]] const Options& options() const noexcept;
+  [[nodiscard]] Stats stats() const noexcept;
+  [[nodiscard]] RegisterFile& register_file(std::size_t core_index = 0) noexcept;
+  [[nodiscard]] const RegisterFile& register_file(std::size_t core_index = 0) const noexcept;
+  [[nodiscard]] AddressSpace& address_space() noexcept;
   [[nodiscard]] const AddressSpace& address_space() const noexcept;
   [[nodiscard]] SyscallResult dispatch_syscall(Context&, SyscallKind) noexcept;
   [[nodiscard]] CpuidResult dispatch_cpuid(Context&, CpuidRequest) noexcept;
   void set_pending_stop(RunResult);
 
 private:
-  void prepare_context(Context&) noexcept;
-  void reset_core(Context&);
-
   HostCallbacks& callbacks_;
   Options options_;
   std::unique_ptr<AddressSpace> address_space_;
@@ -239,68 +212,6 @@ struct std::formatter<x86sim::CoreModel> {
       return std::format_to(ctx.out(), "sequential");
     }
     return std::format_to(ctx.out(), "unknown({})", static_cast<int>(model));
-  }
-};
-
-template<>
-struct std::formatter<x86sim::Register> {
-  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-
-  template<typename FormatContext>
-  auto format(x86sim::Register reg, FormatContext& ctx) const {
-    using enum x86sim::Register;
-    switch (reg) {
-    case rax:
-      return std::format_to(ctx.out(), "rax");
-    case rcx:
-      return std::format_to(ctx.out(), "rcx");
-    case rdx:
-      return std::format_to(ctx.out(), "rdx");
-    case rbx:
-      return std::format_to(ctx.out(), "rbx");
-    case rsp:
-      return std::format_to(ctx.out(), "rsp");
-    case rbp:
-      return std::format_to(ctx.out(), "rbp");
-    case rsi:
-      return std::format_to(ctx.out(), "rsi");
-    case rdi:
-      return std::format_to(ctx.out(), "rdi");
-    case r8:
-      return std::format_to(ctx.out(), "r8");
-    case r9:
-      return std::format_to(ctx.out(), "r9");
-    case r10:
-      return std::format_to(ctx.out(), "r10");
-    case r11:
-      return std::format_to(ctx.out(), "r11");
-    case r12:
-      return std::format_to(ctx.out(), "r12");
-    case r13:
-      return std::format_to(ctx.out(), "r13");
-    case r14:
-      return std::format_to(ctx.out(), "r14");
-    case r15:
-      return std::format_to(ctx.out(), "r15");
-    case rip:
-      return std::format_to(ctx.out(), "rip");
-    case flags:
-      return std::format_to(ctx.out(), "flags");
-    }
-    return std::format_to(ctx.out(), "unknown({})", static_cast<int>(reg));
-  }
-};
-
-template<>
-struct std::formatter<x86sim::XmmRegister> {
-  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-
-  template<typename FormatContext>
-  auto format(x86sim::XmmRegister reg, FormatContext& ctx) const {
-    const int index = (static_cast<int>(reg) - static_cast<int>(x86sim::XmmRegister::xmm0)) / 2;
-    if (index >= 0 && index <= 15 && static_cast<int>(reg) == static_cast<int>(x86sim::XmmRegister::xmm0) + index * 2)
-      return std::format_to(ctx.out(), "xmm{}", index);
-    return std::format_to(ctx.out(), "unknown({})", static_cast<int>(reg));
   }
 };
 
@@ -366,16 +277,6 @@ struct std::formatter<x86sim::MemoryError> {
       return std::format_to(ctx.out(), "mapping failed");
     }
     return std::format_to(ctx.out(), "unknown({})", static_cast<int>(error));
-  }
-};
-
-template<>
-struct std::formatter<x86sim::XmmValue> {
-  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-
-  template<typename FormatContext>
-  auto format(const x86sim::XmmValue& value, FormatContext& ctx) const {
-    return std::format_to(ctx.out(), "0x{:016x}{:016x}", value.hi, value.lo);
   }
 };
 
@@ -485,32 +386,19 @@ struct std::formatter<x86sim::RunResult> {
 };
 
 template<>
-struct std::formatter<x86sim::RegisterRef> {
-  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-
-  template<typename FormatContext>
-  auto format(const x86sim::RegisterRef& reg, FormatContext& ctx) const {
-    return std::format_to(ctx.out(), "0x{:016x}", static_cast<x86sim::word_t>(reg));
-  }
-};
-
-template<>
-struct std::formatter<x86sim::XmmRegisterRef> {
-  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-
-  template<typename FormatContext>
-  auto format(const x86sim::XmmRegisterRef& reg, FormatContext& ctx) const {
-    return std::format_to(ctx.out(), "{}", static_cast<x86sim::XmmValue>(reg));
-  }
-};
-
-template<>
 struct std::formatter<x86sim::Machine> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const x86sim::Machine& cpu, FormatContext& ctx) const {
-    return std::format_to(ctx.out(), "{}", x86sim::detail::format_cpu(cpu));
+  auto format(const x86sim::Machine& machine, FormatContext& ctx) const {
+    const auto& options = machine.options();
+    const auto stats = machine.stats();
+    return std::format_to(ctx.out(),
+                          "x86sim::Machine(core={}, address_space={}, cycles={}, instructions={}, sse={}, x87={}, "
+                          "perfect_cache={}, static_branch_prediction={})",
+                          options.core, static_cast<const void*>(&machine.address_space()), stats.cycles,
+                          stats.instructions, options.sse, options.x87, options.perfect_cache,
+                          options.static_branch_prediction);
   }
 };
 

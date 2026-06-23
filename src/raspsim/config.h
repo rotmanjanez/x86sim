@@ -10,6 +10,7 @@
 
 #include "globals.h"
 #include "superstl.h"
+#include "x86sim/x86sim.hpp"
 #include <stdarg.h>
 
 static const x86sim::W64 infinity = std::numeric_limits<x86sim::W64s>::max();
@@ -42,6 +43,7 @@ enum {
   OPTION_TYPE_STRING = 3,
   OPTION_TYPE_TRAILER = 4,
   OPTION_TYPE_BOOL = 5,
+  OPTION_TYPE_CORE_MODEL = 6,
   OPTION_TYPE_SECTION = -1
 };
 
@@ -85,6 +87,10 @@ struct ConfigurationParser : public T {
 
   void add(bool& field, const char* name, const char* description) {
     options.addentry(this, &field, OPTION_TYPE_BOOL, name, description);
+  }
+
+  void add(x86sim::CoreModel& field, const char* name, const char* description) {
+    options.addentry(this, &field, OPTION_TYPE_CORE_MODEL, name, description);
   }
 
   void add(std::string& field, const char* name, const char* description) {

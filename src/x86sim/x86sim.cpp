@@ -220,31 +220,23 @@ void assist_ptlcall(Context& ctx) {
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
 }
 
-CPU::CPU(HostCallbacks& callbacks, Options options)
-    : callbacks_(callbacks), options_(std::move(options)), context_(std::make_unique<Context>()),
-      address_space_(std::make_unique<AddressSpace>()) {
-  config.reset();
+Machine::Machine(HostCallbacks& callbacks, Options options)
+    : callbacks_(callbacks), options_(std::move(options)), address_space_(std::make_unique<AddressSpace>()) {
   init_uops();
 
-  config.log_filename = options_.log_file.string();
-  logging::set_file_sink(config.log_filename.c_str());
+  handle_config_change(options_, 0, nullptr);
 
   switch (options_.core) {
   case CoreModel::sequential:
-    config.core_name = "seq";
-    machine_ = std::make_unique<SequentialMachine>(config);
+    machine_ = std::make_unique<SequentialMachine>(*this, options_);
     break;
   case CoreModel::out_of_order:
-    config.core_name = "ooo";
-    machine_ = std::make_unique<OutOfOrderModel::OutOfOrderMachine>(config);
+    machine_ = std::make_unique<OutOfOrderModel::OutOfOrderMachine>(*this, options_);
     break;
   }
-
-  context_->no_sse = !options_.sse;
-  context_->no_x87 = !options_.x87;
-  config.perfect_cache = options_.perfect_cache;
-  config.static_branchpred = options_.static_branch_prediction;
 }
+
+Machine::~Machine() = default;
 
 std::expected<void, MemoryError> Machine::map(address_t start, std::uint64_t size, Protection prot) noexcept {
   if (size == 0)
@@ -294,29 +286,12 @@ std::expected<std::span<const std::byte>, MemoryError> Machine::read_page(addres
   return std::span<const std::byte>(src, kPageSize);
 }
 
-RegisterRef Context::operator[](Register reg) noexcept {
-  return RegisterRef(*this, reg);
-}
-
-word_t Context::operator[](Register reg) const noexcept {
-  return commitarf[static_cast<int>(reg)];
-}
-
-XmmRegisterRef Context::operator[](XmmRegister reg) noexcept {
-  return XmmRegisterRef(*this, reg);
-}
-
-XmmValue Context::operator[](XmmRegister reg) const noexcept {
-  const int lo = static_cast<int>(reg);
-  return {.lo = commitarf[lo], .hi = commitarf[lo + 1]};
-}
-
-RunResult Machine::run(Context& context, RunOptions options) {
+RunResult Machine::run(RunOptions options) {
   pending_stop_.reset();
 
-  const auto stop_at = options.instruction_limit ? total_user_insns_committed + *options.instruction_limit
+  const auto stop_at = options.instruction_limit ? machine_->total_user_insns_committed + *options.instruction_limit
                                                  : std::numeric_limits<W64>::max();
-  config.stop_at_user_insns = stop_at;
+  machine_->config.stop_at_user_insns = stop_at;
 
 
     simulate(*machine_);
@@ -339,29 +314,40 @@ RunResult Machine::run(Context& context, RunOptions options) {
   return {.reason = StopReason::guest_exit, .stats = stats(), .x86_exception = std::nullopt, .message = {}};
 }
 
-Stats CPU::stats() const noexcept {
-  return current_stats();
+Stats Machine::stats() const noexcept {
+  return machine_ ? Stats{.cycles = machine_->sim_cycle, .instructions = machine_->total_user_insns_committed} : Stats{};
 }
 
-RegisterRef& RegisterRef::operator=(word_t value) noexcept {
-  context_->commitarf[static_cast<int>(reg_)] = value;
-  return *this;
+const Options& Machine::options() const noexcept {
+  return options_;
 }
 
-RegisterRef::operator word_t() const noexcept {
-  return context_->commitarf[static_cast<int>(reg_)];
+RegisterFile& Machine::register_file(std::size_t core_index) noexcept {
+  return machine_->register_file(core_index);
 }
 
-XmmRegisterRef& XmmRegisterRef::operator=(XmmValue value) noexcept {
-  const int lo = static_cast<int>(reg_);
-  context_->commitarf[lo] = value.lo;
-  context_->commitarf[lo + 1] = value.hi;
-  return *this;
+const RegisterFile& Machine::register_file(std::size_t core_index) const noexcept {
+  return machine_->register_file(core_index);
 }
 
-XmmRegisterRef::operator XmmValue() const noexcept {
-  const int lo = static_cast<int>(reg_);
-  return {.lo = context_->commitarf[lo], .hi = context_->commitarf[lo + 1]};
+AddressSpace& Machine::address_space() noexcept {
+  return *address_space_;
+}
+
+const AddressSpace& Machine::address_space() const noexcept {
+  return *address_space_;
+}
+
+SyscallResult Machine::dispatch_syscall(Context& context, SyscallKind kind) noexcept {
+  return callbacks_.syscall(*this, context, kind);
+}
+
+CpuidResult Machine::dispatch_cpuid(Context& context, CpuidRequest request) noexcept {
+  return callbacks_.cpuid(*this, context, request);
+}
+
+void Machine::set_pending_stop(RunResult result) {
+  pending_stop_ = std::move(result);
 }
 
 [[noreturn]] void throw_x86_exception(Context& context, byte exception, W32 errorcode, Waddr virtaddr) {
@@ -379,38 +365,38 @@ XmmRegisterRef::operator XmmValue() const noexcept {
   throw InternalX86Exception{std::move(result)};
 }
 
-void dispatch_syscall_64bit() {
-  CPU& cpu = active_cpu();
-  Context& context = detail::context(cpu);
+void dispatch_syscall_64bit(Context& context) {
+  assert(context.machine);
+  Machine& machine = *context.machine;
   const W64 old_rip = context.commitarf[REG_rip];
-  SyscallResult result = detail::dispatch_syscall(cpu, SyscallKind::syscall64);
-  advance_default_syscall_rip_if_unchanged(cpu, SyscallKind::syscall64, old_rip);
+  SyscallResult result = machine.dispatch_syscall(context, SyscallKind::syscall64);
+  advance_default_syscall_rip_if_unchanged(context, SyscallKind::syscall64, old_rip);
 
   if (!result.continue_execution) {
-    detail::set_pending_stop(
-        cpu, RunResult{.reason = result.reason, .stats = current_stats(), .x86_exception = std::nullopt, .message = result.message});
+    machine.set_pending_stop(
+        RunResult{.reason = result.reason, .stats = machine.stats(), .x86_exception = std::nullopt, .message = result.message});
     requested_switch_to_native = 1;
   }
 }
 
-void dispatch_syscall_32bit(int semantics) {
-  CPU& cpu = active_cpu();
-  Context& context = detail::context(cpu);
+void dispatch_syscall_32bit(Context& context, int semantics) {
+  assert(context.machine);
+  Machine& machine = *context.machine;
   const SyscallKind kind = to_syscall_kind(semantics);
   const W64 old_rip = context.commitarf[REG_rip];
-  SyscallResult result = detail::dispatch_syscall(cpu, kind);
-  advance_default_syscall_rip_if_unchanged(cpu, kind, old_rip);
+  SyscallResult result = machine.dispatch_syscall(context, kind);
+  advance_default_syscall_rip_if_unchanged(context, kind, old_rip);
 
   if (!result.continue_execution) {
-    detail::set_pending_stop(
-        cpu, RunResult{.reason = result.reason, .stats = current_stats(), .x86_exception = std::nullopt, .message = result.message});
+    machine.set_pending_stop(
+        RunResult{.reason = result.reason, .stats = machine.stats(), .x86_exception = std::nullopt, .message = result.message});
     requested_switch_to_native = 1;
   }
 }
 
-CpuidResult dispatch_cpuid(W32 func, W32 subfunc) {
-  CPU& cpu = active_cpu();
-  x86sim::CpuidResult result = detail::dispatch_cpuid(cpu, {.function = func, .subfunction = subfunc});
+CpuidResult dispatch_cpuid(Context& context, W32 func, W32 subfunc) {
+  assert(context.machine);
+  x86sim::CpuidResult result = context.machine->dispatch_cpuid(context, {.function = func, .subfunction = subfunc});
   return {.eax = result.eax, .ebx = result.ebx, .ecx = result.ecx, .edx = result.edx};
 }
 
@@ -419,19 +405,19 @@ CpuidResult dispatch_cpuid(W32 func, W32 subfunc) {
 namespace x86sim {
 
 void Context::propagate_x86_exception(byte exception, W32 errorcode, Waddr virtaddr) {
-  throw_x86_exception(*this, exception, errorcode, virtaddr);
+  // todo: throw_x86_exception(*this, exception, errorcode, virtaddr);
 }
 
-void handle_syscall_64bit() {
-  dispatch_syscall_64bit();
+void handle_syscall_64bit(Context& context) {
+  dispatch_syscall_64bit(context);
 }
 
-void handle_syscall_32bit(int semantics) {
-  dispatch_syscall_32bit(semantics);
+void handle_syscall_32bit(Context& context, int semantics) {
+  dispatch_syscall_32bit(context, semantics);
 }
 
-CpuidResult handle_cpuid(W32 func, W32 subfunc) {
-  return dispatch_cpuid(func, subfunc);
+CpuidResult handle_cpuid(Context& context, W32 func, W32 subfunc) {
+  return dispatch_cpuid(context, func, subfunc);
 }
 
 } // namespace x86sim

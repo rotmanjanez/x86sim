@@ -78,11 +78,13 @@
 
 #include "globals.h"
 #include "logic.h"
+#include "x86sim/registerfile.hpp"
 
 namespace x86sim {
 
 class Machine;
 struct MachineImpl;
+struct Options;
 
 //
 // Exceptions:
@@ -616,11 +618,10 @@ typedef W64 Level1PTE;
 // PTLsim cores will need to define other per-VCPU structures to
 // hold their internal state.
 //
-struct ContextBase {
+struct ContextBase : RegisterFile {
   Machine* machine = nullptr;
   MachineImpl* machine_impl = nullptr;
 
-  W64 commitarf[64];
   int vcpuid;
   SegmentDescriptorCache seg[SEGID_COUNT];
   W64 swapgs_base;
@@ -656,11 +657,6 @@ struct ContextBase {
 // Round up to a full page:
 struct Context : public ContextBase {
   byte padding[PAGE_SIZE - sizeof(ContextBase)];
-
-  [[nodiscard]] RegisterRef operator[](Register reg) noexcept;
-  [[nodiscard]] word_t operator[](Register reg) const noexcept;
-  [[nodiscard]] XmmRegisterRef operator[](XmmRegister reg) noexcept;
-  [[nodiscard]] XmmValue operator[](XmmRegister reg) const noexcept;
 
   void propagate_x86_exception(byte exception, W32 errorcode = 0, Waddr virtaddr = 0);
 
@@ -723,6 +719,8 @@ struct Context : public ContextBase {
     commitarf[REG_ctx] = reinterpret_cast<Waddr>(this);
     commitarf[REG_fpstack] = reinterpret_cast<Waddr>(&fpstack);
   }
+
+  Context(const Options& config, MachineImpl& core, int vcpuid);
 
   void update_pte_acc_dirty(W64 rawvirt, const PTEUpdate& update) {}
   void update_shadow_segment_descriptors();

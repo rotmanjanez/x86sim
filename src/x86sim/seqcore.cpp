@@ -6,6 +6,7 @@
 //
 
 #include <cstdlib>
+#include <utility>
 
 #include "globals.h"
 #include "ptlsim.h"
@@ -603,11 +604,12 @@ static SequentialCoreEventLog eventlog;
 
 struct SequentialCore {
   SequentialMachine& machine;
-  Context& ctx;
+  Options& config;
+  Context ctx;
   CommitRecord* cmtrec;
 
-  SequentialCore(SequentialMachine& machine_, Context& ctx_, CommitRecord* cmtrec_ = null)
-      : machine(machine_), ctx(ctx_), cmtrec(cmtrec_) {}
+  SequentialCore(SequentialMachine& machine_, int core_id, CommitRecord* cmtrec_ = null)
+      : machine(machine_), config(machine_.config), ctx(config, machine_, core_id), cmtrec(cmtrec_) {}
 
   BasicBlock* current_basic_block;
   int bytes_in_current_insn;
@@ -1497,9 +1499,9 @@ std::string_view SequentialMachine::name() const {
 
 SequentialMachine::~SequentialMachine() = default;
 
-SequentialMachine::SequentialMachine(Context& context, const PTLsimConfig& config) : MachineImpl(context, config) {
-  foreach (i, contextcount) {
-    cores[i] = std::make_unique<SequentialCore>(*this, this->context);
+SequentialMachine::SequentialMachine(Machine& machine, Options config) : MachineImpl(machine, std::move(config)) {
+  foreach (i, this->config.core_count) {
+    cores[i] = std::make_unique<SequentialCore>(*this, i);
     //
     // Note: in a real cycle accurate model, config may
     // specify various ways of slicing contextcount up
@@ -1510,6 +1512,13 @@ SequentialMachine::SequentialMachine(Context& context, const PTLsimConfig& confi
   }
 }
 
+RegisterFile& SequentialMachine::register_file(std::size_t core_index) noexcept {
+  return cores[core_index]->ctx;
+}
+
+const RegisterFile& SequentialMachine::register_file(std::size_t core_index) const noexcept {
+  return cores[core_index]->ctx;
+}
 
 int SequentialMachine::run() {
     eventlog.machine = this;
@@ -1524,7 +1533,7 @@ int SequentialMachine::run() {
 
     foreach (i, contextcount) {
       SequentialCore& core = *cores[i];
-      Context& ctx = context;
+      Context& ctx = core.ctx;
 
       core.external_to_core_state(ctx);
 
@@ -1543,7 +1552,6 @@ int SequentialMachine::run() {
       int running_thread_count = 0;
       foreach (i, contextcount) {
         SequentialCore& core = *cores[i];
-        Context& ctx = context;
 
         exiting |= core.execute();
       }
@@ -1571,7 +1579,7 @@ int SequentialMachine::run() {
 
     foreach (i, contextcount) {
       SequentialCore& core = *cores[i];
-      Context& ctx = context;
+      Context& ctx = core.ctx;
 
       core.core_to_external_state(ctx);
 

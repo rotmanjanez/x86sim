@@ -51,9 +51,11 @@ struct OutOfOrderCore;
 struct OutOfOrderMachine : public MachineImpl {
   std::unique_ptr<OutOfOrderCore> cores[MAX_SMT_CORES];
   std::bitset<MAX_CONTEXTS> stopped;
-  explicit OutOfOrderMachine(const PTLsimConfig& config);
+  OutOfOrderMachine(Machine& machine, Options config);
   ~OutOfOrderMachine() override;
   std::string_view name() const override;
+  RegisterFile& register_file(std::size_t core_index) noexcept override;
+  const RegisterFile& register_file(std::size_t core_index) const noexcept override;
   int run() override;
   virtual void update_stats(PTLsimStats& stats) override;
   virtual void flush_tlb(Context& ctx) override;
@@ -1355,7 +1357,8 @@ struct ThreadContext {
   OutOfOrderCore& getcore() const { return core; }
 
   int threadid;
-  Context& ctx;
+  Options& config;
+  Context context;
   BranchPredictorInterface branchpred;
 
   Queue<FetchBufferEntry, FETCH_QUEUE_SIZE> fetchq;
@@ -1435,7 +1438,9 @@ struct ThreadContext {
   byte queued_mem_lock_release_count;
   W64 queued_mem_lock_release_list[4];
 
-  ThreadContext(OutOfOrderCore& core_, int threadid_, Context& ctx_) : core(core_), threadid(threadid_), ctx(ctx_) {
+  ThreadContext(OutOfOrderCore& core_, int threadid_)
+      : core(core_), threadid(threadid_), config(core_.machine.config), context(config, core_.machine, threadid_),
+        ctx(context) {
     reset();
   }
 
@@ -1475,6 +1480,7 @@ struct ThreadContext {
 //
 struct OutOfOrderCore {
   OutOfOrderMachine& machine;
+  Options& config;
   int coreid;
   OutOfOrderCore& getcore() { return *this; }
 
@@ -1591,7 +1597,8 @@ struct OutOfOrderCore {
 #define for_each_operand(iter) foreach (iter, MAX_OPERANDS)
 
   OutOfOrderCore(int coreid_, OutOfOrderMachine& machine_)
-      : machine(machine_), coreid(coreid_), eventlog(machine_), caches(machine_), cache_callbacks(*this) {
+      : machine(machine_), config(machine_.config), coreid(coreid_), eventlog(machine_), caches(machine_),
+        cache_callbacks(*this) {
     threadcount = 0;
   }
 

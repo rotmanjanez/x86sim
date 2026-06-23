@@ -20,9 +20,11 @@ struct SequentialCore;
 struct SequentialMachine : public MachineImpl {
   std::unique_ptr<SequentialCore> cores[MAX_CONTEXTS];
 
-  explicit SequentialMachine(Context& context, const PTLsimConfig& config);
+  SequentialMachine(Machine& machine, Options config);
   ~SequentialMachine() override;
   std::string_view name() const override;
+  RegisterFile& register_file(std::size_t core_index) noexcept override;
+  const RegisterFile& register_file(std::size_t core_index) const noexcept override;
 
   //
   // Run the processor model, until a stopping point

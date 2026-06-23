@@ -11,6 +11,7 @@
 #include <format>
 #include <print>
 #include <cstdio>
+#include <utility>
 #include "globals.h"
 #include "ptlsim.h"
 #include "branchpred.h"
@@ -1662,14 +1663,14 @@ std::string_view OutOfOrderMachine::name() const {
 
 OutOfOrderMachine::~OutOfOrderMachine() = default;
 
-OutOfOrderMachine::OutOfOrderMachine(const PTLsimConfig& config) : MachineImpl(config) {
+OutOfOrderMachine::OutOfOrderMachine(Machine& machine, Options config) : MachineImpl(machine, std::move(config)) {
   // Note: we only create a single core for all contexts for now.
   cores[0] = std::make_unique<OutOfOrderCore>(0, *this);
 
-  foreach (i, contextcount) {
+  foreach (i, this->config.core_count) {
     OutOfOrderCore& core = *cores[0];
     core.threadcount++;
-    core.threads[i] = std::make_unique<ThreadContext>(core, i, this->context);
+    core.threads[i] = std::make_unique<ThreadContext>(core, i);
     core.threads[i]->init();
 
     //
@@ -1683,6 +1684,14 @@ OutOfOrderMachine::OutOfOrderMachine(const PTLsimConfig& config) : MachineImpl(c
 
   cores[0]->init();
   init_luts();
+}
+
+RegisterFile& OutOfOrderMachine::register_file(std::size_t core_index) noexcept {
+  return cores[0]->threads[core_index]->ctx;
+}
+
+const RegisterFile& OutOfOrderMachine::register_file(std::size_t core_index) const noexcept {
+  return cores[0]->threads[core_index]->ctx;
 }
 
 //
