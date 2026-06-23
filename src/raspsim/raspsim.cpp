@@ -13,17 +13,16 @@
 #include <fstream>
 #include <sstream>
 
-#include "globals.h"
-#include "superstl.h"
-#include "logging.h"
+#include "raspsim/globals.h"
+#include "raspsim/logging.h"
 
 
-#include "ptlsim.h"
-#include "ptlsim-api.h"
-#include "ptlhwdef.h"
-#include "config.h"
-#include "stats.h"
-#include "raspsim-hwsetup.h"
+#include "raspsim/ptlsim.h"
+#include "raspsim/ptlsim-api.h"
+#include "raspsim/ptlhwdef.h"
+#include "raspsim/config.h"
+#include "raspsim/stats.h"
+#include "raspsim/raspsim-hwsetup.h"
 
 static void print_hex_bytes(std::span<const byte> bytes, size_t splitat = 16) {
   for (size_t i = 0; i < bytes.size(); i++) {
