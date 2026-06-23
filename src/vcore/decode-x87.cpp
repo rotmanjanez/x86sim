@@ -6,7 +6,7 @@
 //
 
 #include "decode.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 #include <cmath>
 #include <numbers>

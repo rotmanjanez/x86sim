@@ -10,7 +10,7 @@
 #include "globals.h"
 #include "ptlsim.h"
 #include "branchpred.h"
-#include "logging.h"
+#include "vcore/logging.h"
 #include "logic.h"
 #include "dcache.h"
 

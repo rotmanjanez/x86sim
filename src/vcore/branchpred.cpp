@@ -10,7 +10,7 @@
 
 #include "branchpred.h"
 #include "stats.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 template<int SIZE>
 struct BimodalPredictor {

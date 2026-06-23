@@ -6,7 +6,7 @@
 //
 
 #include "config.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 std::string ConfigurationParserBase::format_to_string_usage(const void* baseptr) const {
   std::string result = "Options are:\n";

@@ -16,7 +16,7 @@
 #include "branchpred.h"
 #include "logic.h"
 #include "dcache.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 #define INSIDE_OOOCORE
 #define DECLARE_STRUCTURES

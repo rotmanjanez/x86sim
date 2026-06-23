@@ -6,7 +6,7 @@
 //
 
 #include "decode.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 void assist_int(Context& ctx) {
   byte intid = ctx.commitarf[REG_ar1];

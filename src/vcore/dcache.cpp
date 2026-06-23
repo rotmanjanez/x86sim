@@ -7,7 +7,7 @@
 
 #include "dcache.h"
 #include "stats.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 using namespace CacheSubsystem;
 

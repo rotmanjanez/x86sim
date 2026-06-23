@@ -10,7 +10,7 @@
 #include "ptlsim.h"
 #include "decode.h"
 #include "stats.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 
 BasicBlockCache bbcache;

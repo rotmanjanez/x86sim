@@ -1,7 +1,7 @@
 #include "raspsim-hwsetup.h"
 #include "addrspace.h"
 #include "ptlsim.h"
-#include "logging.h"
+#include "vcore/logging.h"
 #include "seqcore.h"
 #include "ooocore.h"
 #include <format>

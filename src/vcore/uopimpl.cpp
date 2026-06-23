@@ -7,7 +7,7 @@
 
 #include "globals.h"
 #include "ptlsim.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 #include <algorithm>
 #include <array>

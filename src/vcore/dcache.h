@@ -10,7 +10,7 @@
 #define _DCACHE_H_
 
 #include "ptlsim.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 struct LoadStoreInfo {
   W16 rob;

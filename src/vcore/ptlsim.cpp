@@ -10,7 +10,7 @@
 #include <fcntl.h>
 #include "globals.h"
 #include "ptlsim.h"
-#include "logging.h"
+#include "vcore/logging.h"
 #include "stats.h"
 
 #ifndef CONFIG_ONLY

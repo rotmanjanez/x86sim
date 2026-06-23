@@ -15,7 +15,7 @@
 #include "ptlsim-api.h"
 #include "ptlhwdef.h"
 #include "config.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 extern W64 sim_cycle;
 extern W64 unhalted_cycle_count;

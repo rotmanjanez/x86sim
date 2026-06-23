@@ -14,7 +14,7 @@
 #include "dcache.h"
 #include "stats.h"
 #include "ptlhwdef.h"
-#include "logging.h"
+#include "vcore/logging.h"
 
 // With these disabled, simulation is faster
 #define ENABLE_CHECKS
