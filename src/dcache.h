@@ -443,7 +443,7 @@ struct LoadFillReq {
 
 template<int size>
 struct LoadFillReqQueue {
-  CacheHierarchy& hierarchy;
+  CacheHierarchy* hierarchy = nullptr;
   std::bitset<size> freemap; // Slot is free
   std::bitset<size> waiting; // Waiting for the line to arrive in the L1
   std::bitset<size> ready;   // Wait to extract/signext and write into register
@@ -452,8 +452,8 @@ struct LoadFillReqQueue {
 
   static const int SIZE = size;
 
-  LoadFillReqQueue() : hierarchy(*((CacheHierarchy*)null)) { reset(); }
-  LoadFillReqQueue(CacheHierarchy& hierarchy_) : hierarchy(hierarchy_) { reset(); }
+  LoadFillReqQueue() { reset(); }
+  LoadFillReqQueue(CacheHierarchy& hierarchy_) : hierarchy(&hierarchy_) { reset(); }
 
   // Clear entries belonging to one thread
   void reset(int threadid);
@@ -522,10 +522,10 @@ struct MissBuffer {
     }
   };
 
-  MissBuffer() : hierarchy(*((CacheHierarchy*)null)) { reset(); }
-  MissBuffer(CacheHierarchy& hierarchy_) : hierarchy(hierarchy_) { reset(); }
+  MissBuffer() { reset(); }
+  MissBuffer(CacheHierarchy& hierarchy_) : hierarchy(&hierarchy_) { reset(); }
 
-  CacheHierarchy& hierarchy;
+  CacheHierarchy* hierarchy = nullptr;
   Entry missbufs[SIZE];
   std::bitset<SIZE> freemap;
   int count;

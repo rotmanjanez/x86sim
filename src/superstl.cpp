@@ -245,12 +245,10 @@ out:
 decl_div_rem(W8);
 decl_div_rem(W16);
 decl_div_rem(W32);
-decl_div_rem(W64);
 
 decl_div_rem_s(W8);
 decl_div_rem_s(W16);
 decl_div_rem_s(W32);
-decl_div_rem_s(W64);
 
 }; // namespace superstl
 

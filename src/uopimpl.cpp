@@ -548,14 +548,15 @@ UopResult exp_op_mask(const UopInputs& inputs) {
   int mcms = bits(rc, 0, 12);
 
   // M = 1'[(ms+mc-1):ms]
-  W64 M = x86_ror<T>(bitmask(mc), ms);
-  W64 rd = (ra & ~M) | (x86_ror<T>(rb, ds) & M);
+  W64 M = x86_ror<T>(static_cast<T>(bitmask(mc)), ms);
+  W64 rd = (ra & ~M) | (x86_ror<T>(static_cast<T>(rb), ds) & M);
 
   logging::println(logging::TRACE,
                    "mask [{}, {}, {}, ss = {}, mcms {} [shmask {} (ms={} mc={} ds={} (mcms {}))]]:", sizeof(T), ZEROEXT,
                    SIGNEXT, sizeshift, mcms, bitstring(shmask, 18), ms, mc, ds, mcms);
   logging::println(logging::TRACE, "  M      = {} 0x{:016x}", bitstring(M, 64), M);
-  logging::println(logging::TRACE, "  rot rb = {} 0x{:016x}", bitstring(x86_ror<T>(rb, ds), 64), x86_ror<T>(rb, ds));
+  logging::println(logging::TRACE, "  rot rb = {} 0x{:016x}", bitstring(x86_ror<T>(static_cast<T>(rb), ds), 64),
+                   x86_ror<T>(static_cast<T>(rb), ds));
   logging::println(logging::TRACE, "  ra     = {:016x}", ra);
   logging::println(logging::TRACE, "  rb     = {:016x}", rb);
   logging::println(logging::TRACE, "  rc     = {:016x}", rc);

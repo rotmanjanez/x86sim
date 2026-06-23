@@ -89,7 +89,7 @@ void LoadFillReqQueue<size>::annul(int lfrqslot) {
   LoadFillReq& req = reqs[lfrqslot];
   logging::println(logging::TRACE, "  Annul LFRQ slot {}", lfrqslot);
   stats.dcache.lfrq.annuls++;
-  hierarchy.missbuf.annul_lfrq(lfrqslot);
+  hierarchy->missbuf.annul_lfrq(lfrqslot);
   reqs[lfrqslot].mbidx = -1;
   assert(!freemap[lfrqslot]);
   changestate(lfrqslot, ready, freemap);
@@ -114,7 +114,7 @@ int LoadFillReqQueue<size>::add(const LoadFillReq& req) {
       logging::println(logging::ERROR, "ERROR: during add LFRQ req {}, entry {} ({}) already matches at cycle {}", req,
                        i, old, sim_cycle);
       logging::println(logging::ERROR, "{}", *this);
-      logging::println(logging::ERROR, "{}", hierarchy.missbuf);
+      logging::println(logging::ERROR, "{}", hierarchy->missbuf);
       // assert(false);
     }
   }
@@ -185,8 +185,8 @@ void LoadFillReqQueue<size>::clock() {
 
     stats.dcache.lfrq.wakeups++;
     wakeupcount++;
-    if likely (hierarchy.callback)
-      hierarchy.callback->dcache_wakeup(req.lsi, req.addr);
+    if likely (hierarchy->callback)
+      hierarchy->callback->dcache_wakeup(req.lsi, req.addr);
 
     assert(!freemap[idx]);
     changestate(idx, ready, freemap);
@@ -254,13 +254,13 @@ void MissBuffer<SIZE>::reset(int threadid) {
       //
       // NOTE SD: mb.lfrqmap should be zero by now (mb.reset() above)
       if (*mb.lfrqmap) {
-        std::bitset<LFRQ_SIZE> tmp_lfrqmap = mb.lfrqmap ^ hierarchy.lfrq.waiting;
+        std::bitset<LFRQ_SIZE> tmp_lfrqmap = mb.lfrqmap ^ hierarchy->lfrq.waiting;
         if (*tmp_lfrqmap) {
           logging::println(logging::DEBUG, "Multithread share same missbufs[{}] : lfrqmap conflict detected", i);
           mb.lfrqmap &= ~tmp_lfrqmap;
           logging::println(logging::DEBUG, "after remove stale lfrq entries for missbuf[{}]", i);
         }
-        // NB SD: This is the same as mb.lfrqmap &= hierarchy.lfrq.waiting; which actually makes sense :)
+        // NB SD: This is the same as mb.lfrqmap &= hierarchy->lfrq.waiting; which actually makes sense :)
       }
     }
 #endif
@@ -276,7 +276,7 @@ void MissBuffer<SIZE>::reset(int threadid) {
         // Go through all associated LFRs and check their thread ID
         // NOTE: This could also be done in LFRQ::reset or through several
         //       assumptions about the waiting bitmap, as above.
-        const LoadFillReq& lfr = hierarchy.lfrq.reqs[l];
+        const LoadFillReq& lfr = hierarchy->lfrq.reqs[l];
         if (lfr.lsi.threadid == threadid)
           mb.lfrqmap[l] = 0;
       }
@@ -378,7 +378,7 @@ int MissBuffer<SIZE>::initiate_miss(W64 addr, bool hit_in_L2, bool icache, int r
     return idx;
   }
 #ifdef ENABLE_L3_CACHE
-  bool L3hit = hierarchy.L3.probe(addr);
+  bool L3hit = hierarchy->L3.probe(addr);
   if likely (L3hit) {
     logging::println(logging::DEBUG, "[vcpu {}] mb{}: enter state deliver to L2 on {} (iter {})", mb.threadid, idx,
                      (void*)(Waddr)addr, iterations);
@@ -416,7 +416,7 @@ int MissBuffer<SIZE>::initiate_miss(W64 addr, bool hit_in_L2, bool icache, int r
 
 template<int SIZE>
 int MissBuffer<SIZE>::initiate_miss(LoadFillReq& req, bool hit_in_L2, int rob) {
-  int lfrqslot = hierarchy.lfrq.add(req);
+  int lfrqslot = hierarchy->lfrq.add(req);
 
   logging::println(logging::DEBUG, "[vcpu {}] missbuf.initiate_miss(L2hit? {}) -> lfrqslot {}", req.lsi.threadid,
                    hit_in_L2, lfrqslot);
@@ -426,13 +426,13 @@ int MissBuffer<SIZE>::initiate_miss(LoadFillReq& req, bool hit_in_L2, int rob) {
 
   int mbidx = initiate_miss(req.addr, hit_in_L2, 0, rob, req.lsi.threadid);
   if unlikely (mbidx < 0) {
-    hierarchy.lfrq.free(lfrqslot);
+    hierarchy->lfrq.free(lfrqslot);
     return -1;
   }
 
   Entry& missbuf = missbufs[mbidx];
   missbuf.lfrqmap[lfrqslot] = 1;
-  hierarchy.lfrq[lfrqslot].mbidx = mbidx;
+  hierarchy->lfrq[lfrqslot].mbidx = mbidx;
   // missbuf.threadid = req.lsi.threadid;       //NOTE SD: Multiple threads can share the same MBE
 
   return lfrqslot;
@@ -454,7 +454,7 @@ void MissBuffer<SIZE>::clock() {
                        (void*)(Waddr)mb.addr, mb.cycles, iterations);
       mb.cycles--;
       if unlikely (!mb.cycles) {
-        hierarchy.L3.validate(mb.addr);
+        hierarchy->L3.validate(mb.addr);
         mb.cycles = L3_LATENCY;
         mb.state = STATE_DELIVER_TO_L2;
         stats.dcache.missbuf.deliver.mem_to_L3++;
@@ -468,7 +468,7 @@ void MissBuffer<SIZE>::clock() {
       mb.cycles--;
       if unlikely (!mb.cycles) {
         logging::println(logging::DEBUG, "[vcpu {}] mb{}: delivered to L2", mb.threadid, i);
-        hierarchy.L2.validate(mb.addr);
+        hierarchy->L2.validate(mb.addr);
         mb.cycles = L2_LATENCY;
         mb.state = STATE_DELIVER_TO_L1;
         stats.dcache.missbuf.deliver.L3_to_L2++;
@@ -487,9 +487,9 @@ void MissBuffer<SIZE>::clock() {
                            (void*)(Waddr)mb.addr);
           // If the L2 line size is bigger than the L1 line size, this will validate multiple lines in the L1 when an L2 line arrives:
           // foreach (i, L2_LINE_SIZE / L1_LINE_SIZE) L1.validate(mb.addr + i*L1_LINE_SIZE, std::bitset<L1_LINE_SIZE>().set());
-          hierarchy.L1.validate(mb.addr, std::bitset<L1_LINE_SIZE>().set());
+          hierarchy->L1.validate(mb.addr, std::bitset<L1_LINE_SIZE>().set());
           stats.dcache.missbuf.deliver.L2_to_L1D++;
-          hierarchy.lfrq.wakeup(mb.addr, mb.lfrqmap);
+          hierarchy->lfrq.wakeup(mb.addr, mb.lfrqmap);
         }
         if unlikely (mb.icache) {
           // Sometimes we can initiate an icache miss on an existing dcache line in the missbuf
@@ -497,13 +497,13 @@ void MissBuffer<SIZE>::clock() {
                            (void*)(Waddr)mb.addr);
           // If the L2 line size is bigger than the L1 line size, this will validate multiple lines in the L1 when an L2 line arrives:
           // foreach (i, L2_LINE_SIZE / L1I_LINE_SIZE) L1I.validate(mb.addr + i*L1I_LINE_SIZE, std::bitset<L1I_LINE_SIZE>().set());
-          hierarchy.L1I.validate(mb.addr, std::bitset<L1I_LINE_SIZE>().set());
+          hierarchy->L1I.validate(mb.addr, std::bitset<L1I_LINE_SIZE>().set());
           stats.dcache.missbuf.deliver.L2_to_L1I++;
           LoadStoreInfo lsi = 0;
           lsi.rob = mb.rob;
           lsi.threadid = mb.threadid; /* FIXME: can mb.threadid be 0xfe at this point, and does that matter ? */
-          if likely (hierarchy.callback)
-            hierarchy.callback->icache_wakeup(lsi, mb.addr);
+          if likely (hierarchy->callback)
+            hierarchy->callback->icache_wakeup(lsi, mb.addr);
         }
 
         assert(!freemap[i]);

@@ -1642,7 +1642,7 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
   Iterator iter(this);
   BasicBlock* bb;
 
-  while (bb = iter.next()) {
+  while ((bb = iter.next())) {
     oldest = std::min(oldest, bb->lastused);
     newest = std::max(newest, bb->lastused);
     average += bb->lastused;
@@ -1674,7 +1674,7 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
   int reclaimed_objs = 0;
 
   iter.reset(this);
-  while (bb = iter.next()) {
+  while ((bb = iter.next())) {
     if unlikely (bb->refcount) {
       //
       // We cannot invalidate anything that's still in the pipeline.
@@ -1710,7 +1710,7 @@ int BasicBlockCache::reclaim(size_t bytesreq, int urgency) {
     int pages_freed = 0;
 
     logging::println(logging::DEBUG, "Scanning {} code pages:", bbpages.count);
-    while (page = iter.next()) {
+    while ((page = iter.next())) {
       if (page->empty()) {
         if (!page->refcount) {
           logging::println(logging::DEBUG, "  mfn {} has no entries; freeing", page->mfn);
@@ -1743,7 +1743,7 @@ void BasicBlockCache::flush() {
   {
     Iterator iter(this);
     BasicBlock* bb;
-    while (bb = iter.next()) {
+    while ((bb = iter.next())) {
       invalidate(bb, INVALIDATE_REASON_RECLAIM);
     }
   }
@@ -1757,7 +1757,7 @@ void BasicBlockCache::flush() {
     BasicBlockChunkList* page;
     int pages_freed = 0;
 
-    while (page = iter.next()) {
+    while ((page = iter.next())) {
       assert(page->empty());
       bbpages.remove(page);
       delete page;

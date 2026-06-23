@@ -49,13 +49,13 @@ struct OutOfOrderMachine : public PTLsimMachine {
   OutOfOrderCore* cores[MAX_SMT_CORES];
   std::bitset<MAX_CONTEXTS> stopped;
   std::string_view name() const override;
-  virtual bool init(PTLsimConfig& config);
-  virtual int run(PTLsimConfig& config);
-  virtual void reset();
+  virtual bool init(PTLsimConfig& config) override;
+  virtual int run(PTLsimConfig& config) override;
+  virtual void reset() override;
   virtual void dump_state();
-  virtual void update_stats(PTLsimStats& stats);
-  virtual void flush_tlb(Context& ctx);
-  virtual void flush_tlb_virt(Context& ctx, Waddr virtaddr);
+  virtual void update_stats(PTLsimStats& stats) override;
+  virtual void flush_tlb(Context& ctx) override;
+  virtual void flush_tlb_virt(Context& ctx, Waddr virtaddr) override;
   void flush_all_pipelines();
 };
 

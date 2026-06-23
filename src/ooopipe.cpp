@@ -1105,9 +1105,9 @@ int ReorderBufferEntry::select_cluster() {
     cluster_operand_tally[i] = 0;
   }
   foreach (i, MAX_OPERANDS) {
-    PhysicalRegister& r = *operands[i];
-    if ((&r) && ((r.state == PHYSREG_WAITING) || (r.state == PHYSREG_BYPASS)) && (r.rob->cluster >= 0))
-      cluster_operand_tally[r.rob->cluster]++;
+    PhysicalRegister* r = operands[i];
+    if (r && ((r->state == PHYSREG_WAITING) || (r->state == PHYSREG_BYPASS)) && (r->rob->cluster >= 0))
+      cluster_operand_tally[r->rob->cluster]++;
   }
 
   assert(executable_on_cluster);

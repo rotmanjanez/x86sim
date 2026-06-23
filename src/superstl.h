@@ -662,7 +662,7 @@ public:
     int n = 0;
     Iterator iter(this);
     T* t;
-    while (t = iter.next()) {
+    while ((t = iter.next())) {
       assert(n < count);
       result[n++] = t;
     }
@@ -827,7 +827,7 @@ struct ChunkList {
       Iterator iter(this);
       T* entry;
       int n = 0;
-      while (entry = iter.next()) {
+      while ((entry = iter.next())) {
         if unlikely (n >= limit)
           return n;
         a[n++] = *entry;
@@ -957,8 +957,8 @@ struct ChunkList {
   int getentries(T* a, int limit) {
     Iterator iter(this);
     T* entry;
-    int n;
-    while (entry = iter.next()) {
+    int n = 0;
+    while ((entry = iter.next())) {
       if unlikely (n >= limit)
         return n;
       a[n++] = *entry;
