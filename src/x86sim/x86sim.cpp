@@ -10,7 +10,6 @@
 #include "x86sim/logging.h"
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -258,6 +257,22 @@ void Machine::unmap(address_t start, std::uint64_t size) noexcept {
   address_space_->unmap(start, size);
 }
 
+std::expected<std::span<const std::byte>, MemoryError> Machine::read_memory(address_t start,
+                                                                           std::size_t num_bytes) const noexcept {
+  if (num_bytes == 0)
+    return std::span<const std::byte>{};
+
+  const auto page_remaining = kPageSize - (start & (kPageSize - 1));
+  if (num_bytes > page_remaining)
+    return std::unexpected(MemoryError::unmapped_address);
+
+  auto* src = static_cast<const std::byte*>(address_space_->page_virt_to_mapped(start));
+  if (!src)
+    return std::unexpected(MemoryError::unmapped_address);
+
+  return std::span<const std::byte>(src, num_bytes);
+}
+
 std::expected<void, MemoryError> Machine::write_memory(address_t start, std::span<const std::byte> bytes) noexcept {
   std::uint64_t processed = 0;
   while (processed < bytes.size()) {
@@ -271,19 +286,6 @@ std::expected<void, MemoryError> Machine::write_memory(address_t start, std::spa
     processed += chunk;
   }
   return {};
-}
-
-std::expected<std::span<const std::byte>, MemoryError> Machine::read_page(address_t page_aligned_address) const noexcept {
-  static std::array<std::byte, kPageSize> zero_page{};
-
-  if ((page_aligned_address & (kPageSize - 1)) != 0)
-    return std::unexpected(MemoryError::unaligned_address);
-
-  auto* src = static_cast<const std::byte*>(address_space_->page_virt_to_mapped(page_aligned_address));
-  if (!src)
-    src = zero_page.data();
-
-  return std::span<const std::byte>(src, kPageSize);
 }
 
 RunResult Machine::run(RunOptions options) {

@@ -25,6 +25,7 @@ target_sources(x86sim
     BASE_DIRS include
     FILES
       include/x86sim/logging.h
+      include/x86sim/registerfile.hpp
       include/x86sim/x86sim.hpp
 )
 target_include_directories(x86sim
@@ -38,13 +39,16 @@ add_library(x86sim::defaults ALIAS vcore_defaults)
 target_sources(vcore_defaults
   PRIVATE
     src/x86sim-support/raspsim-defaults.cpp
+    src/x86sim-support/syscall-linux.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
       include/x86sim-support/defaults.hpp
+      include/x86sim-support/syscall-linux.hpp
 )
 target_link_libraries(vcore_defaults PUBLIC x86sim::x86sim)
+target_include_directories(vcore_defaults PRIVATE src/x86sim)
 set_target_properties(vcore_defaults PROPERTIES EXPORT_NAME defaults)
 
 add_executable(raspsim

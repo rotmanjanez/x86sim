@@ -149,9 +149,9 @@ public:
 
   [[nodiscard]] std::expected<void, MemoryError> map(address_t start, std::uint64_t size, Protection) noexcept;
   void unmap(address_t start, std::uint64_t size) noexcept;
+  [[nodiscard]] std::expected<std::span<const std::byte>, MemoryError> read_memory(address_t start,
+                                                                                  std::size_t num_bytes) const noexcept;
   [[nodiscard]] std::expected<void, MemoryError> write_memory(address_t start, std::span<const std::byte>) noexcept;
-
-  [[nodiscard]] std::expected<std::span<const std::byte>, MemoryError> read_page(address_t page_aligned_address) const noexcept;
 
   [[nodiscard]] RunResult run(RunOptions = {});
 
@@ -322,9 +322,10 @@ struct std::formatter<x86sim::Options> {
   template<typename FormatContext>
   auto format(const x86sim::Options& options, FormatContext& ctx) const {
     return std::format_to(ctx.out(),
-                          "core={}, sse={}, x87={}, perfect_cache={}, static_branch_prediction={}, log_file={}",
-                          options.core, options.sse, options.x87, options.perfect_cache,
-                          options.static_branch_prediction, options.log_file.string());
+                          "core={}, core_count={}, sse={}, x87={}, perfect_cache={}, static_branchpred={}, "
+                          "log_filename={}",
+                          options.core, options.core_count, options.sse, options.x87, options.perfect_cache,
+                          options.static_branchpred, options.log_filename.string());
   }
 };
 
@@ -394,11 +395,12 @@ struct std::formatter<x86sim::Machine> {
     const auto& options = machine.options();
     const auto stats = machine.stats();
     return std::format_to(ctx.out(),
-                          "x86sim::Machine(core={}, address_space={}, cycles={}, instructions={}, sse={}, x87={}, "
-                          "perfect_cache={}, static_branch_prediction={})",
-                          options.core, static_cast<const void*>(&machine.address_space()), stats.cycles,
+                          "x86sim::Machine(core={}, core_count={}, address_space={}, cycles={}, instructions={}, "
+                          "sse={}, x87={}, perfect_cache={}, static_branch_prediction={}, core0={})",
+                          options.core, options.core_count, static_cast<const void*>(&machine.address_space()), stats.cycles,
                           stats.instructions, options.sse, options.x87, options.perfect_cache,
-                          options.static_branch_prediction);
+                          options.static_branchpred,
+                          options.core_count == 0 ? x86sim::RegisterFile{} : machine.register_file(0));
   }
 };
 

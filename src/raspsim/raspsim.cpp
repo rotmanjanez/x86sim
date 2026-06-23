@@ -278,7 +278,7 @@ int main(int argc, char** argv) {
   logging::eprintln("End state:\n{}", registers);
 
   for (x86sim::address_t addr : dump_pages) {
-    if (auto page = machine.read_page(addr)) {
+    if (auto page = machine.read_memory(addr, x86sim::Machine::kPageSize)) {
       logging::eprintln("Dump of memory at {}:", (void*)addr);
       print_hex_bytes(*page);
     } else {
