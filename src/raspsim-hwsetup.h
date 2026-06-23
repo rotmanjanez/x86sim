@@ -2,6 +2,7 @@
 #define _RASPSIM_HWSETUP_H_
 
 #include "typedefs.h"
+#include "ptlsim-api.h"
 #include "addrspace.h"
 #include <memory>
 #include <string>
@@ -64,6 +65,7 @@ public:
 
   static void handle_syscall_64bit();
   static void handle_syscall_32bit(int semantics);
+  static CpuidResult handle_cpuid(W32 func, W32 subfunc);
 };
 
 #endif

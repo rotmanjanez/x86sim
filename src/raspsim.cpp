@@ -126,6 +126,10 @@ void Raspsim::handle_syscall_32bit(int semantics) {
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
 }
 
+CpuidResult Raspsim::handle_cpuid(W32 func, W32 subfunc) {
+  return default_cpuid(func, subfunc, Raspsim::getContext().vcpuid);
+}
+
 
 bool handle_config_arg(Raspsim& sim, const std::string_view line, std::vector<Waddr>& dump_pages) {
   using std::operator""sv;

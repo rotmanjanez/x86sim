@@ -34,127 +34,6 @@ void assist_sysenter(Context& ctx) {
   // REG_rip is filled out for us
 }
 
-static const char cpuid_vendor[12 + 1] = "GenuineIntel";
-static const char cpuid_description[48 + 1] = "Intel(R) Xeon(TM) CPU 2.00 GHz                  ";
-
-//static const char cpuid_vendor[12+1] = "PTLsimCPUx64";
-//static const char cpuid_description[48+1] = "PTLsim Cycle Accurate x86-64 Simulator Model    ";
-
-
-//
-// CPUID level 0x00000001, result in %edx
-//
-#define X86_FEATURE_FPU (1 << 0) // Onboard FPU
-#define X86_FEATURE_VME (1 << 1) // Virtual Mode Extensions
-#define X86_FEATURE_DE (1 << 2)  // Debugging Extensions
-#define X86_FEATURE_PSE (1 << 3) // Page Size Extensions
-#define X86_FEATURE_TSC (1 << 4) // Time Stamp Counter
-#define X86_FEATURE_MSR (1 << 5) // Model-Specific Registers, RDMSR, WRMSR
-#define X86_FEATURE_PAE (1 << 6) // Physical Address Extensions
-#define X86_FEATURE_MCE (1 << 7) // Machine Check Architecture
-
-#define X86_FEATURE_CX8 (1 << 8)    // CMPXCHG8 instruction
-#define X86_FEATURE_APIC (1 << 9)   // Onboard APIC
-#define X86_FEATURE_BIT10 (1 << 10) // (undefined)
-#define X86_FEATURE_SEP (1 << 11)   // SYSENTER/SYSEXIT
-#define X86_FEATURE_MTRR (1 << 12)  // Memory Type Range Registers
-#define X86_FEATURE_PGE (1 << 13)   // Page Global Enable
-#define X86_FEATURE_MCA (1 << 14)   // Machine Check Architecture
-#define X86_FEATURE_CMOV (1 << 15)  // CMOV instruction (FCMOVCC and FCOMI too if FPU present)
-
-#define X86_FEATURE_PAT (1 << 16)   // Page Attribute Table
-#define X86_FEATURE_PSE36 (1 << 17) // 36-bit PSEs
-#define X86_FEATURE_PN (1 << 18)    // Processor serial number
-#define X86_FEATURE_CLFL (1 << 19)  // Supports the CLFLUSH instruction
-#define X86_FEATURE_NX (1 << 20)    // No-Execute page attribute
-#define X86_FEATURE_DTES (1 << 21)  // Debug Trace Store
-#define X86_FEATURE_ACPI (1 << 22)  // ACPI via MSR
-#define X86_FEATURE_MMX (1 << 23)   // Multimedia Extensions
-
-#define X86_FEATURE_FXSR (1 << 24)  // FXSAVE and FXRSTOR instructions; CR4.OSFXSR available
-#define X86_FEATURE_XMM (1 << 25)   // Streaming SIMD Extensions
-#define X86_FEATURE_XMM2 (1 << 26)  // Streaming SIMD Extensions-2
-#define X86_FEATURE_SNOOP (1 << 27) // CPU self snoop
-#define X86_FEATURE_HT (1 << 28)    // Hyper-Threading
-#define X86_FEATURE_ACC (1 << 29)   // Automatic clock control
-#define X86_FEATURE_IA64 (1 << 30)  // IA-64 processor
-#define X86_FEATURE_BIT31 (1 << 31) // (undefined)
-
-//
-// Xen forces us to mask some features (vme, de, pse, pge, sep, mtrr)
-// when returning the CPUID to a guest, since it uses these features itself.
-//
-#define PTLSIM_X86_FEATURE                                                                                             \
-  (X86_FEATURE_FPU | /*X86_FEATURE_VME | X86_FEATURE_DE | */ X86_FEATURE_PSE | X86_FEATURE_TSC | X86_FEATURE_MSR |     \
-   X86_FEATURE_PAE | X86_FEATURE_MCE | X86_FEATURE_CX8 | X86_FEATURE_APIC | /*X86_FEATURE_BIT10 | X86_FEATURE_SEP | */ \
-   /*X86_FEATURE_MTRR | X86_FEATURE_PGE | */ X86_FEATURE_MCA | X86_FEATURE_CMOV | X86_FEATURE_PAT |                    \
-   X86_FEATURE_PSE36 | X86_FEATURE_PN | X86_FEATURE_CLFL | X86_FEATURE_NX | /*X86_FEATURE_DTES | */ X86_FEATURE_ACPI | \
-   X86_FEATURE_MMX | X86_FEATURE_FXSR | X86_FEATURE_XMM | X86_FEATURE_XMM2 | X86_FEATURE_SNOOP |                       \
-   X86_FEATURE_HT /* | X86_FEATURE_ACC | X86_FEATURE_IA64 | X86_FEATURE_BIT31*/)
-
-//
-// CPUID level 0x00000001, result in %ecx
-//
-#define X86_EXT_FEATURE_XMM3 (1 << 0)  // Streaming SIMD Extensions-3
-#define X86_EXT_FEATURE_MWAIT (1 << 3) // Monitor/Mwait support
-#define X86_EXT_FEATURE_DSCPL (1 << 4) // CPL Qualified Debug Store
-#define X86_EXT_FEATURE_EST (1 << 7)   // Enhanced SpeedStep
-#define X86_EXT_FEATURE_TM2 (1 << 8)   // Thermal Monitor 2
-#define X86_EXT_FEATURE_CID (1 << 10)  // Context ID
-#define X86_EXT_FEATURE_CX16 (1 << 13) // CMPXCHG16B
-#define X86_EXT_FEATURE_XTPR (1 << 14) // Send Task Priority Messages
-
-#define PTLSIM_X86_EXT_FEATURE (X86_EXT_FEATURE_XMM3 | X86_EXT_FEATURE_CX16)
-
-//
-// CPUID level 0x80000001, result in %edx
-//
-#define X86_VENDOR_FEATURE_SYSCALL (1 << 11)  // SYSCALL/SYSRET
-#define X86_VENDOR_FEATURE_MMXEXT (1 << 22)   // AMD MMX extensions
-#define X86_VENDOR_FEATURE_FXSR_OPT (1 << 25) // FXSR optimizations
-#define X86_VENDOR_FEATURE_RDTSCP (1 << 27)   // RDTSCP instruction
-#define X86_VENDOR_FEATURE_LM (1 << 29)       // Long Mode (x86-64)
-#define X86_VENDOR_FEATURE_3DNOWEXT (1 << 30) // AMD 3DNow! extensions
-#define X86_VENDOR_FEATURE_3DNOW (1 << 31)    // 3DNow!
-
-#define PTLSIM_X86_VENDOR_FEATURE                                                                                      \
-  (X86_VENDOR_FEATURE_FXSR_OPT | X86_VENDOR_FEATURE_LM | (PTLSIM_X86_FEATURE & 0x1ffffff))
-
-//
-// CPUID level 0x80000001, result in %ecx
-//
-#define X86_VENDOR_EXT_FEATURE_LAHF_LM (1 << 0)    // LAHF/SAHF in long mode
-#define X86_VENDOR_EXT_FEATURE_CMP_LEGACY (1 << 1) // If yes HyperThreading not valid
-#define X86_VENDOR_EXT_FEATURE_SVM (1 << 2)        // Secure Virtual Machine extensions
-
-//
-// Make sure we do NOT define CMP_LEGACY since PTLsim may have multiple threads
-// per core enabled and the guest OS must optimize cache coherency as such.
-//
-#define PTLSIM_X86_VENDOR_EXT_FEATURE (X86_VENDOR_EXT_FEATURE_LAHF_LM)
-
-union ProcessorModelInfo {
-  struct {
-    W32 stepping : 4, model : 4, family : 4, reserved1 : 4, extmodel : 4, extfamily : 8, reserved2 : 4;
-  } fields;
-  W32 data;
-};
-
-union ProcessorMiscInfo {
-  struct {
-    W32 brandid : 8, clflush : 8, reserved : 8, apicid : 8;
-  } fields;
-  W32 data;
-};
-
-#define PTLSIM_X86_MODEL_INFO                                                                                          \
-  ((0 << 0) /* stepping */ | (0 << 4) /* model */ | (15 << 8) /* family */ | (0 << 12) /* reserved1 */ |               \
-   (0 << 16) /* extmodel */ | (0 << 20) /* extfamily */ | (0 << 24))
-
-#define PTLSIM_X86_MISC_INFO                                                                                           \
-  ((0 << 0) /* brandid */ | (8 << 8) /* line size (8 x 8 = 64) */ | (0 << 16) /* reserved */ |                         \
-   (0 << 24)) /* APIC ID (must be patched later!) */
-
 void assist_cpuid(Context& ctx) {
   W64& rax = ctx.commitarf[REG_rax];
   W64& rbx = ctx.commitarf[REG_rbx];
@@ -162,76 +41,14 @@ void assist_cpuid(Context& ctx) {
   W64& rdx = ctx.commitarf[REG_rdx];
 
   W32 func = rax;
+  W32 subfunc = rcx;
   logging::println("assist_cpuid: func 0x{:08x} called from {}:", func, (void*)(Waddr)ctx.commitarf[REG_selfrip]);
 
-  switch (func) {
-  case 0: {
-    // Max avail function spec and vendor ID:
-    const W32* vendor = (const W32*)&cpuid_vendor;
-    rax = 2; // two extended function
-    rbx = vendor[0];
-    rdx = vendor[1];
-    rcx = vendor[2];
-    break;
-  }
-
-  case 1: {
-    // Model and capability information
-    rax = PTLSIM_X86_MODEL_INFO; // model
-    rbx = PTLSIM_X86_MISC_INFO | (ctx.vcpuid << 24);
-    rcx = PTLSIM_X86_EXT_FEATURE;
-    rdx = PTLSIM_X86_FEATURE;
-    break;
-  }
-
-  case 2: {
-    // Dummy cache informations, required by glibc
-    rax = 0; // TODO
-    rbx = 0;
-    rcx = 0;
-    rdx = 0;
-    break;
-  }
-
-  case 0x80000000: {
-    // Max avail extended function spec and vendor ID:
-    const W32* vendor = (const W32*)&cpuid_vendor;
-    rax = 4;
-    rbx = vendor[0];
-    rdx = vendor[1];
-    rcx = vendor[2];
-    break;
-  }
-
-  case 0x80000001: {
-    // extended feature info
-    rax = PTLSIM_X86_MODEL_INFO;
-    rbx = 0; // brand ID
-    rcx = PTLSIM_X86_VENDOR_EXT_FEATURE;
-    rdx = PTLSIM_X86_VENDOR_FEATURE;
-    break;
-  }
-
-  case 0x80000002 ... 0x80000004: {
-    // processor name string
-    const W32* cpudesc = (const W32*)(&cpuid_description[(func - 0x80000002) * 16]);
-    rax = cpudesc[0];
-    rbx = cpudesc[1];
-    rcx = cpudesc[2];
-    rdx = cpudesc[3];
-    break;
-  }
-
-  default: {
-    W32 eax, ebx, ecx, edx;
-    cpuid(func, eax, ebx, ecx, edx);
-    rax = eax;
-    rbx = ebx;
-    rcx = ecx;
-    rdx = edx;
-    break;
-  }
-  }
+  CpuidResult result = handle_cpuid(func, subfunc);
+  rax = result.eax;
+  rbx = result.ebx;
+  rcx = result.ecx;
+  rdx = result.edx;
 
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
 }

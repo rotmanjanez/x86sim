@@ -423,6 +423,10 @@ void handle_syscall_32bit(int semantics) {
   Raspsim::handle_syscall_32bit(semantics);
 }
 
+CpuidResult handle_cpuid(W32 func, W32 subfunc) {
+  return Raspsim::handle_cpuid(func, subfunc);
+}
+
 // This is where we end up after issuing opcode 0x0f37 (undocumented x86 PTL call opcode)
 void assist_ptlcall(Context& ctx) {
   requested_switch_to_native = 1; // exit

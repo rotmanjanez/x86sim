@@ -680,3 +680,7 @@ void Raspsim::handle_syscall_64bit() {
   PyRaspsim::X86Exception = {"Syscall not supported"};
   longjmp(PyRaspsim::simexit, 1);
 }
+
+CpuidResult Raspsim::handle_cpuid(W32 func, W32 subfunc) {
+  return default_cpuid(func, subfunc, Raspsim::getContext().vcpuid);
+}
