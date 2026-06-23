@@ -1358,7 +1358,7 @@ struct ThreadContext {
 
   int threadid;
   Options& config;
-  Context context;
+  Context ctx;
   BranchPredictorInterface branchpred;
 
   Queue<FetchBufferEntry, FETCH_QUEUE_SIZE> fetchq;
@@ -1438,11 +1438,7 @@ struct ThreadContext {
   byte queued_mem_lock_release_count;
   W64 queued_mem_lock_release_list[4];
 
-  ThreadContext(OutOfOrderCore& core_, int threadid_)
-      : core(core_), threadid(threadid_), config(core_.machine.config), context(config, core_.machine, threadid_),
-        ctx(context) {
-    reset();
-  }
+  ThreadContext(OutOfOrderCore& core_, int threadid_);
 
   int commit();
   int writeback(int cluster);
@@ -1673,6 +1669,12 @@ struct OutOfOrderCore {
   void check_refcounts();
   void check_rob();
 };
+
+inline ThreadContext::ThreadContext(OutOfOrderCore& core_, int threadid_)
+    : core(core_), threadid(threadid_), config(core_.machine.config), ctx(config, core_.machine, threadid_),
+      branchpred(config) {
+  reset();
+}
 
 inline OutOfOrderCoreEvent* OutOfOrderCoreEvent::fill_commit(int type, const ReorderBufferEntry* rob) {
   fill(type, rob);

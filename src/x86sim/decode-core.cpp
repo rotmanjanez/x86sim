@@ -2128,6 +2128,7 @@ std::string format_flags(W64 flags) {
 //
 BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
   AddressSpace& asp = ctx.machine->address_space();
+  Options& config = ctx.machine_impl->config;
 
   if unlikely ((rvp.rip == config.start_log_at_rip) && (rvp.rip != 0xffffffffffffffffULL)) {
     config.start_log_at_iteration = 0;
@@ -2258,6 +2259,8 @@ BasicBlock* BasicBlockCache::translate(Context& ctx, const RIPVirtPhys& rvp) {
 // This function does not allocate any memory.
 //
 void BasicBlockCache::translate_in_place(BasicBlock& targetbb, Context& ctx, Waddr rip) {
+  Options& config = ctx.machine_impl->config;
+
   if unlikely ((rip == config.start_log_at_rip) && (rip != MAX_RIP)) {
     config.start_log_at_iteration = 0;
     logenable = 1;
@@ -2294,6 +2297,8 @@ void BasicBlockCache::translate_in_place(BasicBlock& targetbb, Context& ctx, Wad
 }
 
 BasicBlock* BasicBlockCache::translate_and_clone(Context& ctx, Waddr rip) {
+  Options& config = ctx.machine_impl->config;
+
   if unlikely ((rip == config.start_log_at_rip) && (rip != MAX_RIP)) {
     config.start_log_at_iteration = 0;
     logenable = 1;

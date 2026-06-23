@@ -121,10 +121,12 @@ bool IssueQueue<size, operandcount>::insert(tag_t uopid, const tag_t* operands, 
 template<int size, int operandcount>
 void IssueQueue<size, operandcount>::tally_broadcast_matches(IssueQueue<size, operandcount>::tag_t sourceid,
                                                              const std::bitset<size>& mask, int operand) const {
+  OutOfOrderCore& core = getcore();
+  Options& config = core.config;
+
   if likely (!config.event_log_enabled)
     return;
 
-  OutOfOrderCore& core = getcore();
   int threadid, rob_idx;
   decode_tag(sourceid, threadid, rob_idx);
   auto& thread = core.threads[threadid];
@@ -165,6 +167,7 @@ void IssueQueue<size, operandcount>::tally_broadcast_matches(IssueQueue<size, op
 
 template<int size, int operandcount>
 bool IssueQueue<size, operandcount>::broadcast(tag_t uopid) {
+  Options& config = getcore().config;
   vec_t tagvec = assoc_t::prep(uopid);
 
   foreach (operand, operandcount) {
@@ -262,6 +265,7 @@ declare_issueq_templates;
 int ReorderBufferEntry::issue() {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
   OutOfOrderCoreEvent* event = null;
 
   W32 executable_on_fu = fuinfo[uop.opcode].fu & clusters[cluster].fu_mask & core.fu_avail;
@@ -623,6 +627,7 @@ bool ReorderBufferEntry::handle_common_load_store_exceptions(LoadStoreQueueEntry
                                                              int& exception, PageFaultErrorCode& pfec) {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
 
   bool st = isstore(uop.opcode);
   int aligntype = uop.cond;
@@ -702,6 +707,7 @@ bool ReorderBufferEntry::release_mem_lock(bool forced) {
 
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
 
   if unlikely (config.event_log_enabled) {
     OutOfOrderCoreEvent* event = core.eventlog.add_load_store(
@@ -750,6 +756,7 @@ int ReorderBufferEntry::issuestore(LoadStoreQueueEntry& state, Waddr& origaddr, 
   LoadStoreAliasPredictor& lsap = thread.lsap;
 
   OutOfOrderCore& core = getcore();
+  Options& config = thread.config;
   OutOfOrderCoreEvent* event;
 
   int sizeshift = uop.size;
@@ -1090,6 +1097,7 @@ int ReorderBufferEntry::issueload(LoadStoreQueueEntry& state, Waddr& origaddr, W
                                   PTEUpdate& pteupdate) {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
   Queue<LoadStoreQueueEntry, LSQ_SIZE>& LSQ = thread.LSQ;
   LoadStoreAliasPredictor& lsap = thread.lsap;
 
@@ -1494,6 +1502,7 @@ int ReorderBufferEntry::issueload(LoadStoreQueueEntry& state, Waddr& origaddr, W
 int ReorderBufferEntry::probecache(Waddr addr, LoadStoreQueueEntry* sfra) {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
   OutOfOrderCoreEvent* event;
   int sizeshift = uop.size;
   int aligntype = uop.cond;
@@ -1596,6 +1605,7 @@ int ReorderBufferEntry::issuefence(LoadStoreQueueEntry& state) {
   ThreadContext& thread = getthread();
 
   OutOfOrderCore& core = getcore();
+  Options& config = thread.config;
   OutOfOrderCoreEvent* event;
 
   assert(uop.opcode == OP_mf);
@@ -1696,6 +1706,8 @@ void OutOfOrderCoreCacheCallbacks::dcache_wakeup(LoadStoreInfo lsi, W64 physaddr
 }
 
 void ReorderBufferEntry::loadwakeup() {
+  Options& config = getcore().config;
+
   if (tlb_walk_level) {
     // Wake up from TLB walk wait and move to next level
     if unlikely (config.event_log_enabled)
@@ -1722,6 +1734,7 @@ void ReorderBufferEntry::loadwakeup() {
 
 void ReorderBufferEntry::fencewakeup() {
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
 
   if unlikely (config.event_log_enabled)
     getcore().eventlog.add_commit(EVENT_COMMIT_FENCE_COMPLETED, this);
@@ -1770,6 +1783,7 @@ void ReorderBufferEntry::fencewakeup() {
 void ReorderBufferEntry::replay() {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
 
   if unlikely (config.event_log_enabled) {
     OutOfOrderCoreEvent* event = core.eventlog.add(EVENT_REPLAY, this);
@@ -1814,6 +1828,7 @@ void ReorderBufferEntry::replay() {
 void ReorderBufferEntry::replay_locked() {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
 
   if unlikely (config.event_log_enabled) {
     OutOfOrderCoreEvent* event = core.eventlog.add(EVENT_REPLAY, this);
@@ -1923,6 +1938,7 @@ int OutOfOrderCore::issue(int cluster) {
 // forwarding networks.
 //
 int ReorderBufferEntry::forward() {
+  Options& config = getcore().config;
   ReorderBufferEntry* target;
   int wakeupcount = 0;
 
@@ -1978,6 +1994,7 @@ W64 ReorderBufferEntry::annul(bool keep_misspec_uop, bool return_first_annulled_
   OutOfOrderCore& core = getcore();
 
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
   BranchPredictorInterface& branchpred = thread.branchpred;
   Queue<ReorderBufferEntry, ROB_SIZE>& ROB = thread.ROB;
   Queue<LoadStoreQueueEntry, LSQ_SIZE>& LSQ = thread.LSQ;
@@ -2209,6 +2226,7 @@ W64 ReorderBufferEntry::annul(bool keep_misspec_uop, bool return_first_annulled_
 void ReorderBufferEntry::redispatch(const std::bitset<MAX_OPERANDS>& dependent_operands, ReorderBufferEntry* prevrob) {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
 
   if (issued) {
     issued = 0;
@@ -2285,6 +2303,7 @@ void ReorderBufferEntry::redispatch(const std::bitset<MAX_OPERANDS>& dependent_o
 void ReorderBufferEntry::redispatch_dependents(bool inclusive) {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
   Queue<ReorderBufferEntry, ROB_SIZE>& ROB = thread.ROB;
 
   std::bitset<ROB_SIZE> depmap;
@@ -2353,6 +2372,7 @@ int ReorderBufferEntry::pseudocommit() {
   OutOfOrderCore& core = getcore();
 
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
   RegisterRenameTable& specrrt = thread.specrrt;
   RegisterRenameTable& commitrrt = thread.commitrrt;
 

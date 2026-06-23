@@ -1094,6 +1094,7 @@ bool ReorderBufferEntry::find_sources() {
 }
 
 int ReorderBufferEntry::select_cluster() {
+  Options& config = getcore().config;
   OutOfOrderCoreEvent* event;
 
   if (MAX_CLUSTERS == 1) {
@@ -1534,6 +1535,7 @@ void ThreadContext::flush_mem_lock_release_list(int start) {
 int ReorderBufferEntry::commit() {
   OutOfOrderCore& core = getcore();
   ThreadContext& thread = getthread();
+  Options& config = thread.config;
   Context& ctx = thread.ctx;
   bool all_ready_to_commit = true;
   bool macro_op_has_exceptions = false;

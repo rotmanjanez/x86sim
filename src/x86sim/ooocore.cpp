@@ -991,6 +991,8 @@ void EventLog::flush(bool only_to_tail) {
 }
 
 void EventLog::print(bool only_to_tail) {
+  Options& config = machine.config;
+
   if (tail >= end)
     tail = start;
   if (tail < start)

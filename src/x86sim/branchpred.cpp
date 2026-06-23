@@ -188,12 +188,16 @@ namespace x86sim {
 template<int METASIZE, int BIMODSIZE, int L1SIZE, int L2SIZE, int SHIFTWIDTH, bool HISTORYXOR, int BTBSETS, int BTBWAYS,
          int RASSIZE>
 struct CombinedPredictor {
+  Options& config;
+
   TwoLevelPredictor<L1SIZE, L2SIZE, SHIFTWIDTH, HISTORYXOR> twolevel;
   BimodalPredictor<BIMODSIZE> bimodal;
   BimodalPredictor<METASIZE> meta;
 
   BranchTargetBuffer<BTBSETS, BTBWAYS> btb;
   ReturnAddressStack<RASSIZE> ras;
+
+  explicit CombinedPredictor(Options& config_) : config(config_) {}
 
   void reset() {
     twolevel.reset();
@@ -362,7 +366,10 @@ struct CombinedPredictor {
 
 // template <int METASIZE, int BIMODSIZE, int L1SIZE, int L2SIZE, int SHIFTWIDTH, bool HISTORYXOR, int BTBSETS, int BTBWAYS, int RASSIZE>
 // G-share constraints: METASIZE, BIMODSIZE, 1, L2SIZE, log2(L2SIZE), (HISTORYXOR = true), BTBSETS, BTBWAYS, RASSIZE
-struct BranchPredictorImplementation : public CombinedPredictor<65536, 65536, 1, 65536, 16, 1, 1024, 4, 1024> {};
+struct BranchPredictorImplementation : public CombinedPredictor<65536, 65536, 1, 65536, 16, 1, 1024, 4, 1024> {
+  explicit BranchPredictorImplementation(Options& config)
+      : CombinedPredictor<65536, 65536, 1, 65536, 16, 1, 1024, 4, 1024>(config) {}
+};
 
 void BranchPredictorInterface::destroy() {
   if (impl)
@@ -376,7 +383,7 @@ void BranchPredictorInterface::reset() {
 
 void BranchPredictorInterface::init() {
   destroy();
-  impl = new BranchPredictorImplementation();
+  impl = new BranchPredictorImplementation(config);
   reset();
 }
 

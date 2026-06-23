@@ -58,12 +58,15 @@ extern W64 branchpred_ras_underflows;
 extern W64 branchpred_ras_annuls;
 
 struct BranchPredictorImplementation;
+struct Options;
 
 struct BranchPredictorInterface {
+  Options& config;
+
   // Pointer to private implementation:
   BranchPredictorImplementation* impl;
 
-  BranchPredictorInterface() { impl = null; }
+  explicit BranchPredictorInterface(Options& config_) : config(config_), impl(null) {}
   void init();
   void reset();
   void destroy();
@@ -73,8 +76,6 @@ struct BranchPredictorInterface {
   void annulras(const PredictorUpdate& predinfo);
   void flush();
 };
-
-extern BranchPredictorInterface branchpred;
 
 } // namespace x86sim
 

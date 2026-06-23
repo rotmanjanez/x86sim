@@ -42,16 +42,18 @@ std::string current_bbcache_dump_filename;
 
 void backup_and_reopen_logfile(const Options& options) {
   if (!options.log_filename.empty()) {
+    std::string log_filename = options.log_filename.string();
+
     // Close existing log
     logging::flush();
 
     // Backup old log file
-    std::string oldname = std::format("{}.backup", options.log_filename);
+    std::string oldname = std::format("{}.backup", log_filename);
     std::remove(oldname.c_str());
-    std::rename(options.log_filename.c_str(), oldname.c_str());
+    std::rename(log_filename.c_str(), oldname.c_str());
 
     // Open new log file
-    logging::set_file_sink(options.log_filename.c_str());
+    logging::set_file_sink(log_filename.c_str());
   }
 }
 
@@ -66,10 +68,11 @@ void force_logging_enabled(Options& options) {
 bool handle_config_change(Options& options, int argc, char** argv) {
   static bool first_time = true;
 
-  if (!options.log_filename.empty() && (options.log_filename != current_log_filename)) {
+  std::string log_filename = options.log_filename.string();
+  if (!options.log_filename.empty() && (log_filename != current_log_filename)) {
     // Can also use "-logfile /dev/fd/1" to send to stdout (or /dev/fd/2 for stderr):
     backup_and_reopen_logfile(options);
-    current_log_filename = options.log_filename;
+    current_log_filename = log_filename;
   }
 
   // Set log level in the new logging system

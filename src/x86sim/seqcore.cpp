@@ -492,6 +492,8 @@ struct SequentialCoreEventLog {
 
   SequentialCoreEvent* add() {
     if unlikely (tail >= end) {
+      assert(machine);
+      Options& config = machine->config;
       tail = start;
       if likely ((config.loglevel >= 6) || config.flush_event_log_every_cycle)
         flush();
@@ -556,6 +558,9 @@ void SequentialCoreEventLog::flush(bool only_to_tail) {
 void SequentialCoreEventLog::print(bool only_to_tail) {
   if (!start)
     return;
+
+  assert(machine);
+  Options& config = machine->config;
 
   if (tail > end)
     tail = start;
