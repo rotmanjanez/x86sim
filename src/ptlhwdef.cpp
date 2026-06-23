@@ -388,7 +388,7 @@ void Context::fxrstor(const FXSAVEStruct& state) {
 
   // x86 FSAVE state is in order of stack rather than physical registers:
   foreach (i, 8) {
-    fpstack[lowbits(state.sw.tos + i, 3)] = x87_fp_80bit_to_64bit(&state.fpregs[i].reg);
+    fpstack[lowbits(state.sw.tos + i, 3)] = x87_fp_80bit_to_64bit(&state.fpregs[i].reg, fpcw.rc);
   }
 
   mxcsr = state.mxcsr & state.mxcsr_mask;

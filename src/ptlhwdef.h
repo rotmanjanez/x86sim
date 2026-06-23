@@ -298,39 +298,137 @@ struct FXSAVEStruct {
   XMMReg xmmregs[16];
 };
 
-inline W64 x87_fp_80bit_to_64bit(const X87Reg* x87reg) {
-  W64 reg64;
-  asm("fldt (%[mem80])\n"
-      "fstpl %[mem64]\n"
-      :
-      : [mem64] "m"(reg64), [mem80] "r"(x87reg));
-  return reg64;
+inline W64 x87_overflowed_double_bits(bool negative, int rc) {
+  bool infinity = (rc == 0) || (rc == 2 && !negative) || (rc == 1 && negative);
+  W64 exponent = infinity ? 0x7ffULL : 0x7feULL;
+  W64 fraction = infinity ? 0 : ((1ULL << 52) - 1);
+  return (W64(negative) << 63) | (exponent << 52) | fraction;
+}
+
+inline W64 x87_round_shift_right(W64 value, unsigned shift, bool negative, int rc) {
+  if (shift == 0)
+    return value;
+
+  W64 rounded = 0;
+  bool increment = false;
+
+  if (shift < 64) {
+    rounded = value >> shift;
+    W64 remainder = value & ((1ULL << shift) - 1);
+    W64 half = 1ULL << (shift - 1);
+    switch (rc) {
+    case 1: increment = negative && remainder; break;
+    case 2: increment = !negative && remainder; break;
+    case 3: increment = false; break;
+    default: increment = (remainder > half) || (remainder == half && (rounded & 1)); break;
+    }
+  } else {
+    switch (rc) {
+    case 1: increment = negative && value; break;
+    case 2: increment = !negative && value; break;
+    case 3: increment = false; break;
+    default: increment = (shift == 64) && (value > (1ULL << 63)); break;
+    }
+  }
+
+  return rounded + increment;
+}
+
+inline W64 x87_nan_double_bits(bool negative, W64 significand) {
+  W64 payload = (significand & ((1ULL << 63) - 1)) >> 11;
+  payload |= 1ULL << 51;
+  return (W64(negative) << 63) | (0x7ffULL << 52) | payload;
+}
+
+inline W64 x87_fp_80bit_to_64bit(const X87Reg* x87reg, int rc = 0) {
+  const byte* bytes = *x87reg;
+  W64 significand = 0;
+  foreach (i, 8)
+    significand |= W64(bytes[i]) << (i * 8);
+
+  W16 sign_and_exponent = W16(bytes[8]) | (W16(bytes[9]) << 8);
+  bool negative = bit(sign_and_exponent, 15);
+  W16 exponent = sign_and_exponent & 0x7fff;
+  W64 sign = W64(negative) << 63;
+
+  if (exponent == 0) {
+    if (significand == 0)
+      return sign;
+
+    // Any true or pseudo binary80 denormal is far below the binary64 range.
+    if ((rc == 2 && !negative) || (rc == 1 && negative))
+      return sign | 1;
+    return sign;
+  }
+
+  bool explicit_integer_bit = bit(significand, 63);
+  if (exponent == 0x7fff) {
+    if (explicit_integer_bit && ((significand & ((1ULL << 63) - 1)) == 0))
+      return sign | (0x7ffULL << 52);
+    return x87_nan_double_bits(negative, significand);
+  }
+
+  if (!explicit_integer_bit)
+    return x87_nan_double_bits(negative, significand);
+
+  int unbiased_exponent = int(exponent) - 16383;
+  if (unbiased_exponent > 1023)
+    return x87_overflowed_double_bits(negative, rc);
+
+  if (unbiased_exponent >= -1022) {
+    W64 rounded = x87_round_shift_right(significand, 11, negative, rc);
+    if (rounded == (1ULL << 53)) {
+      rounded >>= 1;
+      unbiased_exponent++;
+      if (unbiased_exponent > 1023)
+        return x87_overflowed_double_bits(negative, rc);
+    }
+    W64 double_exponent = W64(unbiased_exponent + 1023);
+    W64 fraction = rounded & ((1ULL << 52) - 1);
+    return sign | (double_exponent << 52) | fraction;
+  }
+
+  int shift = -unbiased_exponent - 1011;
+  W64 rounded = x87_round_shift_right(significand, unsigned(shift), negative, rc);
+  if (rounded >= (1ULL << 52))
+    return sign | (1ULL << 52);
+  return sign | rounded;
 }
 
 inline void x87_fp_64bit_to_80bit(X87Reg* x87reg, W64 reg64) {
-  asm("fldl %[mem64]\n"
-      "fstpt (%[mem80])\n"
-      :
-      : [mem80] "r"(*x87reg), [mem64] "m"(reg64)
-      : "memory");
-}
+  byte* bytes = *x87reg;
+  foreach (i, 10)
+    bytes[i] = 0;
 
-inline void cpu_fsave(X87State& state) {
-  asm volatile("fsave %[state]" : [state] "=m"(*&state));
-}
+  bool negative = bit(reg64, 63);
+  W16 exponent = W16((reg64 >> 52) & 0x7ff);
+  W64 fraction = reg64 & ((1ULL << 52) - 1);
 
-inline void cpu_frstor(X87State& state) {
-  asm volatile("frstor %[state]" : : [state] "m"(*&state));
-}
+  W16 x87_exponent = 0;
+  W64 significand = 0;
 
-inline W16 cpu_get_fpcw() {
-  W16 fpcw;
-  asm volatile("fstcw %[fpcw]" : [fpcw] "=m"(fpcw));
-  return fpcw;
-}
+  if (exponent == 0) {
+    if (fraction != 0) {
+      int highest_bit = 63 - std::countl_zero(fraction);
+      x87_exponent = W16(highest_bit - 1074 + 16383);
+      significand = fraction << (63 - highest_bit);
+    }
+  } else if (exponent == 0x7ff) {
+    x87_exponent = 0x7fff;
+    significand = 1ULL << 63;
+    if (fraction != 0)
+      significand |= (fraction << 11) | (1ULL << 62);
+  } else {
+    x87_exponent = W16(int(exponent) - 1023 + 16383);
+    significand = (1ULL << 63) | (fraction << 11);
+  }
 
-inline void cpu_set_fpcw(W16 fpcw) {
-  asm volatile("fldcw %[fpcw]" : : [fpcw] "m"(fpcw));
+  foreach (i, 8)
+    bytes[i] = byte(significand >> (i * 8));
+
+  W16 sign_and_exponent = (W16(negative) << 15) | x87_exponent;
+  bytes[8] = byte(sign_and_exponent);
+  bytes[9] = byte(sign_and_exponent >> 8);
 }
 
 struct SegmentDescriptor {

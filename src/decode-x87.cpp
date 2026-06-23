@@ -8,11 +8,24 @@
 #include "decode.h"
 #include "logging.h"
 
+#include <cmath>
+#include <numbers>
+
 //
 // x87 assists
 //
 
 #define FP_STACK_MASK 0x3f
+
+// Round per the x87 FPCW rounding-control field (0=nearest, 1=down, 2=up, 3=truncate)
+static double x87_round(double v, int rc) {
+  switch (rc) {
+  case 1: return std::floor(v);
+  case 2: return std::ceil(v);
+  case 3: return std::trunc(v);
+  default: return std::nearbyint(v);
+  }
+}
 
 void assist_x87_fist(Context& ctx) {
   W64& tos = ctx.commitarf[REG_fptos];
@@ -21,13 +34,9 @@ void assist_x87_fist(Context& ctx) {
   W64 pop = ctx.commitarf[REG_ar2] & 0x1;
   W64 st0 = ctx.fpstack[tos >> 3];
   SSEType st0u(st0);
-  W16 oldfpcw = cpu_get_fpcw();
 
-  cpu_set_fpcw(ctx.fpcw);
-  asm("fldl %0\n\t"
-      "fistpll %0\n\t"
-      : "+m"(st0u.d));
-  cpu_set_fpcw(oldfpcw);
+  const double r = x87_round(st0u.d, ctx.fpcw.rc);
+  st0u.w64 = (r >= -0x1p63 && r < 0x1p63) ? W64(W64s(r)) : (W64(1) << 63); // out of range/NaN: integer indefinite
 
   PageFaultErrorCode pfec;
   Waddr faultaddr;
@@ -45,8 +54,6 @@ void assist_x87_fist(Context& ctx) {
 }
 
 void assist_x87_fldcw(Context& ctx) {
-  W16 new_fpcw = (W16)ctx.fpcw;
-  cpu_set_fpcw(new_fpcw);
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
 }
 
@@ -57,23 +64,16 @@ void assist_x87_fprem(Context& ctx) {
   SSEType st0u(st0);
   SSEType st1u(st1);
 
-  X87StatusWord fpsw;
-  asm("fldl %[st1]\n"
-      "fldl %[st0]\n"
-      "fprem\n"
-      "fstsw %%ax\n"
-      "fstpl %[st0]\n"
-      "ffree %%st(0)\n"
-      "fincstp\n"
-      : [st0] "+m"(st0u.d), "=a"(*(W16*)&fpsw)
-      : [st1] "m"(st1u.d));
+  const double quot = std::trunc(st0u.d / st1u.d);
+  const W64 q = (std::fabs(quot) < 0x1p63) ? W64(W64s(quot)) : 0;
+  st0u.d = std::fmod(st0u.d, st1u.d);
   st0 = st0u.w64;
 
   X87StatusWord* sw = (X87StatusWord*)&ctx.commitarf[REG_fpsw];
-  sw->c0 = fpsw.c0;
-  sw->c1 = fpsw.c1;
-  sw->c2 = fpsw.c2;
-  sw->c3 = fpsw.c3;
+  sw->c0 = bit(q, 2);
+  sw->c1 = bit(q, 0);
+  sw->c2 = 0; // reduction complete
+  sw->c3 = bit(q, 1);
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
 }
 
@@ -105,21 +105,15 @@ void assist_x87_fprem(Context& ctx) {
 //
 
 double x87_fyl2xp1(double st1, double st0) {
-  double stout;
-  asm("fldl %[st1]; fldl %[st0]; fyl2xp1; fstpl %[stout];" : [stout] "=m"(stout) : [st0] "m"(st0), [st1] "m"(st1));
-  return stout;
+  return st1 * std::log1p(st0) * std::numbers::log2e;
 }
 
 double x87_fyl2x(double st1, double st0) {
-  double stout;
-  asm("fldl %[st1]; fldl %[st0]; fyl2x; fstpl %[stout];" : [stout] "=m"(stout) : [st0] "m"(st0), [st1] "m"(st1));
-  return stout;
+  return st1 * std::log2(st0);
 }
 
 double x87_fpatan(double st1, double st0) {
-  double stout;
-  asm("fldl %[st1]; fldl %[st0]; fpatan; fstpl %[stout];" : [stout] "=m"(stout) : [st0] "m"(st0), [st1] "m"(st1));
-  return stout;
+  return std::atan2(st1, st0);
 }
 
 // st(1) = st(1) * log2(st(0)) and pop st(0)
@@ -169,32 +163,9 @@ make_unary_x87_func(f2xm1, std::exp2(ra.d) - 1);
 
 void assist_x87_frndint(Context& ctx) {
   W64& r = ctx.fpstack[ctx.commitarf[REG_fptos] >> 3];
-#if 0
-  assert(0);  // Now implemented using uops
   SSEType ra(r);
-  switch (ctx.fpcw.rc) {
-  case 0: // round to nearest (round)
-    ra.d = std::round(ra.d); break;
-  case 1: // round down (floor)
-    ra.d = std::floor(ra.d); break;
-  case 2: // round up (ceil)
-    ra.d = std::ceil(ra.d); break;
-  case 3: // round towards zero (trunc)
-    ra.d = std::trunc(ra.d); break;
-  }
+  ra.d = x87_round(ra.d, ctx.fpcw.rc);
   r = ra.w64;
-#else
-  int ofpcw; // Old fpcw
-  int tfpcw = ctx.fpcw & 0x0c00 | 0x37f;
-  asm("fstcw %0    \n\t"
-      "fldcw %4    \n\t"
-      "fldl  %3    \n\t"
-      "frndint     \n\t"
-      "fstpl %1    \n\t"
-      "fldcw %2"
-      : "=m"(ofpcw), "=m"(r)
-      : "m"(ofpcw), "m"(r), "m"(tfpcw));
-#endif
 
   X87StatusWord* sw = (X87StatusWord*)&ctx.commitarf[REG_fpsw];
   sw->c1 = 0;
@@ -226,7 +197,9 @@ make_two_output_x87_func_with_push(fsincos, (st1u.d = std::cos(st0u.d), st0u.d =
 // st(0) = tan(st(0)) and push value 1.0
 make_two_output_x87_func_with_push(fptan, (st1u.d = 1.0, st0u.d = std::tan(st0u.d)));
 
-make_two_output_x87_func_with_push(fxtract, (st1u.d = significand(st0u.d), st0u.d = std::ilogb(st0u.d)));
+// st(0) = significand in [1,2) and push the unbiased exponent
+make_two_output_x87_func_with_push(fxtract, (st1u.d = std::scalbn(st0u.d, -std::ilogb(st0u.d)),
+                                             st0u.d = double(std::ilogb(st0u.d))));
 
 void assist_x87_fprem1(Context& ctx) {
   W64& tos = ctx.commitarf[REG_fptos];
@@ -235,17 +208,16 @@ void assist_x87_fprem1(Context& ctx) {
   SSEType st0u(st0);
   SSEType st1u(st1);
 
-  X87StatusWord fpsw;
-  asm("fldl %[st1]; fldl %[st0]; fprem1; fstsw %%ax; fstpl %[st0]; ffree %%st(0); fincstp;"
-      : [st0] "+m"(st0u.d), "=a"(*(W16*)&fpsw)
-      : [st1] "m"(st1u.d));
+  int q = 0;
+  st0u.d = std::remquo(st0u.d, st1u.d, &q);
   st0 = st0u.w64;
 
+  const unsigned uq = unsigned(std::abs(q));
   X87StatusWord* sw = (X87StatusWord*)&ctx.commitarf[REG_fpsw];
-  sw->c0 = fpsw.c0;
-  sw->c1 = fpsw.c1;
-  sw->c2 = fpsw.c2;
-  sw->c3 = fpsw.c3;
+  sw->c0 = bit(uq, 2);
+  sw->c1 = bit(uq, 0);
+  sw->c2 = 0; // reduction complete
+  sw->c3 = bit(uq, 1);
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
 }
 
@@ -253,14 +225,15 @@ void assist_x87_fxam(Context& ctx) {
   W64& r = ctx.fpstack[ctx.commitarf[REG_fptos] >> 3];
   SSEType ra(r);
 
-  X87StatusWord fpsw;
-  asm("fxam; fstsw %%ax" : "=a"(*(W16*)&fpsw) : "t"(ra.d));
-
   X87StatusWord* sw = (X87StatusWord*)&ctx.commitarf[REG_fpsw];
-  sw->c0 = fpsw.c0;
-  sw->c1 = fpsw.c1;
-  sw->c2 = fpsw.c2;
-  sw->c3 = fpsw.c3;
+  sw->c1 = std::signbit(ra.d);
+  switch (std::fpclassify(ra.d)) {
+  case FP_NAN:       sw->c3 = 0; sw->c2 = 0; sw->c0 = 1; break;
+  case FP_INFINITE:  sw->c3 = 0; sw->c2 = 1; sw->c0 = 1; break;
+  case FP_ZERO:      sw->c3 = 1; sw->c2 = 0; sw->c0 = 0; break;
+  case FP_SUBNORMAL: sw->c3 = 1; sw->c2 = 1; sw->c0 = 0; break;
+  default:           sw->c3 = 0; sw->c2 = 1; sw->c0 = 0; break; // normal
+  }
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
 }
 
@@ -284,7 +257,7 @@ void assist_x87_fld80(Context& ctx) {
   // Push on stack
   W64& tos = ctx.commitarf[REG_fptos];
   tos = (tos - 8) & FP_STACK_MASK;
-  ctx.fpstack[tos >> 3] = x87_fp_80bit_to_64bit(&data);
+  ctx.fpstack[tos >> 3] = x87_fp_80bit_to_64bit(&data, ctx.fpcw.rc);
   setbit(ctx.commitarf[REG_fptags], tos);
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
 }
