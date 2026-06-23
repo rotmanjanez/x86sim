@@ -17,7 +17,7 @@
 #include "ooocore.h"
 #include "stats.h"
 
-namespace vcore {
+namespace x86sim {
 
 #ifndef ENABLE_CHECKS
 #undef assert
@@ -2169,4 +2169,4 @@ const byte archdest_can_commit[TRANSREG_COUNT] = {
 };
 }; // namespace OutOfOrderModel
 
-} // namespace vcore
+} // namespace x86sim

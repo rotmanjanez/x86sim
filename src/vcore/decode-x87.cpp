@@ -6,12 +6,12 @@
 //
 
 #include "decode.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
 #include <cmath>
 #include <numbers>
 
-namespace vcore {
+namespace x86sim {
 
 //
 // x87 assists
@@ -1165,4 +1165,4 @@ bool TraceDecoder::decode_x87() {
   return true;
 }
 
-} // namespace vcore
+} // namespace x86sim

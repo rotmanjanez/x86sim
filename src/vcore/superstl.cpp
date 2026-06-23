@@ -10,7 +10,7 @@
 #include "globals.h"
 #include "superstl.h"
 
-namespace vcore {
+namespace x86sim {
 
 // For debugging of messages before crashes:
 bool force_synchronous_streams = false;
@@ -360,4 +360,4 @@ const W64 expand_8bit_to_64bit_lut[256] alignto(8) = {
     0xffffffffffffffffULL,
 };
 
-} // namespace vcore
+} // namespace x86sim

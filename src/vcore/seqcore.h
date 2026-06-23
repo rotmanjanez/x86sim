@@ -13,7 +13,7 @@
 
 #include <memory>
 
-namespace vcore {
+namespace x86sim {
 
 struct SequentialCore;
 
@@ -89,14 +89,14 @@ int execute_sequential(Context& ctx, CommitRecord* cmtrec = null, W64 bbcount = 
 
 extern W64 suppress_total_user_insn_count_updates_in_seqcore;
 
-} // namespace vcore
+} // namespace x86sim
 
 //
 // std::formatter specialization
 template<>
-struct std::formatter<vcore::CommitRecord> {
+struct std::formatter<x86sim::CommitRecord> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::CommitRecord& cr, std::format_context& ctx) const;
+  auto format(const x86sim::CommitRecord& cr, std::format_context& ctx) const;
 };
 
 #endif // _SEQCORE_H_

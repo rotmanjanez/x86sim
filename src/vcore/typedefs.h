@@ -1,7 +1,7 @@
 #ifndef _TYPEDEFS_H_
 #define _TYPEDEFS_H_
 
-namespace vcore {
+namespace x86sim {
 
 typedef __SIZE_TYPE__ size_t;
 typedef unsigned long long W64;
@@ -18,6 +18,6 @@ typedef signed char W8s;
 typedef W64 Waddr;
 
 
-} // namespace vcore
+} // namespace x86sim
 
 #endif

@@ -7,14 +7,14 @@
 
 #include "globals.h"
 #include "ptlsim.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
 #include <algorithm>
 #include <array>
 #include <functional>
 
 
-namespace vcore {
+namespace x86sim {
 
 //
 // Flags generation (all but CF and OF)
@@ -2199,4 +2199,4 @@ void init_uops() {}
 
 void shutdown_uops() {}
 
-} // namespace vcore
+} // namespace x86sim

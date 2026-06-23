@@ -12,7 +12,7 @@
 #include "globals.h"
 #include "superstl.h"
 
-namespace vcore {
+namespace x86sim {
 
 using namespace superstl;
 
@@ -168,14 +168,14 @@ struct FixedQueue : public std::array<T, SIZE> {
   }
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<class T, int SIZE>
-struct std::formatter<vcore::FixedQueue<T, SIZE>> {
+struct std::formatter<x86sim::FixedQueue<T, SIZE>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::FixedQueue<T, SIZE>& q, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::FixedQueue<T, SIZE>& q, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
     out = std::format_to(out, "Queue<{}>: head {} to tail {} ({} entries):\n", SIZE, q.head, q.tail, q.count);
 
@@ -188,7 +188,7 @@ struct std::formatter<vcore::FixedQueue<T, SIZE>> {
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 template<class T, int SIZE>
 struct Queue : public FixedQueue<T, SIZE> {
@@ -211,14 +211,14 @@ struct Queue : public FixedQueue<T, SIZE> {
   }
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<class T, int Size>
-struct std::formatter<vcore::Queue<T, Size>> : std::formatter<vcore::FixedQueue<T, Size>> {
-  // Inherits parse and format from vcore::FixedQueue formatter
+struct std::formatter<x86sim::Queue<T, Size>> : std::formatter<x86sim::FixedQueue<T, Size>> {
+  // Inherits parse and format from x86sim::FixedQueue formatter
 };
 
-namespace vcore {
+namespace x86sim {
 
 //
 // Fully Associative Arrays
@@ -343,14 +343,14 @@ struct FullyAssociativeTags {
 
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<typename T, int ways>
-struct std::formatter<vcore::FullyAssociativeTags<T, ways>> {
+struct std::formatter<x86sim::FullyAssociativeTags<T, ways>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::FullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::FullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
     for (int i = 0; i < ways; i++) {
       out = std::format_to(out, "  way {:<2}: ", i);
@@ -367,7 +367,7 @@ struct std::formatter<vcore::FullyAssociativeTags<T, ways>> {
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 
 //
@@ -559,14 +559,14 @@ struct FullyAssociativeTagsNbitOneHot {
   }
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<int Size, int Width, int PadSize>
-struct std::formatter<vcore::FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>> {
+struct std::formatter<x86sim::FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>& tags, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::FullyAssociativeTagsNbitOneHot<Size, Width, PadSize>& tags, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
     for (int i = 0; i < Size; i++) {
       out = std::format_to(out, "{}\n", tags.slotid(i));
@@ -575,7 +575,7 @@ struct std::formatter<vcore::FullyAssociativeTagsNbitOneHot<Size, Width, PadSize
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 template<typename T, typename V>
 struct NullAssociativeArrayStatisticsCollector {
@@ -664,14 +664,14 @@ struct FullyAssociativeArray {
   V* operator()(T tag) { return select(tag); }
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<typename T, typename V, int ways, typename stats>
-struct std::formatter<vcore::FullyAssociativeArray<T, V, ways, stats>> {
+struct std::formatter<x86sim::FullyAssociativeArray<T, V, ways, stats>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::FullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::FullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
     for (int i = 0; i < ways; i++) {
       std::string waystr = std::format("  way {:<2}: ", i);
@@ -689,7 +689,7 @@ struct std::formatter<vcore::FullyAssociativeArray<T, V, ways, stats>> {
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 template<typename T, typename V, int setcount, int waycount, int linesize,
          typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
@@ -721,16 +721,16 @@ struct AssociativeArray {
   void invalidate(T addr) { sets[setof(addr)].invalidate(tagof(addr)); }
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<typename T, typename V, int setcount, int waycount, int linesize, typename stats>
-struct std::formatter<vcore::AssociativeArray<T, V, setcount, waycount, linesize, stats>> {
+struct std::formatter<x86sim::AssociativeArray<T, V, setcount, waycount, linesize, stats>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::AssociativeArray<T, V, setcount, waycount, linesize, stats>& arr, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::AssociativeArray<T, V, setcount, waycount, linesize, stats>& arr, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
-    out = std::format_to(out, "vcore::AssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount, linesize);
+    out = std::format_to(out, "x86sim::AssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount, linesize);
     for (int set = 0; set < setcount; set++) {
       out = std::format_to(out, "  Set {}:\n", set);
       out = std::format_to(out, "{}", arr.sets[set]);
@@ -739,7 +739,7 @@ struct std::formatter<vcore::AssociativeArray<T, V, setcount, waycount, linesize
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 //
 // Lockable version of associative arrays:
@@ -864,14 +864,14 @@ struct LockableFullyAssociativeTags {
 
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<typename T, int ways>
-struct std::formatter<vcore::LockableFullyAssociativeTags<T, ways>> {
+struct std::formatter<x86sim::LockableFullyAssociativeTags<T, ways>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::LockableFullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::LockableFullyAssociativeTags<T, ways>& tags, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
     for (int i = 0; i < ways; i++) {
       out = std::format_to(out, "  way {:<2}: ", i);
@@ -890,7 +890,7 @@ struct std::formatter<vcore::LockableFullyAssociativeTags<T, ways>> {
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 template<typename T, typename V, int ways, typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
 struct LockableFullyAssociativeArray {
@@ -1024,14 +1024,14 @@ struct LockableFullyAssociativeArray {
   V* operator()(T tag) { return select(tag); }
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<typename T, typename V, int ways, typename stats>
-struct std::formatter<vcore::LockableFullyAssociativeArray<T, V, ways, stats>> {
+struct std::formatter<x86sim::LockableFullyAssociativeArray<T, V, ways, stats>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::LockableFullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::LockableFullyAssociativeArray<T, V, ways, stats>& arr, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
     for (int i = 0; i < ways; i++) {
       std::string waystr = std::format("  way {:<2}: ", i);
@@ -1051,7 +1051,7 @@ struct std::formatter<vcore::LockableFullyAssociativeArray<T, V, ways, stats>> {
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 template<typename T, typename V, int setcount, int waycount, int linesize,
          typename stats = NullAssociativeArrayStatisticsCollector<T, V>>
@@ -1098,17 +1098,17 @@ struct LockableAssociativeArray {
   }
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<typename T, typename V, int setcount, int waycount, int linesize, typename stats>
-struct std::formatter<vcore::LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>> {
+struct std::formatter<x86sim::LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>& arr,
+  auto format(const x86sim::LockableAssociativeArray<T, V, setcount, waycount, linesize, stats>& arr,
               std::format_context& ctx) const {
-    using namespace vcore;
+    using namespace x86sim;
     auto out = ctx.out();
-    out = std::format_to(out, "vcore::LockableAssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount,
+    out = std::format_to(out, "x86sim::LockableAssociativeArray<{} sets, {} ways, {}-byte lines>:\n", setcount, waycount,
                          linesize);
     for (int set = 0; set < setcount; set++) {
       out = std::format_to(out, "  Set {}:\n", set);
@@ -1118,7 +1118,7 @@ struct std::formatter<vcore::LockableAssociativeArray<T, V, setcount, waycount, 
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 template<int size, int width, int padsize = 0>
 struct FullyAssociativeTagsNbit {
@@ -1256,14 +1256,14 @@ using FullyAssociativeTags8bit = FullyAssociativeTagsNbit<size, 8, padsize>;
 template<int size, int padsize = 0>
 using FullyAssociativeTags16bit = FullyAssociativeTagsNbit<size, 16, padsize>;
 
-} // namespace vcore
+} // namespace x86sim
 
 template<int Size, int Width, int PadSize>
-struct std::formatter<vcore::FullyAssociativeTagsNbit<Size, Width, PadSize>> {
+struct std::formatter<x86sim::FullyAssociativeTagsNbit<Size, Width, PadSize>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::FullyAssociativeTagsNbit<Size, Width, PadSize>& tags, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::FullyAssociativeTagsNbit<Size, Width, PadSize>& tags, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
     for (int i = 0; i < Size; i++) {
       out = std::format_to(out, "{} ", tags.slotid(i));

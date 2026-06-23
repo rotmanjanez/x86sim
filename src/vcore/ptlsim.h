@@ -17,9 +17,9 @@
 #include "globals.h"
 #include "ptlsim-api.h"
 #include "ptlhwdef.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
-namespace vcore {
+namespace x86sim {
 
 void user_process_terminated(int rc);
 
@@ -209,21 +209,21 @@ extern PTLsimConfig config;
 extern bool logenable;
 void force_logging_enabled();
 
-} // namespace vcore
+} // namespace x86sim
 
 namespace std {
 
 template<>
-struct formatter<vcore::PTLsimConfig> {
+struct formatter<x86sim::PTLsimConfig> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::PTLsimConfig& config, format_context& ctx) const {
+  auto format(const x86sim::PTLsimConfig& config, format_context& ctx) const {
     auto out = std::format_to(ctx.out(), "Active parameters:\n");
 
     auto bool_text = [](bool value) { return value ? "enabled" : "disabled"; };
-    auto format_w64 = [](vcore::W64 value) {
+    auto format_w64 = [](x86sim::W64 value) {
       if (value == 0)
         return std::string{"0"};
-      if (value == std::numeric_limits<vcore::W64s>::max())
+      if (value == std::numeric_limits<x86sim::W64s>::max())
         return std::string{"infinity"};
       if ((value % 1000000000LL) == 0)
         return std::format("{} G", value / 1000000000LL);
@@ -273,17 +273,17 @@ struct formatter<vcore::PTLsimConfig> {
 };
 
 template<>
-struct formatter<vcore::PTLsimBanner> {
+struct formatter<x86sim::PTLsimBanner> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::PTLsimBanner& banner, format_context& ctx) const {
+  auto format(const x86sim::PTLsimBanner& banner, format_context& ctx) const {
     auto out = std::format_to(ctx.out(), "//  \n");
     out = std::format_to(out, "//  PTLsim: Cycle Accurate x86-64 Simulator\n");
     out = std::format_to(out, "//  Copyright 1999-2007 Matt T. Yourst <yourst@yourst.com>\n");
     out = std::format_to(out, "// \n");
-    out = std::format_to(out, "//  Built {} on {} using {}\n", vcore::build_info::timestamp,
-                         vcore::build_info::hostname, vcore::build_info::compiler);
-    out = std::format_to(out, "//  Revision {}\n", vcore::build_info::git_revision);
-    out = std::format_to(out, "//  Running on {}\n", vcore::host_platform_name());
+    out = std::format_to(out, "//  Built {} on {} using {}\n", x86sim::build_info::timestamp,
+                         x86sim::build_info::hostname, x86sim::build_info::compiler);
+    out = std::format_to(out, "//  Revision {}\n", x86sim::build_info::git_revision);
+    out = std::format_to(out, "//  Running on {}\n", x86sim::host_platform_name());
     out = std::format_to(out, "//  \n");
 
     out = std::format_to(out, "//  Arguments:\n");

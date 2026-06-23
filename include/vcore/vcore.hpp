@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace vcore {
+namespace x86sim {
 
 class AddressSpace;
 struct Context;
@@ -204,38 +204,38 @@ namespace detail {
 [[nodiscard]] std::string format_cpu(const CPU&);
 } // namespace detail
 
-} // namespace vcore
+} // namespace x86sim
 
 template<>
-struct std::formatter<vcore::Protection> {
+struct std::formatter<x86sim::Protection> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(vcore::Protection protection, FormatContext& ctx) const {
+  auto format(x86sim::Protection protection, FormatContext& ctx) const {
     const auto bits = static_cast<unsigned>(protection);
     if ((bits & ~0x7u) != 0)
       return std::format_to(ctx.out(), "unknown(0x{:02x})", bits);
-    if (protection == vcore::Protection::none)
+    if (protection == x86sim::Protection::none)
       return std::format_to(ctx.out(), "none");
 
     auto out = ctx.out();
-    if (vcore::has_protection(protection, vcore::Protection::read))
+    if (x86sim::has_protection(protection, x86sim::Protection::read))
       out = std::format_to(out, "r");
-    if (vcore::has_protection(protection, vcore::Protection::write))
+    if (x86sim::has_protection(protection, x86sim::Protection::write))
       out = std::format_to(out, "w");
-    if (vcore::has_protection(protection, vcore::Protection::execute))
+    if (x86sim::has_protection(protection, x86sim::Protection::execute))
       out = std::format_to(out, "x");
     return out;
   }
 };
 
 template<>
-struct std::formatter<vcore::CoreModel> {
+struct std::formatter<x86sim::CoreModel> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(vcore::CoreModel model, FormatContext& ctx) const {
-    using enum vcore::CoreModel;
+  auto format(x86sim::CoreModel model, FormatContext& ctx) const {
+    using enum x86sim::CoreModel;
     switch (model) {
     case out_of_order:
       return std::format_to(ctx.out(), "out_of_order");
@@ -247,12 +247,12 @@ struct std::formatter<vcore::CoreModel> {
 };
 
 template<>
-struct std::formatter<vcore::Register> {
+struct std::formatter<x86sim::Register> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(vcore::Register reg, FormatContext& ctx) const {
-    using enum vcore::Register;
+  auto format(x86sim::Register reg, FormatContext& ctx) const {
+    using enum x86sim::Register;
     switch (reg) {
     case rax:
       return std::format_to(ctx.out(), "rax");
@@ -296,25 +296,25 @@ struct std::formatter<vcore::Register> {
 };
 
 template<>
-struct std::formatter<vcore::XmmRegister> {
+struct std::formatter<x86sim::XmmRegister> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(vcore::XmmRegister reg, FormatContext& ctx) const {
-    const int index = (static_cast<int>(reg) - static_cast<int>(vcore::XmmRegister::xmm0)) / 2;
-    if (index >= 0 && index <= 15 && static_cast<int>(reg) == static_cast<int>(vcore::XmmRegister::xmm0) + index * 2)
+  auto format(x86sim::XmmRegister reg, FormatContext& ctx) const {
+    const int index = (static_cast<int>(reg) - static_cast<int>(x86sim::XmmRegister::xmm0)) / 2;
+    if (index >= 0 && index <= 15 && static_cast<int>(reg) == static_cast<int>(x86sim::XmmRegister::xmm0) + index * 2)
       return std::format_to(ctx.out(), "xmm{}", index);
     return std::format_to(ctx.out(), "unknown({})", static_cast<int>(reg));
   }
 };
 
 template<>
-struct std::formatter<vcore::SyscallKind> {
+struct std::formatter<x86sim::SyscallKind> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(vcore::SyscallKind kind, FormatContext& ctx) const {
-    using enum vcore::SyscallKind;
+  auto format(x86sim::SyscallKind kind, FormatContext& ctx) const {
+    using enum x86sim::SyscallKind;
     switch (kind) {
     case int80:
       return std::format_to(ctx.out(), "int80");
@@ -328,12 +328,12 @@ struct std::formatter<vcore::SyscallKind> {
 };
 
 template<>
-struct std::formatter<vcore::StopReason> {
+struct std::formatter<x86sim::StopReason> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(vcore::StopReason reason, FormatContext& ctx) const {
-    using enum vcore::StopReason;
+  auto format(x86sim::StopReason reason, FormatContext& ctx) const {
+    using enum x86sim::StopReason;
     switch (reason) {
     case guest_exit:
       return std::format_to(ctx.out(), "guest_exit");
@@ -351,12 +351,12 @@ struct std::formatter<vcore::StopReason> {
 };
 
 template<>
-struct std::formatter<vcore::MemoryError> {
+struct std::formatter<x86sim::MemoryError> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(vcore::MemoryError error, FormatContext& ctx) const {
-    using enum vcore::MemoryError;
+  auto format(x86sim::MemoryError error, FormatContext& ctx) const {
+    using enum x86sim::MemoryError;
     switch (error) {
     case unaligned_address:
       return std::format_to(ctx.out(), "address is not page-aligned");
@@ -374,42 +374,42 @@ struct std::formatter<vcore::MemoryError> {
 };
 
 template<>
-struct std::formatter<vcore::XmmValue> {
+struct std::formatter<x86sim::XmmValue> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::XmmValue& value, FormatContext& ctx) const {
+  auto format(const x86sim::XmmValue& value, FormatContext& ctx) const {
     return std::format_to(ctx.out(), "0x{:016x}{:016x}", value.hi, value.lo);
   }
 };
 
 template<>
-struct std::formatter<vcore::CpuidRequest> {
+struct std::formatter<x86sim::CpuidRequest> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::CpuidRequest& request, FormatContext& ctx) const {
+  auto format(const x86sim::CpuidRequest& request, FormatContext& ctx) const {
     return std::format_to(ctx.out(), "function=0x{:08x}, subfunction=0x{:08x}", request.function, request.subfunction);
   }
 };
 
 template<>
-struct std::formatter<vcore::CpuidResult> {
+struct std::formatter<x86sim::CpuidResult> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::CpuidResult& result, FormatContext& ctx) const {
+  auto format(const x86sim::CpuidResult& result, FormatContext& ctx) const {
     return std::format_to(ctx.out(), "eax=0x{:08x}, ebx=0x{:08x}, ecx=0x{:08x}, edx=0x{:08x}", result.eax,
                           result.ebx, result.ecx, result.edx);
   }
 };
 
 template<>
-struct std::formatter<vcore::SyscallResult> {
+struct std::formatter<x86sim::SyscallResult> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::SyscallResult& result, FormatContext& ctx) const {
+  auto format(const x86sim::SyscallResult& result, FormatContext& ctx) const {
     auto out = std::format_to(ctx.out(), "reason={}, continue_execution={}", result.reason,
                               result.continue_execution);
     if (!result.message.empty())
@@ -419,11 +419,11 @@ struct std::formatter<vcore::SyscallResult> {
 };
 
 template<>
-struct std::formatter<vcore::Options> {
+struct std::formatter<x86sim::Options> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::Options& options, FormatContext& ctx) const {
+  auto format(const x86sim::Options& options, FormatContext& ctx) const {
     return std::format_to(ctx.out(),
                           "core={}, sse={}, x87={}, perfect_cache={}, static_branch_prediction={}, log_file={}",
                           options.core, options.sse, options.x87, options.perfect_cache,
@@ -432,11 +432,11 @@ struct std::formatter<vcore::Options> {
 };
 
 template<>
-struct std::formatter<vcore::RunOptions> {
+struct std::formatter<x86sim::RunOptions> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::RunOptions& options, FormatContext& ctx) const {
+  auto format(const x86sim::RunOptions& options, FormatContext& ctx) const {
     if (options.instruction_limit)
       return std::format_to(ctx.out(), "instruction_limit={}", *options.instruction_limit);
     return std::format_to(ctx.out(), "instruction_limit=none");
@@ -444,21 +444,21 @@ struct std::formatter<vcore::RunOptions> {
 };
 
 template<>
-struct std::formatter<vcore::Stats> {
+struct std::formatter<x86sim::Stats> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::Stats& stats, FormatContext& ctx) const {
+  auto format(const x86sim::Stats& stats, FormatContext& ctx) const {
     return std::format_to(ctx.out(), "{} cycles, {} instructions", stats.cycles, stats.instructions);
   }
 };
 
 template<>
-struct std::formatter<vcore::X86Exception> {
+struct std::formatter<x86sim::X86Exception> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::X86Exception& exception, FormatContext& ctx) const {
+  auto format(const x86sim::X86Exception& exception, FormatContext& ctx) const {
     auto out = ctx.out();
     if (!exception.message.empty()) {
       out = std::format_to(out, "{}", exception.message);
@@ -474,11 +474,11 @@ struct std::formatter<vcore::X86Exception> {
 };
 
 template<>
-struct std::formatter<vcore::RunResult> {
+struct std::formatter<x86sim::RunResult> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::RunResult& result, FormatContext& ctx) const {
+  auto format(const x86sim::RunResult& result, FormatContext& ctx) const {
     auto out = std::format_to(ctx.out(), "{} after {}", result.reason, result.stats);
     if (result.x86_exception)
       return std::format_to(out, "\n{}", *result.x86_exception);
@@ -489,32 +489,32 @@ struct std::formatter<vcore::RunResult> {
 };
 
 template<>
-struct std::formatter<vcore::RegisterRef> {
+struct std::formatter<x86sim::RegisterRef> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::RegisterRef& reg, FormatContext& ctx) const {
-    return std::format_to(ctx.out(), "0x{:016x}", static_cast<vcore::word_t>(reg));
+  auto format(const x86sim::RegisterRef& reg, FormatContext& ctx) const {
+    return std::format_to(ctx.out(), "0x{:016x}", static_cast<x86sim::word_t>(reg));
   }
 };
 
 template<>
-struct std::formatter<vcore::XmmRegisterRef> {
+struct std::formatter<x86sim::XmmRegisterRef> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::XmmRegisterRef& reg, FormatContext& ctx) const {
-    return std::format_to(ctx.out(), "{}", static_cast<vcore::XmmValue>(reg));
+  auto format(const x86sim::XmmRegisterRef& reg, FormatContext& ctx) const {
+    return std::format_to(ctx.out(), "{}", static_cast<x86sim::XmmValue>(reg));
   }
 };
 
 template<>
-struct std::formatter<vcore::CPU> {
+struct std::formatter<x86sim::CPU> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const vcore::CPU& cpu, FormatContext& ctx) const {
-    return std::format_to(ctx.out(), "{}", vcore::detail::format_cpu(cpu));
+  auto format(const x86sim::CPU& cpu, FormatContext& ctx) const {
+    return std::format_to(ctx.out(), "{}", x86sim::detail::format_cpu(cpu));
   }
 };
 

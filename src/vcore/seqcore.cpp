@@ -14,9 +14,9 @@
 #include "dcache.h"
 #include "stats.h"
 #include "ptlhwdef.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
-namespace vcore {
+namespace x86sim {
 
 W64 suppress_total_user_insn_count_updates_in_seqcore;
 
@@ -253,21 +253,21 @@ struct TransactionalMemory {
   }
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<int N, int setcount>
-struct std::formatter<vcore::TransactionalMemory<N, setcount>> {
+struct std::formatter<x86sim::TransactionalMemory<N, setcount>> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::TransactionalMemory<N, setcount>& tm, std::format_context& ctx) const;
+  auto format(const x86sim::TransactionalMemory<N, setcount>& tm, std::format_context& ctx) const;
 };
 
 
 template<int N, int setcount>
-auto std::formatter<vcore::TransactionalMemory<N, setcount>>::format(const vcore::TransactionalMemory<N, setcount>& tm,
+auto std::formatter<x86sim::TransactionalMemory<N, setcount>>::format(const x86sim::TransactionalMemory<N, setcount>& tm,
                                                               std::format_context& ctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   auto out = ctx.out();
-  out = std::format_to(out, "vcore::TransactionalMemory containing {} stores:\n", tm.count);
+  out = std::format_to(out, "x86sim::TransactionalMemory containing {} stores:\n", tm.count);
   foreach (i, tm.count) {
     W64 data = tm.data_list[i];
     out = std::format_to(out, "  {:>4}: 0x{:x} <= {}\n", i, W64(tm.addr_list[i]),
@@ -288,7 +288,7 @@ auto std::formatter<vcore::TransactionalMemory<N, setcount>>::format(const vcore
   return out;
 }
 
-namespace vcore {
+namespace x86sim {
 
 template<int N, int setcount>
 W64 TransactionalMemory<N, setcount>::loadimpl(W64 physaddr) {
@@ -378,13 +378,13 @@ struct SequentialCoreEvent {
   };
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<>
-struct std::formatter<vcore::SequentialCoreEvent> {
+struct std::formatter<x86sim::SequentialCoreEvent> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::SequentialCoreEvent& ev, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::SequentialCoreEvent& ev, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
 
     if (ev.uuid > 0)
@@ -416,7 +416,7 @@ struct std::formatter<vcore::SequentialCoreEvent> {
       if (ev.loadstore.origaddr != ev.loadstore.virtaddr)
         out = std::format_to(out, " (orig 0x{:012x})", ev.loadstore.origaddr);
       if (ev.loadstore.sfr.invalid)
-        out = std::format_to(out, " (PFEC {}, PTE {})", vcore::PageFaultErrorCode(ev.loadstore.pfec),
+        out = std::format_to(out, " (PFEC {}, PTE {})", x86sim::PageFaultErrorCode(ev.loadstore.pfec),
                              Level1PTE(ev.loadstore.pteused));
       break;
     }
@@ -469,7 +469,7 @@ struct std::formatter<vcore::SequentialCoreEvent> {
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 struct SequentialCoreEventLog {
   SequentialCoreEvent* start;
@@ -1587,12 +1587,12 @@ int SequentialMachine::run() {
 
 
 
-} // namespace vcore
+} // namespace x86sim
 
-auto std::formatter<vcore::CommitRecord>::format(const vcore::CommitRecord& cr, std::format_context& ctx) const {
-  using namespace vcore;
+auto std::formatter<x86sim::CommitRecord>::format(const x86sim::CommitRecord& cr, std::format_context& ctx) const {
+  using namespace x86sim;
   auto out = ctx.out();
-  out = std::format_to(out, "vcore::CommitRecord: {} stores, {} PTE updates\n", cr.store_count, cr.pte_update_count);
+  out = std::format_to(out, "x86sim::CommitRecord: {} stores, {} PTE updates\n", cr.store_count, cr.pte_update_count);
   foreach (i, cr.store_count) {
     out = std::format_to(out, "  Store {:>3}: {}\n", i, cr.stores[i]);
   }

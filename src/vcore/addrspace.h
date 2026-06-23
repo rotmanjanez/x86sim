@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <memory>
 
-#include "vcore/vcore.hpp"
+#include "x86sim/x86sim.hpp"
 #include "globals.h"
 #include "superstl.h"
 
@@ -23,7 +23,7 @@
 //
 // Address space management
 //
-namespace vcore {
+namespace x86sim {
 
 // Each chunk covers 2 GB of virtual address space:
 #define SPAT_TOPLEVEL_CHUNK_BITS 17
@@ -157,6 +157,6 @@ public:
   void resync_with_process_maps();
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 #endif

@@ -11,7 +11,7 @@
 // Total: 17 bits       + 19 bits                + 12 bits       = 48 bits virtual address space
 //
 
-namespace vcore {
+namespace x86sim {
 
 byte& AddressSpace::pageid_to_map_byte(spat_t top, Waddr pageid) {
   W64 chunkid = pageid >> log2(SPAT_PAGES_PER_CHUNK);
@@ -130,4 +130,4 @@ Protection AddressSpace::getattr(void* addr) {
   return prot;
 }
 
-} // namespace vcore
+} // namespace x86sim

@@ -21,7 +21,7 @@
 #include "ooocore.h"
 #include "dcache.h"
 #include "branchpred.h"
-namespace vcore {
+namespace x86sim {
 
 #undef STATS_ONLY
 
@@ -97,6 +97,6 @@ struct PTLsimStats {
 extern struct PTLsimStats stats;
 
 
-} // namespace vcore
+} // namespace x86sim
 
 #endif // _STATS_H_

@@ -10,9 +10,9 @@
 
 #include "branchpred.h"
 #include "stats.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
-namespace vcore {
+namespace x86sim {
 
 template<int SIZE>
 struct BimodalPredictor {
@@ -176,14 +176,14 @@ struct ReturnAddressStack : public Queue<ReturnAddressStackEntry, SIZE> {
 };
 
 // std::formatter for ReturnAddressStack<SIZE> - inherits from Queue formatter
-} // namespace vcore
+} // namespace x86sim
 
 namespace std {
 template<int SIZE>
-struct formatter<vcore::ReturnAddressStack<SIZE>> : formatter<vcore::Queue<vcore::ReturnAddressStackEntry, SIZE>> {};
+struct formatter<x86sim::ReturnAddressStack<SIZE>> : formatter<x86sim::Queue<x86sim::ReturnAddressStackEntry, SIZE>> {};
 } // namespace std
 
-namespace vcore {
+namespace x86sim {
 
 template<int METASIZE, int BIMODSIZE, int L1SIZE, int L2SIZE, int SHIFTWIDTH, bool HISTORYXOR, int BTBSETS, int BTBWAYS,
          int RASSIZE>
@@ -398,4 +398,4 @@ void BranchPredictorInterface::annulras(const PredictorUpdate& predinfo) {
 
 void BranchPredictorInterface::flush() {}
 
-} // namespace vcore
+} // namespace x86sim

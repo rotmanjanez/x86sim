@@ -9,12 +9,12 @@
 #ifndef _PTLSIM_API_H_
 #define _PTLSIM_API_H_
 
-#include "vcore/vcore.hpp"
+#include "x86sim/x86sim.hpp"
 
 #include "globals.h"
 #include "ptlhwdef.h"
 
-namespace vcore {
+namespace x86sim {
 
 extern bool asp_check_exec(void* addr);
 
@@ -124,6 +124,6 @@ CpuidResult handle_cpuid(W32 func, W32 subfunc);
 extern bool requested_switch_to_native;
 
 
-} // namespace vcore
+} // namespace x86sim
 
 #endif // _PTLSIM_API_H_

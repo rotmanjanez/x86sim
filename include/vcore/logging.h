@@ -10,7 +10,7 @@
 #include <utility>
 #include <filesystem>
 
-namespace vcore {
+namespace x86sim {
 // Global enable flag for backward compatibility
 extern bool logenable;
 
@@ -282,6 +282,6 @@ inline void oprintln(std::format_string<Args...> fmt, Args&&... args) {
 }
 
 } // namespace logging
-} // namespace vcore
+} // namespace x86sim
 
 #endif // PTLSIM_LOGGING_H

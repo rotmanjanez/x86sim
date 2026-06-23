@@ -1,4 +1,4 @@
-#include "vcore/vcore.hpp"
+#include "x86sim/x86sim.hpp"
 
 #include "addrspace.h"
 #include "ooocore.h"
@@ -6,7 +6,7 @@
 #include "ptlsim.h"
 #include "ptlsim-api.h"
 #include "seqcore.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
 #include <algorithm>
 #include <array>
@@ -19,7 +19,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace vcore {
+namespace x86sim {
 namespace {
 
 thread_local CPU* running_cpu = nullptr;
@@ -501,13 +501,13 @@ void dispatch_syscall_32bit(int semantics) {
 
 CpuidResult dispatch_cpuid(W32 func, W32 subfunc) {
   CPU& cpu = active_cpu();
-  vcore::CpuidResult result = detail::dispatch_cpuid(cpu, {.function = func, .subfunction = subfunc});
+  x86sim::CpuidResult result = detail::dispatch_cpuid(cpu, {.function = func, .subfunction = subfunc});
   return {.eax = result.eax, .ebx = result.ebx, .ecx = result.ecx, .edx = result.edx};
 }
 
-} // namespace vcore
+} // namespace x86sim
 
-namespace vcore {
+namespace x86sim {
 
 void Context::propagate_x86_exception(byte exception, W32 errorcode, Waddr virtaddr) {
   throw_x86_exception(*this, exception, errorcode, virtaddr);
@@ -525,4 +525,4 @@ CpuidResult handle_cpuid(W32 func, W32 subfunc) {
   return dispatch_cpuid(func, subfunc);
 }
 
-} // namespace vcore
+} // namespace x86sim

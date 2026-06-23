@@ -10,10 +10,10 @@
 #include "ptlsim.h"
 #include "decode.h"
 #include "stats.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
 
-namespace vcore {
+namespace x86sim {
 
 BasicBlockCache bbcache;
 
@@ -664,10 +664,10 @@ bool TraceDecoder::flush() {
   return (!overflow);
 }
 
-} // namespace vcore
+} // namespace x86sim
 
-auto std::formatter<vcore::DecodedOperand>::format(const vcore::DecodedOperand& op, std::format_context& ctx) const {
-  using namespace vcore;
+auto std::formatter<x86sim::DecodedOperand>::format(const x86sim::DecodedOperand& op, std::format_context& ctx) const {
+  using namespace x86sim;
   auto out = ctx.out();
   switch (op.type) {
   case OPTYPE_REG:
@@ -687,7 +687,7 @@ auto std::formatter<vcore::DecodedOperand>::format(const vcore::DecodedOperand& 
   return out;
 }
 
-namespace vcore {
+namespace x86sim {
 
 bool DecodedOperand::gform_ext(TraceDecoder& state, int bytemode, int regfield, bool def64, bool in_rex_base) {
   int add = ((in_rex_base) ? state.rex.extbase : state.rex.extreg) ? 8 : 0;
@@ -2319,15 +2319,15 @@ BasicBlock* BasicBlockCache::translate_and_clone(Context& ctx, Waddr rip) {
 
 #undef MAX_RIP
 
-} // namespace vcore
+} // namespace x86sim
 
-auto std::formatter<vcore::BasicBlockCache>::format(vcore::BasicBlockCache& bbc, std::format_context& ctx) const {
-  using namespace vcore;
+auto std::formatter<x86sim::BasicBlockCache>::format(x86sim::BasicBlockCache& bbc, std::format_context& ctx) const {
+  using namespace x86sim;
   auto out = ctx.out();
   auto bblist = bbc.getentries();
 
   for (const auto* ptr : bblist) {
-    const vcore::BasicBlock& bb = *ptr;
+    const x86sim::BasicBlock& bb = *ptr;
     double percent_of_total_uops = ((double)(bb.hitcount * bb.tagcount) / (double)total_uops_committed);
     double percent_of_total_bbs = ((double)(bb.hitcount) / (double)total_basic_blocks_committed);
 
@@ -2347,7 +2347,7 @@ auto std::formatter<vcore::BasicBlockCache>::format(vcore::BasicBlockCache& bbc,
   return out;
 }
 
-namespace vcore {
+namespace x86sim {
 
 void shutdown_decode() {
   bbcache.flush();
@@ -2357,4 +2357,4 @@ void shutdown_decode() {
   }
 }
 
-} // namespace vcore
+} // namespace x86sim

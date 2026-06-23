@@ -12,7 +12,7 @@
 #include "globals.h"
 #include "ptlsim.h"
 
-namespace vcore {
+namespace x86sim {
 
 struct RexByte {
   // a.k.a., b, x, r, w
@@ -632,19 +632,19 @@ static const char* decode_type_names[DECODE_TYPE_COUNT] = {"fast", "complex", "x
 //
 // std::formatter specializations
 //
-} // namespace vcore
+} // namespace x86sim
 
 template<>
-struct std::formatter<vcore::DecodedOperand> {
+struct std::formatter<x86sim::DecodedOperand> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::DecodedOperand& op, std::format_context& ctx) const;
+  auto format(const x86sim::DecodedOperand& op, std::format_context& ctx) const;
 };
 
 
 template<>
-struct std::formatter<vcore::BasicBlockCache> {
+struct std::formatter<x86sim::BasicBlockCache> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(vcore::BasicBlockCache& bbc, std::format_context& ctx) const;
+  auto format(x86sim::BasicBlockCache& bbc, std::format_context& ctx) const;
 };
 
 #endif // _DECODE_H_

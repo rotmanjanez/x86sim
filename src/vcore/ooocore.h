@@ -16,7 +16,7 @@
 #include <format>
 #include <memory>
 
-namespace vcore {
+namespace x86sim {
 
 // With these disabled, simulation is faster
 #define ENABLE_CHECKS
@@ -2043,83 +2043,83 @@ struct OutOfOrderCoreStats {
 
 #ifdef INSIDE_OOOCORE
 // std::formatter specializations for OutOfOrderModel types
-} // namespace vcore
+} // namespace x86sim
 
 namespace std {
 template<>
-struct formatter<vcore::OutOfOrderModel::OutOfOrderCoreEvent> {
+struct formatter<x86sim::OutOfOrderModel::OutOfOrderCoreEvent> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::OutOfOrderCoreEvent& ev, format_context& ctx) const;
+  auto format(const x86sim::OutOfOrderModel::OutOfOrderCoreEvent& ev, format_context& ctx) const;
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::PhysicalRegister> {
+struct formatter<x86sim::OutOfOrderModel::PhysicalRegister> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::PhysicalRegister& physreg, format_context& ctx) const;
+  auto format(const x86sim::OutOfOrderModel::PhysicalRegister& physreg, format_context& ctx) const;
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::PhysicalRegisterFile> {
+struct formatter<x86sim::OutOfOrderModel::PhysicalRegisterFile> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::PhysicalRegisterFile& prf, format_context& ctx) const;
+  auto format(const x86sim::OutOfOrderModel::PhysicalRegisterFile& prf, format_context& ctx) const;
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::ReorderBufferEntry> {
+struct formatter<x86sim::OutOfOrderModel::ReorderBufferEntry> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::ReorderBufferEntry& rob, format_context& ctx) const;
+  auto format(const x86sim::OutOfOrderModel::ReorderBufferEntry& rob, format_context& ctx) const;
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::LoadStoreQueueEntry> {
+struct formatter<x86sim::OutOfOrderModel::LoadStoreQueueEntry> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::LoadStoreQueueEntry& lsq, format_context& ctx) const;
+  auto format(const x86sim::OutOfOrderModel::LoadStoreQueueEntry& lsq, format_context& ctx) const;
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::ThreadContext> {
+struct formatter<x86sim::OutOfOrderModel::ThreadContext> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::ThreadContext& thread, format_context& ctx) const;
+  auto format(const x86sim::OutOfOrderModel::ThreadContext& thread, format_context& ctx) const;
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::OutOfOrderCore> {
+struct formatter<x86sim::OutOfOrderModel::OutOfOrderCore> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::OutOfOrderCore& core, format_context& ctx) const;
+  auto format(const x86sim::OutOfOrderModel::OutOfOrderCore& core, format_context& ctx) const;
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::MemoryInterlockEntry> {
+struct formatter<x86sim::OutOfOrderModel::MemoryInterlockEntry> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::MemoryInterlockEntry& entry, format_context& ctx) const {
+  auto format(const x86sim::OutOfOrderModel::MemoryInterlockEntry& entry, format_context& ctx) const {
     return std::format_to(ctx.out(), "vcpu {}, threadid {}, uuid {}, rob {}", entry.vcpuid, entry.threadid,
                           entry.uuid, entry.rob);
   }
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::MemoryInterlockBuffer> {
+struct formatter<x86sim::OutOfOrderModel::MemoryInterlockBuffer> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::MemoryInterlockBuffer& interlocks, format_context& ctx) const {
+  auto format(const x86sim::OutOfOrderModel::MemoryInterlockBuffer& interlocks, format_context& ctx) const {
     using base_t =
-        vcore::LockableAssociativeArray<vcore::W64, vcore::OutOfOrderModel::MemoryInterlockEntry, 16, 4, 8>;
+        x86sim::LockableAssociativeArray<x86sim::W64, x86sim::OutOfOrderModel::MemoryInterlockEntry, 16, 4, 8>;
     return formatter<base_t>{}.format(static_cast<const base_t&>(interlocks), ctx);
   }
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::PhysicalRegisterOperandInfo> {
+struct formatter<x86sim::OutOfOrderModel::PhysicalRegisterOperandInfo> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::PhysicalRegisterOperandInfo& opinfo, format_context& ctx) const {
-    return std::format_to(ctx.out(), "r{} (rob {} uuid {} {} rf{})", vcore::arch_reg_names[opinfo.archreg], opinfo.rob,
-                          opinfo.uuid, vcore::OutOfOrderModel::physreg_state_names[opinfo.state], opinfo.rfid);
+  auto format(const x86sim::OutOfOrderModel::PhysicalRegisterOperandInfo& opinfo, format_context& ctx) const {
+    return std::format_to(ctx.out(), "r{} (rob {} uuid {} {} rf{})", x86sim::arch_reg_names[opinfo.archreg], opinfo.rob,
+                          opinfo.uuid, x86sim::OutOfOrderModel::physreg_state_names[opinfo.state], opinfo.rfid);
   }
 };
 
 template<int Size, int OperandCount>
-struct formatter<vcore::OutOfOrderModel::IssueQueue<Size, OperandCount>> {
+struct formatter<x86sim::OutOfOrderModel::IssueQueue<Size, OperandCount>> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::IssueQueue<Size, OperandCount>& iq, format_context& ctx) const {
+  auto format(const x86sim::OutOfOrderModel::IssueQueue<Size, OperandCount>& iq, format_context& ctx) const {
     auto out = ctx.out();
     out = std::format_to(out, "IssueQueue: count = {}:\n", iq.count);
     for (int i = 0; i < Size; i++) {
@@ -2137,14 +2137,14 @@ struct formatter<vcore::OutOfOrderModel::IssueQueue<Size, OperandCount>> {
 };
 
 template<>
-struct formatter<vcore::OutOfOrderModel::RegisterRenameTable> {
+struct formatter<x86sim::OutOfOrderModel::RegisterRenameTable> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::OutOfOrderModel::RegisterRenameTable& rrt, format_context& ctx) const {
+  auto format(const x86sim::OutOfOrderModel::RegisterRenameTable& rrt, format_context& ctx) const {
     auto out = ctx.out();
     for (int i = 0; i < TRANSREG_COUNT; ++i) {
       if ((i % 8) == 0)
         out = std::format_to(out, " ");
-      out = std::format_to(out, " {:<6} r{:3d} | ", vcore::arch_reg_names[i], rrt[i]->index());
+      out = std::format_to(out, " {:<6} r{:3d} | ", x86sim::arch_reg_names[i], rrt[i]->index());
       if ((i % 8) == 7)
         out = std::format_to(out, "\n");
     }
@@ -2153,7 +2153,7 @@ struct formatter<vcore::OutOfOrderModel::RegisterRenameTable> {
 };
 } // namespace std
 #else
-} // namespace vcore
+} // namespace x86sim
 #endif // INSIDE_OOOCORE
 
 #endif // _OOOCORE_H_

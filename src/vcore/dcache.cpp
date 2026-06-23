@@ -7,9 +7,9 @@
 
 #include "dcache.h"
 #include "stats.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
-namespace vcore {
+namespace x86sim {
 
 using namespace CacheSubsystem;
 
@@ -211,11 +211,11 @@ LoadFillReq::LoadFillReq(W64 addr, W64 data, byte mask, LoadStoreInfo lsi) {
   this->mbidx = -1;
 }
 
-} // namespace vcore
+} // namespace x86sim
 
-auto std::formatter<vcore::CacheSubsystem::LoadFillReq>::format(const vcore::CacheSubsystem::LoadFillReq& req,
+auto std::formatter<x86sim::CacheSubsystem::LoadFillReq>::format(const x86sim::CacheSubsystem::LoadFillReq& req,
                                                          std::format_context& ctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   auto out = ctx.out();
   out = std::format_to(out, "0x{:016x} @ {} -> rob {} @ t{}", req.data, (void*)(Waddr)req.addr, req.lsi.rob,
                        req.lsi.threadid);
@@ -224,7 +224,7 @@ auto std::formatter<vcore::CacheSubsystem::LoadFillReq>::format(const vcore::Cac
   return out;
 }
 
-namespace vcore {
+namespace x86sim {
 
 //
 // Miss Buffer
@@ -533,14 +533,14 @@ void MissBuffer<SIZE>::annul_lfrq(int slot) {
   }
 }
 
-} // namespace vcore
+} // namespace x86sim
 
 template<int linesize>
-auto std::formatter<std::pair<vcore::CacheSubsystem::CacheLine<linesize>, vcore::W64>>::format(
-    const std::pair<vcore::CacheSubsystem::CacheLine<linesize>, vcore::W64>& p, std::format_context& ctx) const {
-  using namespace vcore;
+auto std::formatter<std::pair<x86sim::CacheSubsystem::CacheLine<linesize>, x86sim::W64>>::format(
+    const std::pair<x86sim::CacheSubsystem::CacheLine<linesize>, x86sim::W64>& p, std::format_context& ctx) const {
+  using namespace x86sim;
   auto out = ctx.out();
-  const vcore::byte* data = (const vcore::byte*)&p.first;
+  const x86sim::byte* data = (const x86sim::byte*)&p.first;
   foreach (i, linesize / 8) {
     out = std::format_to(out, "    {} \n", bytemaskstring(data + i * 8, (W64)-1LL, 8, 8));
   }
@@ -549,18 +549,18 @@ auto std::formatter<std::pair<vcore::CacheSubsystem::CacheLine<linesize>, vcore:
 
 
 template<int linesize>
-auto std::formatter<std::pair<vcore::CacheSubsystem::CacheLineWithValidMask<linesize>, vcore::W64>>::format(
-    const std::pair<vcore::CacheSubsystem::CacheLineWithValidMask<linesize>, vcore::W64>& p, std::format_context& ctx) const {
-  using namespace vcore;
+auto std::formatter<std::pair<x86sim::CacheSubsystem::CacheLineWithValidMask<linesize>, x86sim::W64>>::format(
+    const std::pair<x86sim::CacheSubsystem::CacheLineWithValidMask<linesize>, x86sim::W64>& p, std::format_context& ctx) const {
+  using namespace x86sim;
   auto out = ctx.out();
-  const vcore::byte* data = (const vcore::byte*)&p.first;
+  const x86sim::byte* data = (const x86sim::byte*)&p.first;
   foreach (i, linesize / 8) {
     out = std::format_to(out, "    {} \n", bytemaskstring(data + i * 8, p.first.valid(i * 8, 8).integer(), 8, 8));
   }
   return out;
 }
 
-namespace vcore {
+namespace x86sim {
 
 int CacheHierarchy::issueload_slowpath(Waddr physaddr, SFR& sfra, LoadStoreInfo lsi, bool& L2hit) {
   starttimer(load_slowpath_timer);
@@ -848,11 +848,11 @@ void CacheHierarchy::reset() {
   dtlb.reset();
 }
 
-} // namespace vcore
+} // namespace x86sim
 
-auto std::formatter<vcore::CacheSubsystem::CacheHierarchy>::format(const vcore::CacheSubsystem::CacheHierarchy& ch,
+auto std::formatter<x86sim::CacheSubsystem::CacheHierarchy>::format(const x86sim::CacheSubsystem::CacheHierarchy& ch,
                                                             std::format_context& ctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   auto out = ctx.out();
   out = std::format_to(out, "Data Cache Subsystem:\n");
   out = std::format_to(out, "{}", ch.lfrq);
@@ -864,7 +864,7 @@ auto std::formatter<vcore::CacheSubsystem::CacheHierarchy>::format(const vcore::
   return out;
 }
 
-namespace vcore {
+namespace x86sim {
 
 //
 // Make sure the templates and vtables get instantiated:
@@ -893,4 +893,4 @@ if ((i & 3) == 3) logging::println(logging::INFO, "")
 }
 */
 
-} // namespace vcore
+} // namespace x86sim

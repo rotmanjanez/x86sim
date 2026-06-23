@@ -25,7 +25,7 @@
 #include <math.h>
 #include <float.h>
 
-namespace vcore {
+namespace x86sim {
 
 #define __stringify_1(x) #x
 #define stringify(x) __stringify_1(x)
@@ -199,13 +199,13 @@ typedef float v2df __attribute__((vector_size(16)));
 typedef v2df vec2d;
 
 // std::formatter specializations for vector types - must be declared early before any use
-} // namespace vcore
+} // namespace x86sim
 
 template<>
-struct std::formatter<vcore::v16qi> {
+struct std::formatter<x86sim::v16qi> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::v16qi& v, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::v16qi& v, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
     const unsigned char* b = (const unsigned char*)&v;
     for (int i = 15; i >= 0; i--) {
@@ -219,10 +219,10 @@ struct std::formatter<vcore::v16qi> {
 
 
 template<>
-struct std::formatter<vcore::v8hi> {
+struct std::formatter<x86sim::v8hi> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::v8hi& v, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::v8hi& v, std::format_context& ctx) const {
+    using namespace x86sim;
     auto out = ctx.out();
     const W16* b = (const W16*)&v;
     for (int i = 0; i < 8; i++) {
@@ -234,7 +234,7 @@ struct std::formatter<vcore::v8hi> {
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 union MXCSR {
   struct {
@@ -551,17 +551,17 @@ inline int add_index_modulo(int index, int increment, int bufsize) {
   return index;
 }
 
-} // namespace vcore
+} // namespace x86sim
 
 #include "superstl.h"
 
 
 template<>
-struct std::formatter<vcore::MXCSR> {
+struct std::formatter<x86sim::MXCSR> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
-  auto format(const vcore::MXCSR& mxcsr, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::MXCSR& mxcsr, std::format_context& ctx) const {
+    using namespace x86sim;
     return std::format_to(ctx.out(), "0x{:08x}", mxcsr.data);
   }
 };

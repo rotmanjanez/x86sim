@@ -16,14 +16,14 @@
 #include "branchpred.h"
 #include "logic.h"
 #include "dcache.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
 #define INSIDE_OOOCORE
 #define DECLARE_STRUCTURES
 #include "ooocore.h"
 #include "stats.h"
 
-namespace vcore {
+namespace x86sim {
 
 #ifndef ENABLE_CHECKS
 #undef assert
@@ -672,11 +672,11 @@ void OutOfOrderCore::print_smt_state() {
   }
 }
 
-} // namespace vcore
+} // namespace x86sim
 
-auto std::formatter<vcore::OutOfOrderModel::ThreadContext>::format(const vcore::OutOfOrderModel::ThreadContext& thread,
+auto std::formatter<x86sim::OutOfOrderModel::ThreadContext>::format(const x86sim::OutOfOrderModel::ThreadContext& thread,
                                                             std::format_context& fctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   auto out = fctx.out();
   out = std::format_to(out, "SMT per-thread state for t{}:\n", thread.threadid);
   out = std::format_to(out, "SpecRRT:\n");
@@ -689,9 +689,9 @@ auto std::formatter<vcore::OutOfOrderModel::ThreadContext>::format(const vcore::
 }
 
 
-auto std::formatter<vcore::OutOfOrderModel::OutOfOrderCore>::format(const vcore::OutOfOrderModel::OutOfOrderCore& core,
+auto std::formatter<x86sim::OutOfOrderModel::OutOfOrderCore>::format(const x86sim::OutOfOrderModel::OutOfOrderCore& core,
                                                              std::format_context& ctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   auto out = ctx.out();
 
   out = std::format_to(out, "SMT common structures:\n");
@@ -715,7 +715,7 @@ auto std::formatter<vcore::OutOfOrderModel::OutOfOrderCore>::format(const vcore:
   return out;
 }
 
-namespace vcore {
+namespace x86sim {
 
 //
 // Validate the physical register reference counters against what
@@ -1024,11 +1024,11 @@ void EventLog::print(bool only_to_tail) {
     logging::println(logging::INFO, "#-------- End of event log --------");
 }
 
-} // namespace vcore
+} // namespace x86sim
 
-auto std::formatter<vcore::OutOfOrderModel::OutOfOrderCoreEvent>::format(const vcore::OutOfOrderModel::OutOfOrderCoreEvent& ev,
+auto std::formatter<x86sim::OutOfOrderModel::OutOfOrderCoreEvent>::format(const x86sim::OutOfOrderModel::OutOfOrderCoreEvent& ev,
                                                                   std::format_context& ctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   auto out = ctx.out();
   bool ld = isload(ev.uop.opcode);
   bool st = isstore(ev.uop.opcode);
@@ -1646,7 +1646,7 @@ auto std::formatter<vcore::OutOfOrderModel::OutOfOrderCoreEvent>::format(const v
   return out;
 }
 
-namespace vcore {
+namespace x86sim {
 
 //
 // Construct all the structures necessary to configure
@@ -1918,11 +1918,11 @@ void OutOfOrderMachine::flush_all_pipelines() {
 }
 
 // Formatter implementations
-} // namespace vcore
+} // namespace x86sim
 
-auto std::formatter<vcore::OutOfOrderModel::PhysicalRegister>::format(const vcore::OutOfOrderModel::PhysicalRegister& physreg,
+auto std::formatter<x86sim::OutOfOrderModel::PhysicalRegister>::format(const x86sim::OutOfOrderModel::PhysicalRegister& physreg,
                                                                std::format_context& ctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   using namespace OutOfOrderModel;
   std::string vf = format_value_and_flags(physreg.data, physreg.flags);
   auto out = std::format_to(ctx.out(), "TH {} rfid {}", physreg.threadid, physreg.rfid);
@@ -1934,9 +1934,9 @@ auto std::formatter<vcore::OutOfOrderModel::PhysicalRegister>::format(const vcor
 }
 
 
-auto std::formatter<vcore::OutOfOrderModel::PhysicalRegisterFile>::format(const vcore::OutOfOrderModel::PhysicalRegisterFile& prf,
+auto std::formatter<x86sim::OutOfOrderModel::PhysicalRegisterFile>::format(const x86sim::OutOfOrderModel::PhysicalRegisterFile& prf,
                                                                    std::format_context& ctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   auto out = std::format_to(ctx.out(), "PhysicalRegisterFile<{}, rfid {}, size {}>:\n", prf.name, prf.rfid, prf.size);
   for (int i = 0; i < prf.size; i++) {
     out = std::format_to(out, "{}\n", prf[i]);
@@ -1945,9 +1945,9 @@ auto std::formatter<vcore::OutOfOrderModel::PhysicalRegisterFile>::format(const 
 }
 
 
-auto std::formatter<vcore::OutOfOrderModel::ReorderBufferEntry>::format(const vcore::OutOfOrderModel::ReorderBufferEntry& rob,
+auto std::formatter<x86sim::OutOfOrderModel::ReorderBufferEntry>::format(const x86sim::OutOfOrderModel::ReorderBufferEntry& rob,
                                                                  std::format_context& ctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   using namespace OutOfOrderModel;
   std::string name = nameof(rob.uop);
   std::string rainfo = rob.get_operand_info(0);
@@ -1972,9 +1972,9 @@ auto std::formatter<vcore::OutOfOrderModel::ReorderBufferEntry>::format(const vc
 }
 
 
-auto std::formatter<vcore::OutOfOrderModel::LoadStoreQueueEntry>::format(const vcore::OutOfOrderModel::LoadStoreQueueEntry& lsq,
+auto std::formatter<x86sim::OutOfOrderModel::LoadStoreQueueEntry>::format(const x86sim::OutOfOrderModel::LoadStoreQueueEntry& lsq,
                                                                   std::format_context& ctx) const {
-  using namespace vcore;
+  using namespace x86sim;
   using namespace OutOfOrderModel;
   auto out = std::format_to(ctx.out(), "{}{:<3} uuid {:>10} rob {:<3} r{:<3}", (lsq.store ? "st" : "ld"), lsq.index(),
                             lsq.rob->uop.uuid, lsq.rob->index(), lsq.rob->physreg->index());

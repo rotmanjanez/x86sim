@@ -6,9 +6,9 @@
 //
 
 #include "decode.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
-namespace vcore {
+namespace x86sim {
 
 void assist_int(Context& ctx) {
   byte intid = ctx.commitarf[REG_ar1];
@@ -232,19 +232,19 @@ struct IRETStackFrame {
   W64 rip, cs, rflags, rsp, ss;
 };
 
-} // namespace vcore
+} // namespace x86sim
 
 template<>
-struct std::formatter<vcore::IRETStackFrame> {
+struct std::formatter<x86sim::IRETStackFrame> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::IRETStackFrame& iretctx, std::format_context& ctx) const {
-    using namespace vcore;
+  auto format(const x86sim::IRETStackFrame& iretctx, std::format_context& ctx) const {
+    using namespace x86sim;
     return std::format_to(ctx.out(), "cs:rip {}:{}, ss:rsp {}:{}, rflags {}", (void*)iretctx.cs, (void*)iretctx.rip,
                           (void*)iretctx.ss, (void*)iretctx.rsp, (void*)iretctx.rflags);
   }
 };
 
-namespace vcore {
+namespace x86sim {
 
 void assist_iret64(Context& ctx) {
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_selfrip];
@@ -1962,4 +1962,4 @@ bool TraceDecoder::decode_complex() {
   return true;
 }
 
-} // namespace vcore
+} // namespace x86sim

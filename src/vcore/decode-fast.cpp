@@ -7,7 +7,7 @@
 
 #include "decode.h"
 
-namespace vcore {
+namespace x86sim {
 
 bool TraceDecoder::decode_fast() {
   DecodedOperand rd;
@@ -982,4 +982,4 @@ bool TraceDecoder::decode_fast() {
   return true;
 }
 
-} // namespace vcore
+} // namespace x86sim

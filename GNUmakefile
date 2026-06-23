@@ -14,7 +14,7 @@ GEN ?= Ninja
 export CMAKE_GENERATOR := $(GEN)
 
 PRESETS := debug release relwithdeb
-CMAKE_TARGETS := raspsim vcore vcore_defaults
+CMAKE_TARGETS := raspsim x86sim vcore_defaults
 
 .PHONY: all $(PRESETS) $(CMAKE_TARGETS) test clean distclean
 

@@ -10,9 +10,9 @@
 #define _DCACHE_H_
 
 #include "ptlsim.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 
-namespace vcore {
+namespace x86sim {
 
 struct LoadStoreInfo {
   W16 rob;
@@ -377,8 +377,8 @@ static inline void prep_L2_sframask_and_reqmask(const SFR* sfr, W64 addr, int si
 // is 36 bits.
 //
 template<int tlbid, int size>
-struct TranslationLookasideBuffer : public vcore::FullyAssociativeTagsNbitOneHot<size, 40> {
-  typedef vcore::FullyAssociativeTagsNbitOneHot<size, 40> base_t;
+struct TranslationLookasideBuffer : public x86sim::FullyAssociativeTagsNbitOneHot<size, 40> {
+  typedef x86sim::FullyAssociativeTagsNbitOneHot<size, 40> base_t;
   TranslationLookasideBuffer() : base_t() {}
 
   void reset() { base_t::reset(); }
@@ -717,20 +717,20 @@ struct DataCacheStats {
 //
 // std::formatter specializations for C++23 std::print/std::format support
 //
-} // namespace vcore
+} // namespace x86sim
 
 namespace std {
 
 template<>
-struct formatter<vcore::CacheSubsystem::LoadFillReq> {
+struct formatter<x86sim::CacheSubsystem::LoadFillReq> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::CacheSubsystem::LoadFillReq& req, format_context& ctx) const;
+  auto format(const x86sim::CacheSubsystem::LoadFillReq& req, format_context& ctx) const;
 };
 
 template<int Size>
-struct formatter<vcore::CacheSubsystem::LoadFillReqQueue<Size>> {
+struct formatter<x86sim::CacheSubsystem::LoadFillReqQueue<Size>> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::CacheSubsystem::LoadFillReqQueue<Size>& lfrq, format_context& ctx) const {
+  auto format(const x86sim::CacheSubsystem::LoadFillReqQueue<Size>& lfrq, format_context& ctx) const {
     auto out = ctx.out();
     out = std::format_to(out, "LoadFillReqQueue<{}>: {} of {} entries ({} free)\n", Size, lfrq.count, Size,
                          Size - lfrq.count);
@@ -747,9 +747,9 @@ struct formatter<vcore::CacheSubsystem::LoadFillReqQueue<Size>> {
 };
 
 template<int Size>
-struct formatter<vcore::CacheSubsystem::MissBuffer<Size>> {
+struct formatter<x86sim::CacheSubsystem::MissBuffer<Size>> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::CacheSubsystem::MissBuffer<Size>& mb, format_context& ctx) const {
+  auto format(const x86sim::CacheSubsystem::MissBuffer<Size>& mb, format_context& ctx) const {
     auto out = ctx.out();
     out = std::format_to(out, "MissBuffer<{}>:\n", Size);
     foreach (i, Size) {
@@ -758,8 +758,8 @@ struct formatter<vcore::CacheSubsystem::MissBuffer<Size>> {
       const auto& entry = mb.missbufs[i];
       out =
           std::format_to(out, "slot {:>2}: vcpu {}, addr {} state {:<8} {} {} on {} cycles -> lfrq {}\n", i,
-                         entry.threadid, (void*)(vcore::Waddr)entry.addr,
-                         vcore::CacheSubsystem::missbuf_state_names[entry.state],
+                         entry.threadid, (void*)(x86sim::Waddr)entry.addr,
+                         x86sim::CacheSubsystem::missbuf_state_names[entry.state],
                          (entry.dcache ? "dcache" : " "), (entry.icache ? "icache" : " "), entry.cycles,
                          entry.lfrqmap.to_string());
     }
@@ -768,35 +768,35 @@ struct formatter<vcore::CacheSubsystem::MissBuffer<Size>> {
 };
 
 template<>
-struct formatter<vcore::CacheSubsystem::CacheHierarchy> {
+struct formatter<x86sim::CacheSubsystem::CacheHierarchy> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::CacheSubsystem::CacheHierarchy& ch, format_context& ctx) const;
+  auto format(const x86sim::CacheSubsystem::CacheHierarchy& ch, format_context& ctx) const;
 };
 
 template<int Type, int Size>
-struct formatter<vcore::CacheSubsystem::TranslationLookasideBuffer<Type, Size>> {
+struct formatter<x86sim::CacheSubsystem::TranslationLookasideBuffer<Type, Size>> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const vcore::CacheSubsystem::TranslationLookasideBuffer<Type, Size>& tlb, format_context& ctx) const {
-    using base_t = vcore::FullyAssociativeTagsNbitOneHot<Size, 40>;
+  auto format(const x86sim::CacheSubsystem::TranslationLookasideBuffer<Type, Size>& tlb, format_context& ctx) const {
+    using base_t = x86sim::FullyAssociativeTagsNbitOneHot<Size, 40>;
     return formatter<base_t>{}.format(static_cast<const base_t&>(tlb), ctx);
   }
 };
 
 template<int linesize>
-struct formatter<std::pair<vcore::CacheSubsystem::CacheLine<linesize>, vcore::W64>> {
+struct formatter<std::pair<x86sim::CacheSubsystem::CacheLine<linesize>, x86sim::W64>> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const std::pair<vcore::CacheSubsystem::CacheLine<linesize>, vcore::W64>& p, format_context& ctx) const;
+  auto format(const std::pair<x86sim::CacheSubsystem::CacheLine<linesize>, x86sim::W64>& p, format_context& ctx) const;
 };
 
 template<int linesize>
-struct formatter<std::pair<vcore::CacheSubsystem::CacheLineWithValidMask<linesize>, vcore::W64>> {
+struct formatter<std::pair<x86sim::CacheSubsystem::CacheLineWithValidMask<linesize>, x86sim::W64>> {
   constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
-  auto format(const std::pair<vcore::CacheSubsystem::CacheLineWithValidMask<linesize>, vcore::W64>& p, format_context& ctx) const;
+  auto format(const std::pair<x86sim::CacheSubsystem::CacheLineWithValidMask<linesize>, x86sim::W64>& p, format_context& ctx) const;
 };
 
 } // namespace std
 #else
-} // namespace vcore
+} // namespace x86sim
 #endif // STATS_ONLY
 
 #endif // _DCACHE_H_

@@ -10,7 +10,7 @@
 #include "globals.h"
 #include "ptlsim.h"
 #include "branchpred.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 #include "logic.h"
 #include "dcache.h"
 
@@ -18,7 +18,7 @@
 #include "ooocore.h"
 #include "stats.h"
 
-namespace vcore {
+namespace x86sim {
 
 #ifndef ENABLE_CHECKS
 #undef assert
@@ -2389,4 +2389,4 @@ int ReorderBufferEntry::pseudocommit() {
   return COMMIT_RESULT_OK;
 }
 
-} // namespace vcore
+} // namespace x86sim

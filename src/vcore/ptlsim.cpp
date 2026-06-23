@@ -10,10 +10,10 @@
 #include <fcntl.h>
 #include "globals.h"
 #include "ptlsim.h"
-#include "vcore/logging.h"
+#include "x86sim/logging.h"
 #include "stats.h"
 
-namespace vcore {
+namespace x86sim {
 
 #ifndef CONFIG_ONLY
 //
@@ -161,4 +161,4 @@ void shutdown_subsystems() {
 
 #endif // CONFIG_ONLY
 
-} // namespace vcore
+} // namespace x86sim
