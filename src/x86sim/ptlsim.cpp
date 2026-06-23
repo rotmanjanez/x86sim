@@ -25,6 +25,10 @@ PTLsimStats stats;
 bool logenable = 0;
 #endif
 
+int MachineImp::run() {
+  return 0;
+}
+
 void PTLsimConfig::reset() {
   quiet = 0;
   core_name = "ooo";

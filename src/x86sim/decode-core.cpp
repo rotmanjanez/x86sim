@@ -450,6 +450,7 @@ void TraceDecoder::reset() {
   outcome = DECODE_OUTCOME_OK;
   stop_at_rip = std::numeric_limits<W64>::max();
   stop_at_user_insns = std::numeric_limits<W64>::max();
+  machine = nullptr;
 }
 
 TraceDecoder::TraceDecoder(const RIPVirtPhys& rvp) {

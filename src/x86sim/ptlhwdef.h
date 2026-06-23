@@ -81,6 +81,9 @@
 
 namespace x86sim {
 
+class Machine;
+struct MachineImp;
+
 //
 // Exceptions:
 // These are PTL internal exceptions, NOT x86 exceptions:

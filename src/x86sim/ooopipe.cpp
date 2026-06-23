@@ -178,7 +178,7 @@ void ThreadContext::flush_pipeline() {
   foreach_issueq(reset(core, threadid));
 
   dispatch_deadlock_countdown = DISPATCH_DEADLOCK_COUNTDOWN_CYCLES;
-  last_commit_at_cycle = sim_cycle;
+  last_commit_at_cycle = core.machine.sim_cycle;
   external_to_core_state();
 }
 
@@ -657,7 +657,7 @@ BasicBlock* ThreadContext::fetch_or_translate_basic_block(const RIPVirtPhys& rvp
   // reclaim the BB while we still have a reference to it.
   //
   current_basic_block->acquire();
-  current_basic_block->use(sim_cycle);
+  current_basic_block->use(core.machine.sim_cycle);
 
   if unlikely (!current_basic_block->synthops)
     synth_uops_for_bb(*current_basic_block);
@@ -1140,7 +1140,7 @@ int ReorderBufferEntry::select_cluster() {
   }
 
   int n = 0;
-  int cluster = find_random_set_bit(executable_on_cluster, sim_cycle);
+  int cluster = find_random_set_bit(executable_on_cluster, getcore().machine.sim_cycle);
 
   foreach (i, MAX_CLUSTERS) {
     if ((cluster_operand_tally[i] > n) && bit(executable_on_cluster, i)) {
@@ -1486,7 +1486,7 @@ int ThreadContext::commit() {
     rc = rob.commit();
     if likely (rc == COMMIT_RESULT_OK) {
       core.commitcount++;
-      last_commit_at_cycle = sim_cycle;
+      last_commit_at_cycle = core.machine.sim_cycle;
     } else {
       break;
     }
@@ -1943,7 +1943,7 @@ int ReorderBufferEntry::commit() {
   }
 
   if likely (uop.eom) {
-    total_user_insns_committed++;
+    core.machine.total_user_insns_committed++;
     per_context_ooocore_stats_update(threadid, commit.insns++);
     thread.total_insns_committed++;
 
@@ -1951,7 +1951,7 @@ int ReorderBufferEntry::commit() {
   }
 
   stats.summary.uops++;
-  total_uops_committed++;
+  core.machine.total_uops_committed++;
   per_context_ooocore_stats_update(threadid, commit.uops++);
   thread.total_uops_committed++;
 
@@ -1977,8 +1977,8 @@ int ReorderBufferEntry::commit() {
   }
 
   if unlikely (uop_is_eom & thread.stop_at_next_eom) {
-    logging::println("[vcpu {}] Stopping at cycle {} ({} commits)", thread.ctx.vcpuid, sim_cycle,
-                     total_user_insns_committed);
+    logging::println("[vcpu {}] Stopping at cycle {} ({} commits)", thread.ctx.vcpuid, core.machine.sim_cycle,
+                     core.machine.total_user_insns_committed);
     return COMMIT_RESULT_STOP;
   }
 

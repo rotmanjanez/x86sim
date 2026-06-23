@@ -16,7 +16,7 @@ namespace x86sim {
 
 class AddressSpace;
 struct Context;
-struct CoreImpl;
+struct MachineImpl;
 
 using address_t = std::uint64_t;
 using word_t = std::uint64_t;
@@ -100,13 +100,13 @@ struct SyscallResult {
   std::string message;
 };
 
-class CPU;
+class Machine;
 
 class HostCallbacks {
 public:
   virtual ~HostCallbacks() = default;
-  virtual SyscallResult syscall(CPU&, SyscallKind) noexcept = 0;
-  virtual CpuidResult cpuid(CPU&, CpuidRequest) noexcept = 0;
+  virtual SyscallResult syscall(Machine&, Context&, SyscallKind) noexcept = 0;
+  virtual CpuidResult cpuid(Machine&, Context&, CpuidRequest) noexcept = 0;
 };
 
 struct Options {
@@ -149,10 +149,10 @@ public:
   [[nodiscard]] operator word_t() const noexcept;
 
 private:
-  friend class CPU;
-  constexpr RegisterRef(CPU& cpu, Register reg) noexcept : cpu_(&cpu), reg_(reg) {}
+  friend struct Context;
+  constexpr RegisterRef(Context& context, Register reg) noexcept : context_(&context), reg_(reg) {}
 
-  CPU* cpu_;
+  Context* context_;
   Register reg_;
 };
 
@@ -162,18 +162,19 @@ public:
   [[nodiscard]] operator XmmValue() const noexcept;
 
 private:
-  friend class CPU;
-  constexpr XmmRegisterRef(CPU& cpu, XmmRegister reg) noexcept : cpu_(&cpu), reg_(reg) {}
+  friend struct Context;
+  constexpr XmmRegisterRef(Context& context, XmmRegister reg) noexcept : context_(&context), reg_(reg) {}
 
-  CPU* cpu_;
+  Context* context_;
   XmmRegister reg_;
 };
 
-class CPU {
+class Machine {
 public:
   static constexpr std::uint64_t kPageSize = 4096;
 
-  explicit CPU(HostCallbacks&, Options = {});
+  explicit Machine(HostCallbacks&, Options = {});
+  ~Machine();
 
   [[nodiscard]] std::expected<void, MemoryError> map(address_t start, std::uint64_t size, Protection) noexcept;
   void unmap(address_t start, std::uint64_t size) noexcept;
@@ -181,27 +182,26 @@ public:
 
   [[nodiscard]] std::expected<std::span<const std::byte>, MemoryError> read_page(address_t page_aligned_address) const noexcept;
 
-  [[nodiscard]] RegisterRef operator[](Register reg) noexcept;
-  [[nodiscard]] word_t operator[](Register reg) const noexcept;
-  [[nodiscard]] XmmRegisterRef operator[](XmmRegister reg) noexcept;
-  [[nodiscard]] XmmValue operator[](XmmRegister reg) const noexcept;
+  [[nodiscard]] RunResult run(Context&, RunOptions = {});
 
-  [[nodiscard]] RunResult run(RunOptions = {});
+  [[nodiscard]] const AddressSpace& address_space() const noexcept;
+  [[nodiscard]] SyscallResult dispatch_syscall(Context&, SyscallKind) noexcept;
+  [[nodiscard]] CpuidResult dispatch_cpuid(Context&, CpuidRequest) noexcept;
+  void set_pending_stop(RunResult);
 
 private:
-  friend class RegisterRef;
-  friend class XmmRegisterRef;
-
-  [[nodiscard]] Stats stats() const noexcept;
+  void prepare_context(Context&) noexcept;
+  void reset_core(Context&);
 
   HostCallbacks& callbacks_;
   Options options_;
-  std::unique_ptr<PTLsimMachine> machine_;
+  std::unique_ptr<AddressSpace> address_space_;
+  std::unique_ptr<MachineImpl> machine_;
   std::optional<RunResult> pending_stop_;
 };
 
 namespace detail {
-[[nodiscard]] std::string format_cpu(const CPU&);
+[[nodiscard]] std::string format_cpu(const Machine&);
 } // namespace detail
 
 } // namespace x86sim
@@ -509,11 +509,11 @@ struct std::formatter<x86sim::XmmRegisterRef> {
 };
 
 template<>
-struct std::formatter<x86sim::CPU> {
+struct std::formatter<x86sim::Machine> {
   constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
   template<typename FormatContext>
-  auto format(const x86sim::CPU& cpu, FormatContext& ctx) const {
+  auto format(const x86sim::Machine& cpu, FormatContext& ctx) const {
     return std::format_to(ctx.out(), "{}", x86sim::detail::format_cpu(cpu));
   }
 };

@@ -22,29 +22,6 @@
 namespace x86sim {
 namespace {
 
-thread_local CPU* running_cpu = nullptr;
-
-struct InternalX86Exception {
-  X86Exception exception;
-};
-
-[[nodiscard]] CPU& active_cpu() noexcept {
-  assert(running_cpu);
-  return *running_cpu;
-}
-
-[[nodiscard]] Context& active_context() noexcept {
-  return detail::context(active_cpu());
-}
-
-[[nodiscard]] AddressSpace& active_address_space() noexcept {
-  return detail::address_space(active_cpu());
-}
-
-[[nodiscard]] Stats current_stats() noexcept {
-  return {.cycles = sim_cycle, .instructions = total_user_insns_committed};
-}
-
 [[nodiscard]] SyscallKind to_syscall_kind(int semantics) {
   switch (semantics) {
   case SYSCALL_SEMANTICS_INT80:
@@ -56,18 +33,17 @@ struct InternalX86Exception {
   }
 }
 
-void advance_default_syscall_rip_if_unchanged(CPU& cpu, SyscallKind kind, W64 old_rip) noexcept {
-  if (cpu[Register::rip] != old_rip)
+void advance_default_syscall_rip_if_unchanged(Context& context, SyscallKind kind, W64 old_rip) noexcept {
+  if (context[Register::rip] != old_rip)
     return;
 
-  Context& context = detail::context(cpu);
   switch (kind) {
   case SyscallKind::int80:
   case SyscallKind::sysenter:
-    cpu[Register::rip] = context.commitarf[REG_nextrip];
+    context[Register::rip] = context.commitarf[REG_nextrip];
     break;
   case SyscallKind::syscall64:
-    cpu[Register::rip] = context.commitarf[REG_rcx];
+    context[Register::rip] = context.commitarf[REG_rcx];
     break;
   }
 }
@@ -75,39 +51,6 @@ void advance_default_syscall_rip_if_unchanged(CPU& cpu, SyscallKind kind, W64 ol
 } // namespace
 
 bool requested_switch_to_native = false;
-
-int current_vcpuid() {
-  return 0;
-}
-
-bool asp_check_exec(void* addr) {
-  AddressSpace& asp = active_address_space();
-  return asp.fastcheck(addr, asp.execmap);
-}
-
-bool smc_isdirty(Waddr mfn) {
-  return active_address_space().isdirty(mfn);
-}
-
-void smc_setdirty(Waddr mfn) {
-  active_address_space().setdirty(mfn);
-}
-
-void smc_cleardirty(Waddr mfn) {
-  active_address_space().cleardirty(mfn);
-}
-
-bool check_for_async_sim_break() {
-  return iterations >= config.stop_at_iteration || total_user_insns_committed >= config.stop_at_user_insns;
-}
-
-int inject_events() {
-  return 0;
-}
-
-Context& contextof(int) {
-  return active_context();
-}
 
 W64 loadphys(Waddr addr) {
   return *reinterpret_cast<W64*>(addr);
@@ -121,7 +64,8 @@ W64 storemask(Waddr addr, W64 data, byte bytemask) {
 
 int Context::copy_from_user(void* target, Waddr addr, int bytes, PageFaultErrorCode& pfec, Waddr& faultaddr,
                             bool forexec, Level1PTE& ptelo, Level1PTE& ptehi) {
-  AddressSpace& asp = active_address_space();
+  assert(machine);
+  AddressSpace& asp = machine->address_space();
   logging::println("VMEM: Read from user {} ({})", reinterpret_cast<void*>(addr), bytes);
   logging::flush();
 
@@ -173,7 +117,8 @@ int Context::copy_from_user(void* target, Waddr addr, int bytes, PageFaultErrorC
 }
 
 int Context::copy_to_user(Waddr target, void* source, int bytes, PageFaultErrorCode& pfec, Waddr& faultaddr) {
-  AddressSpace& asp = active_address_space();
+  assert(machine);
+  AddressSpace& asp = machine->address_space();
   logging::println("VMEM: Write to user {} ({})", reinterpret_cast<void*>(target), bytes);
   logging::flush();
 
@@ -189,7 +134,7 @@ int Context::copy_to_user(Waddr target, void* source, int bytes, PageFaultErrorC
   byte* targetlo = reinterpret_cast<byte*>(asp.page_virt_to_mapped(target));
   int nlo = std::min(static_cast<Waddr>(4096 - lowbits(target, 12)), static_cast<Waddr>(bytes));
 
-  smc_setdirty(target >> 12);
+  asp.setdirty(target >> 12);
 
   if likely (nlo == bytes) {
     std::memcpy(targetlo, source, nlo);
@@ -208,13 +153,14 @@ int Context::copy_to_user(Waddr target, void* source, int bytes, PageFaultErrorC
   std::memcpy(asp.page_virt_to_mapped(target + nlo), reinterpret_cast<byte*>(source) + nlo, bytes - nlo);
   std::memcpy(targetlo, source, nlo);
 
-  smc_setdirty((target + nlo) >> 12);
+  asp.setdirty((target + nlo) >> 12);
   return bytes;
 }
 
 Waddr Context::check_and_translate(Waddr virtaddr, int sizeshift, bool store, bool internal, int& exception,
                                    PageFaultErrorCode& pfec, PTEUpdate& pteupdate, Level1PTE& pteused) {
-  AddressSpace& asp = active_address_space();
+  assert(machine);
+  AddressSpace& asp = machine->address_space();
   exception = 0;
   pteupdate = 0;
   pteused = 0;
@@ -299,7 +245,7 @@ CPU::CPU(HostCallbacks& callbacks, Options options)
   config.static_branchpred = options_.static_branch_prediction;
 }
 
-std::expected<void, MemoryError> CPU::map(address_t start, std::uint64_t size, Protection prot) noexcept {
+std::expected<void, MemoryError> Machine::map(address_t start, std::uint64_t size, Protection prot) noexcept {
   if (size == 0)
     return std::unexpected(MemoryError::zero_size);
 
@@ -313,13 +259,13 @@ std::expected<void, MemoryError> CPU::map(address_t start, std::uint64_t size, P
   return {};
 }
 
-void CPU::unmap(address_t start, std::uint64_t size) noexcept {
+void Machine::unmap(address_t start, std::uint64_t size) noexcept {
   if (size == 0)
     return;
   address_space_->unmap(start, size);
 }
 
-std::expected<void, MemoryError> CPU::write_memory(address_t start, std::span<const std::byte> bytes) noexcept {
+std::expected<void, MemoryError> Machine::write_memory(address_t start, std::span<const std::byte> bytes) noexcept {
   std::uint64_t processed = 0;
   while (processed < bytes.size()) {
     address_t addr = start + processed;
@@ -334,7 +280,7 @@ std::expected<void, MemoryError> CPU::write_memory(address_t start, std::span<co
   return {};
 }
 
-std::expected<std::span<const std::byte>, MemoryError> CPU::read_page(address_t page_aligned_address) const noexcept {
+std::expected<std::span<const std::byte>, MemoryError> Machine::read_page(address_t page_aligned_address) const noexcept {
   static std::array<std::byte, kPageSize> zero_page{};
 
   if ((page_aligned_address & (kPageSize - 1)) != 0)
@@ -347,24 +293,24 @@ std::expected<std::span<const std::byte>, MemoryError> CPU::read_page(address_t 
   return std::span<const std::byte>(src, kPageSize);
 }
 
-RegisterRef CPU::operator[](Register reg) noexcept {
+RegisterRef Context::operator[](Register reg) noexcept {
   return RegisterRef(*this, reg);
 }
 
-word_t CPU::operator[](Register reg) const noexcept {
-  return context_->commitarf[static_cast<int>(reg)];
+word_t Context::operator[](Register reg) const noexcept {
+  return commitarf[static_cast<int>(reg)];
 }
 
-XmmRegisterRef CPU::operator[](XmmRegister reg) noexcept {
+XmmRegisterRef Context::operator[](XmmRegister reg) noexcept {
   return XmmRegisterRef(*this, reg);
 }
 
-XmmValue CPU::operator[](XmmRegister reg) const noexcept {
+XmmValue Context::operator[](XmmRegister reg) const noexcept {
   const int lo = static_cast<int>(reg);
-  return {.lo = context_->commitarf[lo], .hi = context_->commitarf[lo + 1]};
+  return {.lo = commitarf[lo], .hi = commitarf[lo + 1]};
 }
 
-RunResult CPU::run(RunOptions options) {
+RunResult Machine::run(Context& context, RunOptions options) {
   pending_stop_.reset();
 
   const auto stop_at = options.instruction_limit ? total_user_insns_committed + *options.instruction_limit
@@ -397,63 +343,25 @@ Stats CPU::stats() const noexcept {
 }
 
 RegisterRef& RegisterRef::operator=(word_t value) noexcept {
-  detail::context(*cpu_).commitarf[static_cast<int>(reg_)] = value;
+  context_->commitarf[static_cast<int>(reg_)] = value;
   return *this;
 }
 
 RegisterRef::operator word_t() const noexcept {
-  return detail::context(*cpu_).commitarf[static_cast<int>(reg_)];
+  return context_->commitarf[static_cast<int>(reg_)];
 }
 
 XmmRegisterRef& XmmRegisterRef::operator=(XmmValue value) noexcept {
   const int lo = static_cast<int>(reg_);
-  Context& context = detail::context(*cpu_);
-  context.commitarf[lo] = value.lo;
-  context.commitarf[lo + 1] = value.hi;
+  context_->commitarf[lo] = value.lo;
+  context_->commitarf[lo + 1] = value.hi;
   return *this;
 }
 
 XmmRegisterRef::operator XmmValue() const noexcept {
   const int lo = static_cast<int>(reg_);
-  Context& context = detail::context(*cpu_);
-  return {.lo = context.commitarf[lo], .hi = context.commitarf[lo + 1]};
+  return {.lo = context_->commitarf[lo], .hi = context_->commitarf[lo + 1]};
 }
-
-namespace detail {
-
-Context& context(CPU& cpu) noexcept {
-  return *cpu.context_;
-}
-
-const Context& context(const CPU& cpu) noexcept {
-  return *cpu.context_;
-}
-
-AddressSpace& address_space(CPU& cpu) noexcept {
-  return *cpu.address_space_;
-}
-
-const AddressSpace& address_space(const CPU& cpu) noexcept {
-  return *cpu.address_space_;
-}
-
-SyscallResult dispatch_syscall(CPU& cpu, SyscallKind kind) noexcept {
-  return cpu.callbacks_.syscall(cpu, kind);
-}
-
-CpuidResult dispatch_cpuid(CPU& cpu, CpuidRequest request) noexcept {
-  return cpu.callbacks_.cpuid(cpu, request);
-}
-
-void set_pending_stop(CPU& cpu, RunResult result) {
-  cpu.pending_stop_ = std::move(result);
-}
-
-std::string format_cpu(const CPU& cpu) {
-  return std::format("{}", context(cpu));
-}
-
-} // namespace detail
 
 [[noreturn]] void throw_x86_exception(Context& context, byte exception, W32 errorcode, Waddr virtaddr) {
   X86Exception result{

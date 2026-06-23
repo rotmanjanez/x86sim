@@ -1,4 +1,4 @@
-#include "addrspace.h"
+#include "x86sim/addrspace.h"
 
 #include <cstdlib>
 #include <cstring>

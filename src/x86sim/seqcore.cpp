@@ -472,11 +472,12 @@ struct std::formatter<x86sim::SequentialCoreEvent> {
 namespace x86sim {
 
 struct SequentialCoreEventLog {
+  MachineImp* machine = nullptr;
   SequentialCoreEvent* start;
   SequentialCoreEvent* end;
   SequentialCoreEvent* tail;
 
-  SequentialCoreEventLog() {
+  explicit SequentialCoreEventLog(MachineImp& machine_): machine(&machine_) {
     start = null;
     end = null;
     tail = null;
@@ -501,9 +502,11 @@ struct SequentialCoreEventLog {
   void clear() { tail = start; }
 
   SequentialCoreEvent* add(int type, int coreid, const TransOp& uop, W64 rip, int uopid, W64 uuid, W64 eomid) {
+    assert(core);
+
     SequentialCoreEvent* event = add();
     event->type = type;
-    event->cycle = sim_cycle;
+    event->cycle = core->sim_cycle;
     event->uuid = uuid;
     event->rip = rip;
     event->eomid = eomid;
@@ -596,11 +599,12 @@ void SequentialCoreEventLog::print(bool only_to_tail) {
 static SequentialCoreEventLog eventlog;
 
 struct SequentialCore {
+  SequentialMachine& machine;
   Context& ctx;
   CommitRecord* cmtrec;
 
-  SequentialCore() : ctx(contextof(0)), cmtrec(null) {}
-  SequentialCore(Context& ctx_, CommitRecord* cmtrec_ = null) : ctx(ctx_), cmtrec(cmtrec_) {}
+  SequentialCore(SequentialMachine& machine_, Context& ctx_, CommitRecord* cmtrec_ = null)
+      : machine(machine_), ctx(ctx_), cmtrec(cmtrec_) {}
 
   BasicBlock* current_basic_block;
   int bytes_in_current_insn;
@@ -763,7 +767,7 @@ struct SequentialCore {
       //
       if unlikely (config.event_log_enabled) {
         SequentialCoreEvent* event = eventlog.add(EVENT_LOAD_STORE_UNALIGNED, ctx.vcpuid, uop, arf[REG_rip],
-                                                  current_uop_in_macro_op, current_uuid, total_user_insns_committed);
+                                                  current_uop_in_macro_op, current_uuid, machine.total_user_insns_committed);
         event->loadstore.virtaddr = origaddr;
       }
 
@@ -784,7 +788,7 @@ struct SequentialCore {
 
     if unlikely (config.event_log_enabled) {
       SequentialCoreEvent* event = eventlog.add((STORE) ? EVENT_STORE : EVENT_LOAD, ctx.vcpuid, uop, arf[REG_rip],
-                                                current_uop_in_macro_op, current_uuid, total_user_insns_committed);
+                                                current_uop_in_macro_op, current_uuid, machine.total_user_insns_committed);
       event->loadstore.sfr = state;
       event->loadstore.virtaddr = addr;
       event->loadstore.origaddr = origaddr;
@@ -839,7 +843,7 @@ struct SequentialCore {
 
     if unlikely (config.event_log_enabled) {
       SequentialCoreEvent* event = eventlog.add(EVENT_STORE, ctx.vcpuid, uop, rip, current_uop_in_macro_op,
-                                                current_uuid, total_user_insns_committed);
+                                                current_uuid, machine.total_user_insns_committed);
       event->loadstore.sfr = state;
       event->loadstore.virtaddr = addr;
       event->loadstore.origaddr = origaddr;
@@ -894,7 +898,7 @@ struct SequentialCore {
       if unlikely (cmtrec) {
         data = transactmem.load(state.physaddr << 3);
       } else {
-        logging::println("[cycle {}] load from physaddr {} for virtaddr {}", sim_cycle, (void*)physaddr,
+        logging::println("[cycle {}] load from physaddr {} for virtaddr {}", machine.sim_cycle, (void*)physaddr,
                          (void*)origaddr);
         data = loadphys(physaddr);
       }
@@ -939,7 +943,7 @@ struct SequentialCore {
 
         if unlikely (config.event_log_enabled) {
           SequentialCoreEvent* event = eventlog.add(EVENT_LOAD_ANNUL, ctx.vcpuid, uop, rip, current_uop_in_macro_op,
-                                                    current_uuid, total_user_insns_committed);
+                                                    current_uuid, machine.total_user_insns_committed);
           event->loadstore.sfr = state;
           event->loadstore.virtaddr = addr;
           event->loadstore.origaddr = origaddr;
@@ -963,7 +967,7 @@ struct SequentialCore {
 
     if unlikely (config.event_log_enabled) {
       SequentialCoreEvent* event = eventlog.add(EVENT_LOAD, ctx.vcpuid, uop, rip, current_uop_in_macro_op, current_uuid,
-                                                total_user_insns_committed);
+                                                machine.total_user_insns_committed);
       event->loadstore.sfr = state;
       event->loadstore.virtaddr = addr;
       event->loadstore.origaddr = origaddr;
@@ -1002,7 +1006,7 @@ struct SequentialCore {
     logging::println(
         logging::DEBUG, "[vcpu {}] Barrier (#{} -> {} {}) called from {}; return to {}) at {} cycles, {} commits",
         ctx.vcpuid, assistid, (void*)assist, assist_name(assist), (RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx)),
-        (void*)(Waddr)ctx.commitarf[REG_nextrip], sim_cycle, total_user_insns_committed);
+        (void*)(Waddr)ctx.commitarf[REG_nextrip], machine.sim_cycle, machine.total_user_insns_committed);
     logging::flush();
 
     logging::println(logging::TRACE, "Calling assist function at {}...", (void*)assist);
@@ -1031,7 +1035,7 @@ struct SequentialCore {
     core_to_external_state(ctx);
 
     logging::println(logging::INFO, "PTL Exception {} called from rip {} at {} cycles, {} commits", ctx.exception,
-                     (void*)(Waddr)ctx.commitarf[REG_rip], sim_cycle, total_user_insns_committed);
+                     (void*)(Waddr)ctx.commitarf[REG_rip], machine.sim_cycle, machine.total_user_insns_committed);
     logging::flush();
 
     //
@@ -1087,7 +1091,7 @@ struct SequentialCore {
         TransOp dummyuop;
         setzero(dummyuop);
         SequentialCoreEvent* event =
-            eventlog.add(EVENT_TRANSLATE, ctx.vcpuid, dummyuop, rip, 0, 0, total_user_insns_committed);
+            eventlog.add(EVENT_TRANSLATE, ctx.vcpuid, dummyuop, rip, 0, 0, machine.total_user_insns_committed);
         event->bb.rvp = rvp;
         event->bb.bb = current_basic_block;
         event->bb.bbcount = current_basic_block->count;
@@ -1096,7 +1100,7 @@ struct SequentialCore {
       bbcache_inserts++;
     }
 
-    current_basic_block->use(sim_cycle);
+    current_basic_block->use(machine.sim_cycle);
     return current_basic_block;
   }
 
@@ -1120,7 +1124,7 @@ struct SequentialCore {
       TransOp dummyuop;
       setzero(dummyuop);
       SequentialCoreEvent* event =
-          eventlog.add(EVENT_EXECUTE_BB, ctx.vcpuid, dummyuop, bb->rip, 0, 0, total_user_insns_committed);
+          eventlog.add(EVENT_EXECUTE_BB, ctx.vcpuid, dummyuop, bb->rip, 0, 0, machine.total_user_insns_committed);
       event->bb.rvp = bb->rip;
       event->bb.bb = bb;
       event->bb.bbcount = bb->count;
@@ -1139,7 +1143,7 @@ struct SequentialCore {
     int user_insns = 0;
 
     seq_total_basic_blocks++;
-    total_basic_blocks_committed++;
+    machine.total_basic_blocks_committed++;
 
     RIPVirtPhys rvp(arf[REG_rip]);
 
@@ -1253,7 +1257,7 @@ struct SequentialCore {
       if unlikely (force_fpu_not_avail_fault) {
         if unlikely (config.event_log_enabled) {
           SequentialCoreEvent* event = eventlog.add(EVENT_ISSUE, ctx.vcpuid, uop, rip, current_uop_in_macro_op,
-                                                    current_uuid, total_user_insns_committed);
+                                                    current_uuid, machine.total_user_insns_committed);
           IssueState state;
           state.reg.rdflags = FLAG_INV;
           state.reg.rddata = EXCEPTION_FloatingPointNotAvailable;
@@ -1289,7 +1293,7 @@ struct SequentialCore {
           if unlikely (config.event_log_enabled) {
             SequentialCoreEvent* event =
                 eventlog.add(EVENT_ALIGNMENT_FIXUP, ctx.vcpuid, uop, rip, current_uop_in_macro_op, current_uuid,
-                             total_user_insns_committed);
+                             machine.total_user_insns_committed);
             event->alignfixup.uopindex = uopindex;
           }
           bb->transops[uopindex].unaligned = 1;
@@ -1301,7 +1305,7 @@ struct SequentialCore {
 
         if unlikely (config.event_log_enabled) {
           SequentialCoreEvent* event = eventlog.add(EVENT_BRANCH, ctx.vcpuid, uop, rip, current_uop_in_macro_op,
-                                                    current_uuid, total_user_insns_committed);
+                                                    current_uuid, machine.total_user_insns_committed);
           event->issue.state = state;
         }
 
@@ -1316,7 +1320,7 @@ struct SequentialCore {
 
         if unlikely (config.event_log_enabled) {
           SequentialCoreEvent* event = eventlog.add(EVENT_ISSUE, ctx.vcpuid, uop, rip, current_uop_in_macro_op,
-                                                    current_uuid, total_user_insns_committed);
+                                                    current_uuid, machine.total_user_insns_committed);
           event->issue.state = state;
         }
 
@@ -1325,7 +1329,7 @@ struct SequentialCore {
             W64 chk_recovery_rip = arf[REG_rip] + bytes_in_current_insn;
             if unlikely (config.event_log_enabled) {
               SequentialCoreEvent* event = eventlog.add(EVENT_SKIPBLOCK, ctx.vcpuid, uop, rip, current_uop_in_macro_op,
-                                                        current_uuid, total_user_insns_committed);
+                                                        current_uuid, machine.total_user_insns_committed);
               event->skipblock.bytes_in_current_insn = bytes_in_current_insn;
               event->skipblock.chk_recovery_rip = chk_recovery_rip;
             }
@@ -1333,7 +1337,7 @@ struct SequentialCore {
             arf[REG_rip] = chk_recovery_rip;
 
             seq_total_user_insns_committed++;
-            total_user_insns_committed += (!suppress_total_user_insn_count_updates_in_seqcore);
+            machine.total_user_insns_committed += (!suppress_total_user_insn_count_updates_in_seqcore);
             user_insns++;
             return SEQEXEC_OK;
           } else {
@@ -1347,7 +1351,7 @@ struct SequentialCore {
       // Commit
       //
 
-      total_uops_committed++;
+      machine.total_uops_committed++;
       seq_total_uops_committed++;
 
       assert(!ctx.exception);
@@ -1377,7 +1381,7 @@ struct SequentialCore {
       if unlikely (pteupdate) {
         if unlikely (config.event_log_enabled) {
           SequentialCoreEvent* event = eventlog.add(EVENT_PTE_UPDATE, ctx.vcpuid, uop, rip, current_uop_in_macro_op,
-                                                    current_uuid, total_user_insns_committed);
+                                                    current_uuid, machine.total_user_insns_committed);
           event->pteupdate.virtaddr = origvirt;
           event->pteupdate.pteupdate = pteupdate;
         }
@@ -1417,7 +1421,7 @@ struct SequentialCore {
           TransOp dummyuop;
           setzero(dummyuop);
           SequentialCoreEvent* event = eventlog.add(EVENT_ASSIST, ctx.vcpuid, dummyuop, rip, current_uop_in_macro_op,
-                                                    current_uuid, total_user_insns_committed);
+                                                    current_uuid, machine.total_user_insns_committed);
           event->assist.id = assistid;
           event->assist.rip = arf[REG_selfrip];
           event->assist.ptl_pip = (W64)assist;
@@ -1427,7 +1431,7 @@ struct SequentialCore {
       }
 
       seq_total_user_insns_committed += uop.eom;
-      total_user_insns_committed += uop.eom && (!suppress_total_user_insn_count_updates_in_seqcore);
+      machine.total_user_insns_committed += uop.eom && (!suppress_total_user_insn_count_updates_in_seqcore);
       user_insns += uop.eom;
       stats.summary.insns += uop.eom;
       stats.summary.uops++;
@@ -1457,7 +1461,7 @@ struct SequentialCore {
 
     bool exiting = 0;
 
-    int result = execute(current_basic_block, (config.stop_at_user_insns - total_user_insns_committed));
+    int result = execute(current_basic_block, (config.stop_at_user_insns - machine.total_user_insns_committed));
 
     switch (result) {
     case SEQEXEC_OK:
@@ -1487,9 +1491,11 @@ std::string_view SequentialMachine::name() const {
   return "seq";
 }
 
-SequentialMachine::SequentialMachine(const PTLsimConfig& config) : CoreImpl(config) {
+SequentialMachine::~SequentialMachine() = default;
+
+SequentialMachine::SequentialMachine(Context& context, const PTLsimConfig& config) : MachineImp(context, config) {
   foreach (i, contextcount) {
-    cores[i] = std::make_unique<SequentialCore>(contextof(i));
+    cores[i] = std::make_unique<SequentialCore>(*this, this->context);
     //
     // Note: in a real cycle accurate model, config may
     // specify various ways of slicing contextcount up
@@ -1502,8 +1508,8 @@ SequentialMachine::SequentialMachine(const PTLsimConfig& config) : CoreImpl(conf
 
 
 int SequentialMachine::run() {
-    logging::println("Starting sequential core toplevel loop at {} cycles and {} commits", sim_cycle,
-                     total_user_insns_committed);
+    logging::println("Starting sequential core toplevel loop at {} cycles and {} commits", machine.sim_cycle,
+                     machine.total_user_insns_committed);
     logging::flush();
 
     if unlikely (config.event_log_enabled && (!eventlog.start)) {
@@ -1512,7 +1518,7 @@ int SequentialMachine::run() {
 
     foreach (i, contextcount) {
       SequentialCore& core = *cores[i];
-      Context& ctx = contextof(i);
+      Context& ctx = context;
 
       core.external_to_core_state(ctx);
 
@@ -1525,7 +1531,7 @@ int SequentialMachine::run() {
     logging::println(logging::INFO, "Current logenable = {}, start_log_at_iteration = {}, loglevel {}", logenable, config.start_log_at_iteration, config.loglevel);
 
     for (;;) {
-      if unlikely (iterations >= config.start_log_at_iteration)
+      if unlikely (machine.iterations >= config.start_log_at_iteration)
         logenable = 1;
 
       inject_events();
@@ -1533,20 +1539,21 @@ int SequentialMachine::run() {
       int running_thread_count = 0;
       foreach (i, contextcount) {
         SequentialCore& core = *cores[i];
-        Context& ctx = contextof(i);
+        Context& ctx = context;
 
         exiting |= core.execute();
       }
 
-      exiting |= check_for_async_sim_break();
+      exiting |= machine.iterations >= config.stop_at_iteration ||
+                 machine.total_user_insns_committed >= config.stop_at_user_insns;
 
       if unlikely (config.event_log_enabled) {
         if unlikely (config.flush_event_log_every_cycle)
           eventlog.flush(true);
       }
 
-      iterations++;
-      sim_cycle++;
+      machine.iterations++;
+      machine.sim_cycle++;
       unhalted_cycle_count += (running_thread_count > 0);
       stats.summary.cycles++;
 
@@ -1555,12 +1562,12 @@ int SequentialMachine::run() {
     }
 
     logging::println(logging::INFO, "Exiting sequential mode at {} commits, {} uops and {} iterations (cycles)",
-                     total_user_insns_committed, total_uops_committed, iterations);
+                     machine.total_user_insns_committed, machine.total_uops_committed, machine.iterations);
     // logging::println(logging::TRACE, "{}", *this);
 
     foreach (i, contextcount) {
       SequentialCore& core = *cores[i];
-      Context& ctx = contextof(i);
+      Context& ctx = context;
 
       core.core_to_external_state(ctx);
 

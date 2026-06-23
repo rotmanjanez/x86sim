@@ -13,7 +13,7 @@ namespace x86sim {
 void assist_int(Context& ctx) {
   byte intid = ctx.commitarf[REG_ar1];
   if (intid == 0x80) {
-    handle_syscall_32bit(SYSCALL_SEMANTICS_INT80);
+    handle_syscall_32bit(ctx, SYSCALL_SEMANTICS_INT80);
   } else if (intid == 0x01 || intid == 0x03) {
     ctx.propagate_x86_exception(intid, 0);
   } else {
@@ -24,7 +24,7 @@ void assist_int(Context& ctx) {
 
 void assist_syscall(Context& ctx) {
   if (ctx.use64) {
-    handle_syscall_64bit();
+    handle_syscall_64bit(ctx);
   }
   // REG_rip is filled out for us
 }
@@ -32,7 +32,7 @@ void assist_syscall(Context& ctx) {
 void assist_hypercall(Context& ctx) {}
 
 void assist_sysenter(Context& ctx) {
-  handle_syscall_32bit(SYSCALL_SEMANTICS_SYSENTER);
+  handle_syscall_32bit(ctx, SYSCALL_SEMANTICS_SYSENTER);
   // REG_rip is filled out for us
 }
 
@@ -46,7 +46,7 @@ void assist_cpuid(Context& ctx) {
   W32 subfunc = rcx;
   logging::println("assist_cpuid: func 0x{:08x} called from {}:", func, (void*)(Waddr)ctx.commitarf[REG_selfrip]);
 
-  CpuidResult result = handle_cpuid(func, subfunc);
+  CpuidResult result = handle_cpuid(ctx, func, subfunc);
   rax = result.eax;
   rbx = result.ebx;
   rcx = result.ecx;
@@ -58,7 +58,7 @@ void assist_cpuid(Context& ctx) {
 void assist_rdtsc(Context& ctx) {
   W64& rax = ctx.commitarf[REG_rax];
   W64& rdx = ctx.commitarf[REG_rdx];
-  W64 tsc = sim_cycle;
+  W64 tsc = ctx.core->sim_cycle;
   rax = LO32(tsc);
   rdx = HI32(tsc);
 
@@ -1930,7 +1930,8 @@ bool TraceDecoder::decode_complex() {
   case 0x131: {
     // rdtsc: put result into %edx:%eax
     EndOfDecode();
-    TransOp ldp1(OP_ld, REG_rdx, REG_zero, REG_imm, REG_zero, 3, (Waddr)&sim_cycle);
+    assert(core);
+    TransOp ldp1(OP_ld, REG_rdx, REG_zero, REG_imm, REG_zero, 3, (Waddr)&core->sim_cycle);
     ldp1.internal = 1;
     put(ldp1);
     put(TransOp(OP_mov, REG_rax, REG_zero, REG_rdx, REG_zero, 2));

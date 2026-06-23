@@ -439,12 +439,13 @@ struct LoadFillReq {
 
   inline LoadFillReq() {}
 
-  LoadFillReq(W64 addr, W64 data, byte mask, LoadStoreInfo lsi);
+  LoadFillReq(W64 addr, W64 data, byte mask, LoadStoreInfo lsi, W64 initcycle);
 };
 
 
 template<int size>
 struct LoadFillReqQueue {
+  MachineImpl& machine;
   CacheHierarchy* hierarchy = nullptr;
   std::bitset<size> freemap; // Slot is free
   std::bitset<size> waiting; // Waiting for the line to arrive in the L1
@@ -454,8 +455,7 @@ struct LoadFillReqQueue {
 
   static const int SIZE = size;
 
-  LoadFillReqQueue() { reset(); }
-  LoadFillReqQueue(CacheHierarchy& hierarchy_) : hierarchy(&hierarchy_) { reset(); }
+  LoadFillReqQueue(MachineImp& machine_, CacheHierarchy& hierarchy_) : machine(machine_), hierarchy(&hierarchy_) { reset(); }
 
   // Clear entries belonging to one thread
   void reset(int threadid);
@@ -524,10 +524,10 @@ struct MissBuffer {
     }
   };
 
-  MissBuffer() { reset(); }
-  MissBuffer(CacheHierarchy& hierarchy_) : hierarchy(&hierarchy_) { reset(); }
-
+  MachineImpl& machine;
   CacheHierarchy* hierarchy = nullptr;
+
+  MissBuffer(MachineImp& machine_, CacheHierarchy& hierarchy_) : core(core_), hierarchy(&hierarchy_) { reset(); }
   Entry missbufs[SIZE];
   std::bitset<SIZE> freemap;
   int count;
@@ -551,6 +551,7 @@ struct PerCoreCacheCallbacks {
 };
 
 struct CacheHierarchy {
+  MachineImpl& machine;
   LoadFillReqQueue<LFRQ_SIZE> lfrq;
   MissBuffer<MISSBUF_COUNT> missbuf;
   L1Cache L1;
@@ -564,7 +565,7 @@ struct CacheHierarchy {
 
   PerCoreCacheCallbacks* callback;
 
-  CacheHierarchy() : lfrq(*this), missbuf(*this) { callback = null; }
+  explicit CacheHierarchy(MachineImp& machine_) : machine(machine_), lfrq(machine_, *this), missbuf(machine_, *this) { callback = null; }
 
   bool probe_cache_and_sfr(W64 addr, const SFR* sfra, int sizeshift);
   bool covered_by_sfr(W64 addr, SFR* sfr, int sizeshift);

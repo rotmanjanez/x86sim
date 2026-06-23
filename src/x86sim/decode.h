@@ -229,6 +229,7 @@ enum {
 };
 
 struct TraceDecoder {
+  MachineImp* machine;
   BasicBlock bb;
   TransOp transbuf[MAX_TRANSOPS_PER_USER_INSN];
   int transbufcount;

@@ -438,7 +438,7 @@ bool OutOfOrderCore::runcycle() {
   // Flush event log ring buffer
   //
   if unlikely (config.event_log_enabled) {
-    logging::println(logging::INFO, "[cycle {}] Miss buffer contents:", sim_cycle);
+    logging::println(logging::INFO, "[cycle {}] Miss buffer contents:", machine.sim_cycle);
     logging::println(logging::INFO, "{}", caches.missbuf);
     if unlikely (config.flush_event_log_every_cycle) {
       eventlog.flush(true);
@@ -462,7 +462,7 @@ bool OutOfOrderCore::runcycle() {
     case COMMIT_RESULT_SMC: {
       logging::println(logging::INFO,
                        "Potentially cross-modifying SMC detected: global flush required (cycle {}, {} commits)",
-                       sim_cycle, total_user_insns_committed);
+                       machine.sim_cycle, machine.total_user_insns_committed);
       logging::flush();
       //
       // DO NOT GLOBALLY FLUSH! It will cut off the other thread(s) in the
@@ -525,12 +525,12 @@ bool OutOfOrderCore::runcycle() {
     if unlikely (!thread->ctx.running)
       break;
 
-    if unlikely ((sim_cycle - thread->last_commit_at_cycle) > 4096) {
+    if unlikely ((machine.sim_cycle - thread->last_commit_at_cycle) > 4096) {
       logging::println(logging::ERROR,
                        "[vcpu {}] thread {}: WARNING: At cycle {}, {} user commits: no instructions have "
                        "committed for {} cycles; the pipeline could be deadlocked",
-                       thread->ctx.vcpuid, thread->threadid, sim_cycle, total_user_insns_committed,
-                       (sim_cycle - thread->last_commit_at_cycle));
+                       thread->ctx.vcpuid, thread->threadid, machine.sim_cycle, machine.total_user_insns_committed,
+                       (machine.sim_cycle - thread->last_commit_at_cycle));
       logging::flush();
       exiting = 1;
     }
@@ -666,9 +666,9 @@ void OutOfOrderCore::print_smt_state() {
     auto& thread = threads[i];
     logging::println("Thread {}:", i);
     logging::println("  total_uops_committed {}", thread->total_uops_committed);
-    logging::println("  uipc {}", double(thread->total_uops_committed) / double(iterations));
+    logging::println("  uipc {}", double(thread->total_uops_committed) / double(machine.iterations));
     logging::println("  total_insns_committed {}", thread->total_insns_committed);
-    logging::println("  ipc {}", double(thread->total_insns_committed) / double(iterations));
+    logging::println("  ipc {}", double(thread->total_insns_committed) / double(machine.iterations));
   }
 }
 
@@ -835,7 +835,8 @@ bool ThreadContext::handle_barrier() {
   logging::println(logging::INFO,
                    "[vcpu {}] Barrier (#{} -> {} {} called from {}; return to {}) at {} cycles, {} commits", ctx.vcpuid,
                    assistid, (void*)assist, assist_name(assist), RIPVirtPhys(ctx.commitarf[REG_selfrip]).update(ctx),
-                   (void*)(Waddr)ctx.commitarf[REG_nextrip], sim_cycle, total_user_insns_committed);
+                   (void*)(Waddr)ctx.commitarf[REG_nextrip], core.machine.sim_cycle,
+                   core.machine.total_user_insns_committed);
   logging::flush();
 
   logging::println(logging::DEBUG, "Calling assist function at {}...", (void*)assist);
@@ -868,7 +869,8 @@ bool ThreadContext::handle_exception() {
   flush_pipeline();
 
   logging::println(logging::INFO, "[vcpu {}] Exception {} called from rip {} at {} cycles, {} commits", ctx.vcpuid,
-                   ctx.exception, (void*)(Waddr)ctx.commitarf[REG_rip], sim_cycle, total_user_insns_committed);
+                   ctx.exception, (void*)(Waddr)ctx.commitarf[REG_rip], core.machine.sim_cycle,
+                   core.machine.total_user_insns_committed);
   logging::flush();
 
   //
@@ -1660,14 +1662,14 @@ std::string_view OutOfOrderMachine::name() const {
 
 OutOfOrderMachine::~OutOfOrderMachine() = default;
 
-OutOfOrderMachine::OutOfOrderMachine(const PTLsimConfig& config) : CoreImpl(config) {
+OutOfOrderMachine::OutOfOrderMachine(Context& context, const PTLsimConfig& config) : MachineImp(context, config) {
   // Note: we only create a single core for all contexts for now.
   cores[0] = std::make_unique<OutOfOrderCore>(0, *this);
 
   foreach (i, contextcount) {
     OutOfOrderCore& core = *cores[0];
     core.threadcount++;
-    core.threads[i] = std::make_unique<ThreadContext>(core, i, contextof(i));
+    core.threads[i] = std::make_unique<ThreadContext>(core, i, this->context);
     core.threads[i]->init();
 
     //
@@ -1694,8 +1696,8 @@ int OutOfOrderMachine::run() {
   // All VCPUs are running:
   stopped = 0;
 
-  if unlikely (iterations >= config.start_log_at_iteration) {
-    logging::println("Start logging at level {} in cycle {}", config.loglevel, iterations);
+  if unlikely (this->iterations >= config.start_log_at_iteration) {
+    logging::println("Start logging at level {} in cycle {}", config.loglevel, this->iterations);
     logging::flush();
 
     logenable = 1;
@@ -1714,9 +1716,9 @@ int OutOfOrderMachine::run() {
   bool stopping = false;
 
   for (;;) {
-    if unlikely (iterations >= config.start_log_at_iteration) {
+    if unlikely (this->iterations >= config.start_log_at_iteration) {
       if unlikely (!logenable) {
-        logging::println("Start logging at level {} in cycle {}", config.loglevel, iterations);
+        logging::println("Start logging at level {} in cycle {}", config.loglevel, this->iterations);
         logging::flush();
       }
       logenable = 1;
@@ -1732,8 +1734,10 @@ int OutOfOrderMachine::run() {
 
     exiting |= core.runcycle();
 
-    if unlikely (check_for_async_sim_break() && (!stopping)) {
-      logging::println("Waiting for all VCPUs to reach stopping point, starting at cycle {}", sim_cycle);
+    if unlikely (((this->iterations >= config.stop_at_iteration ||
+                   this->total_user_insns_committed >= config.stop_at_user_insns) &&
+                  (!stopping))) {
+      logging::println("Waiting for all VCPUs to reach stopping point, starting at cycle {}", this->sim_cycle);
       // force_logging_enabled();
       OutOfOrderCore& core = *cores[0];
       foreach (i, core.threadcount)
@@ -1749,12 +1753,12 @@ int OutOfOrderMachine::run() {
 
     stats.summary.cycles++;
     stats.ooocore.cycles++;
-    sim_cycle++;
+    this->sim_cycle++;
     unhalted_cycle_count += (running_thread_count > 0);
-    iterations++;
+    this->iterations++;
 
     if unlikely (stopping) {
-      logging::println(logging::TRACE, "Waiting for all VCPUs to stop at {}: mask = {} (need {} VCPUs)", sim_cycle,
+      logging::println(logging::TRACE, "Waiting for all VCPUs to stop at {}: mask = {} (need {} VCPUs)", this->sim_cycle,
                        stopped.to_string(), contextcount);
       exiting |= (stopped.count() == contextcount);
     }
@@ -1764,7 +1768,7 @@ int OutOfOrderMachine::run() {
   }
 
   logging::println("Exiting out-of-order core at {} commits, {} uops and {} iterations (cycles)",
-                   total_user_insns_committed, total_uops_committed, iterations);
+                   this->total_user_insns_committed, this->total_uops_committed, this->iterations);
 
   OutOfOrderCore& core = *cores[0]; /// only one core for now.
 
@@ -1773,7 +1777,7 @@ int OutOfOrderMachine::run() {
 
     thread->core_to_external_state();
 
-    if (((sim_cycle - thread->last_commit_at_cycle) > 1024) | config.dump_state_now) {
+    if (((this->sim_cycle - thread->last_commit_at_cycle) > 1024) | config.dump_state_now) {
       logging::println(logging::TRACE, "Core State at end for thread {}:", thread->threadid);
       logging::println(logging::TRACE, "{}", thread->ctx);
     }

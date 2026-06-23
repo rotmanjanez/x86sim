@@ -48,10 +48,10 @@ struct OutOfOrderCore;
 
 #define MAX_SMT_CORES 1
 
-struct OutOfOrderMachine : public CoreImpl {
+struct OutOfOrderMachine : public MachineImp {
   std::unique_ptr<OutOfOrderCore> cores[MAX_SMT_CORES];
   std::bitset<MAX_CONTEXTS> stopped;
-  explicit OutOfOrderMachine(const PTLsimConfig& config);
+  explicit OutOfOrderMachine(Context& context, const PTLsimConfig& config);
   ~OutOfOrderMachine() override;
   std::string_view name() const override;
   int run() override;
@@ -1159,26 +1159,7 @@ struct OutOfOrderCoreEvent {
     return this;
   }
 
-  OutOfOrderCoreEvent* fill_commit(int type, const ReorderBufferEntry* rob) {
-    fill(type, rob);
-    if unlikely (isstore(rob->uop.opcode)) {
-      commit.state.st = *rob->lsq;
-    } else {
-      commit.state.reg.rddata = rob->physreg->data;
-      commit.state.reg.rdflags = rob->physreg->flags;
-    }
-    // taken, predtaken only for branches
-    commit.ld_st_truly_unaligned = rob->uop.ld_st_truly_unaligned;
-    commit.pteupdate = rob->pteupdate;
-    // oldphysreg filled in later
-    // oldphysreg_refcount filled in later
-    commit.origvirt = rob->origvirt;
-    commit.total_user_insns_committed = total_user_insns_committed;
-    // target_rip filled in later
-    foreach (i, MAX_OPERANDS)
-      commit.operand_physregs[i] = rob->operands[i]->index();
-    return this;
-  }
+  OutOfOrderCoreEvent* fill_commit(int type, const ReorderBufferEntry* rob);
 
   OutOfOrderCoreEvent* fill_load_store(int type, const ReorderBufferEntry* rob, LoadStoreQueueEntry* inherit_sfr,
                                        Waddr virtaddr) {
@@ -1302,11 +1283,12 @@ struct OutOfOrderCoreEvent {
 };
 
 struct EventLog {
+  MachineImpl& machine;
   OutOfOrderCoreEvent* start;
   OutOfOrderCoreEvent* end;
   OutOfOrderCoreEvent* tail;
 
-  EventLog() {
+  explicit EventLog(MachineImp& machine_) : core(core_) {
     start = null;
     end = null;
     tail = null;
@@ -1321,6 +1303,7 @@ struct EventLog {
       flush();
     }
     OutOfOrderCoreEvent* event = tail;
+    event->cycle = core.sim_cycle;
     tail++;
     return event;
   }
@@ -1608,7 +1591,7 @@ struct OutOfOrderCore {
 #define for_each_operand(iter) foreach (iter, MAX_OPERANDS)
 
   OutOfOrderCore(int coreid_, OutOfOrderMachine& machine_)
-      : coreid(coreid_), machine(machine_), cache_callbacks(*this) {
+      : machine(machine_), coreid(coreid_), eventlog(machine_), caches(machine_), cache_callbacks(*this) {
     threadcount = 0;
   }
 
@@ -1683,6 +1666,27 @@ struct OutOfOrderCore {
   void check_refcounts();
   void check_rob();
 };
+
+inline OutOfOrderCoreEvent* OutOfOrderCoreEvent::fill_commit(int type, const ReorderBufferEntry* rob) {
+  fill(type, rob);
+  if unlikely (isstore(rob->uop.opcode)) {
+    commit.state.st = *rob->lsq;
+  } else {
+    commit.state.reg.rddata = rob->physreg->data;
+    commit.state.reg.rdflags = rob->physreg->flags;
+  }
+  // taken, predtaken only for branches
+  commit.ld_st_truly_unaligned = rob->uop.ld_st_truly_unaligned;
+  commit.pteupdate = rob->pteupdate;
+  // oldphysreg filled in later
+  // oldphysreg_refcount filled in later
+  commit.origvirt = rob->origvirt;
+  commit.total_user_insns_committed = rob->getcore().machine.total_user_insns_committed;
+  // target_rip filled in later
+  foreach (i, MAX_OPERANDS)
+    commit.operand_physregs[i] = rob->operands[i]->index();
+  return this;
+}
 
 //
 // The following configuration has two integer/store clusters with a single cycle

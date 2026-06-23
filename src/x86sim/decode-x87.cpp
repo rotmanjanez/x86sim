@@ -389,24 +389,6 @@ static const byte translate_fcmpcc_to_x87[128] = {
     8, 9, 8, 9, 12, 13, 12, 13, 8, 9, 8, 9, 12, 13, 12, 13, 8, 9, 8, 9, 12, 13, 12, 13, 8, 9, 8, 9, 12, 13, 12, 13,
 };
 
-W64 warned_about_x87 = 0;
-
-void check_warned_about_x87() {
-  warned_about_x87++;
-  if (warned_about_x87 == 16) {
-    logging::println(logging::WARNING,
-                     "\n"
-                     "//\n"
-                     "// NOTE: This program is using a lot of legacy x87 floating point\n"
-                     "// at {} commits {} cycles.\n"
-                     "// PTLsim executes x87 code very sub-optimally: it is HIGHLY recommended\n"
-                     "// that you recompile the program with SSE/SSE2 support and/or update\n"
-                     "// the standard libraries (libc, libm) to an SSE/SSE2-specific version.\n"
-                     "//\n",
-                     total_user_insns_committed, sim_cycle);
-  }
-}
-
 //
 // Access the fpstack structure in the current context (REG_ctx register)
 //
@@ -518,8 +500,6 @@ bool TraceDecoder::decode_x87() {
     if (deform & (!memform)) {
       x87_pop_stack();
     }
-
-    check_warned_about_x87();
 
     break;
   }
@@ -984,8 +964,6 @@ bool TraceDecoder::decode_x87() {
       } else {
         x87_store_stack(REG_fptos, REG_temp0);
       }
-
-      check_warned_about_x87();
     }
     break;
   }

@@ -22,8 +22,6 @@ extern bool smc_isdirty(Waddr mfn);
 extern void smc_setdirty(Waddr mfn);
 extern void smc_cleardirty(Waddr mfn);
 
-extern Context& contextof(int vcpu);
-
 #define contextcount (1)
 #define MAX_CONTEXTS 1
 
@@ -113,12 +111,12 @@ inline CpuidResult default_cpuid(W32 func, W32, int vcpuid) {
 //
 enum { SYSCALL_SEMANTICS_INT80, SYSCALL_SEMANTICS_SYSCALL, SYSCALL_SEMANTICS_SYSENTER };
 
-void handle_syscall_32bit(int semantics);
+void handle_syscall_32bit(Context& context, int semantics);
 
 // x86-64 mode has only one type of system call (the syscall instruction)
-void handle_syscall_64bit();
+void handle_syscall_64bit(Context& context);
 
-CpuidResult handle_cpuid(W32 func, W32 subfunc);
+CpuidResult handle_cpuid(Context& context, W32 func, W32 subfunc);
 
 // Used to determine whether to exit emulation.
 extern bool requested_switch_to_native;

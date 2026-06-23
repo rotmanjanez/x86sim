@@ -17,10 +17,11 @@ namespace x86sim {
 
 struct SequentialCore;
 
-struct SequentialMachine : public CoreImpl {
+struct SequentialMachine : public MachineImp {
   std::unique_ptr<SequentialCore> cores[MAX_CONTEXTS];
 
-  explicit SequentialMachine(const PTLsimConfig& config);
+  explicit SequentialMachine(Context& context, const PTLsimConfig& config);
+  ~SequentialMachine() override;
   std::string_view name() const override;
 
   //
