@@ -82,11 +82,11 @@ struct PTLsimMachine {
 
 struct TransOpBuffer {
   TransOp uops[MAX_TRANSOP_BUFFER_SIZE];
-  uopimpl_func_t synthops[MAX_TRANSOP_BUFFER_SIZE];
+  UopImpl synthops[MAX_TRANSOP_BUFFER_SIZE];
   int index;
   int count;
 
-  bool get(TransOp& uop, uopimpl_func_t& synthop) {
+  bool get(TransOp& uop, UopImpl& synthop) {
     if (!count)
       return false;
     uop = uops[index];
@@ -141,9 +141,8 @@ struct AddrPair {
 
 void init_uops();
 void shutdown_uops();
-uopimpl_func_t get_synthcode_for_uop(int op, int size, bool setflags, int cond, int extshift, bool except,
-                                     bool internal);
-uopimpl_func_t get_synthcode_for_cond_branch(int opcode, int cond, int size, bool except);
+UopImpl get_synthcode_for_uop(int op, int size, bool setflags, int cond, int extshift, bool except, bool internal);
+UopImpl get_synthcode_for_cond_branch(int opcode, int cond, int size, bool except);
 void synth_uops_for_bb(BasicBlock& bb);
 struct PTLsimStats;
 

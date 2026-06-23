@@ -639,7 +639,7 @@ struct BranchPredictorUpdateInfo : public PredictorUpdate {
 struct FetchBufferEntry : public TransOp {
   RIPVirtPhys rip;
   W64 uuid;
-  uopimpl_func_t synthop;
+  UopImpl synthop;
   BranchPredictorUpdateInfo predinfo;
   W16 index;
   W8 threadid;

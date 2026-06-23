@@ -308,11 +308,6 @@ void assist_ldmxcsr(Context& ctx) {
   // Top bit of mxcsr archreg doubles as direction flag and other misc flags: preserve it
   ctx.mxcsr = (ctx.mxcsr & 0xffffffff00000000ULL) | mxcsr;
 
-  // We can't have exceptions going on inside PTLsim: virtualize this feature in uopimpl code
-  // Everything else will be used by real SSE insns inside uopimpls.
-  mxcsr |= MXCSR_EXCEPTION_DISABLE_MASK;
-  x86_set_mxcsr(mxcsr);
-
   //
   // Technically all FP uops should update the sticky exception bits in the mxcsr
   // if marked as such (i.e. non-x87). Presently we don't do this, so hopefully
@@ -357,11 +352,6 @@ void assist_fxrstor(Context& ctx) {
   }
 
   ctx.fxrstor(state);
-
-  // We can't have exceptions going on inside PTLsim: virtualize this feature in uopimpl code
-  // Everything else will be used by real SSE insns inside uopimpls.
-  W32 mxcsr = ctx.mxcsr | MXCSR_EXCEPTION_DISABLE_MASK;
-  x86_set_mxcsr(mxcsr);
 
   ctx.commitarf[REG_rip] = ctx.commitarf[REG_nextrip];
 }

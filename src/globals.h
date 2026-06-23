@@ -227,14 +227,6 @@ struct std::formatter<v8hi> {
   }
 };
 
-inline void x86_set_mxcsr(W32 value) {
-  asm volatile("ldmxcsr %[value]" : : [value] "m"(value));
-}
-inline W32 x86_get_mxcsr() {
-  W32 value;
-  asm volatile("stmxcsr %[value]" : [value] "=m"(value));
-  return value;
-}
 union MXCSR {
   struct {
     W32 ie : 1, de : 1, ze : 1, oe : 1, ue : 1, pe : 1, daz : 1, im : 1, dm : 1, zm : 1, om : 1, um : 1, pm : 1, rc : 2,

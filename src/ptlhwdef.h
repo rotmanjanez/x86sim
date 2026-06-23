@@ -187,13 +187,45 @@ struct IssueState {
   };
 };
 
-struct IssueInput {
-  W64 ra;
-  W64 rb;
-  W64 rc;
-  W16 raflags;
-  W16 rbflags;
-  W16 rcflags;
+struct UopInputs {
+  W64 ra = 0;
+  W64 rb = 0;
+  W64 rc = 0;
+  W16 raflags = 0;
+  W16 rbflags = 0;
+  W16 rcflags = 0;
+  W64 riptaken = 0;
+  W64 ripseq = 0;
+};
+
+struct UopResult {
+  W64 rddata = 0;
+  W16 rdflags = 0;
+  W64 addr = 0;
+};
+
+inline IssueState issue_state_from(const UopResult& result) {
+  IssueState state;
+  state.reg.rddata = result.rddata;
+  state.reg.addr = result.addr;
+  state.reg.rdflags = result.rdflags;
+  return state;
+}
+
+struct UopImpl {
+  using Function = UopResult (*)(const UopInputs& inputs);
+
+  Function function = nullptr;
+
+  constexpr UopImpl() = default;
+  constexpr UopImpl(Function function) : function(function) {}
+
+  explicit constexpr operator bool() const { return function != nullptr; }
+
+  UopResult operator()(const UopInputs& inputs) const {
+    assert(function);
+    return function(inputs);
+  }
 };
 
 struct UserContext : public std::array<W64, ARCHREG_COUNT> {
@@ -1109,9 +1141,6 @@ enum { LDST_ALIGN_NORMAL, LDST_ALIGN_LO, LDST_ALIGN_HI };
 
 struct BasicBlock;
 
-typedef void (*uopimpl_func_t)(IssueState& state, W64 ra, W64 rb, W64 rc, W16 raflags, W16 rbflags, W16 rcflags);
-
-
 //
 // List of all BBs on a physical page (for SMC invalidation)
 // With 60 (or 62 on 32-bit PTLsim) 32-bit entries per page,
@@ -1208,7 +1237,7 @@ struct BasicBlockBase {
   byte type : 4, repblock : 1, invalidblock : 1, call : 1, ret : 1;
   byte marked : 1, mfence : 1, x87 : 1, sse : 1, nondeterministic : 1, brtype : 3;
   W64 usedregs;
-  uopimpl_func_t* synthops;
+  UopImpl* synthops;
   int refcount;
   W32 hitcount;
   W32 predcount;

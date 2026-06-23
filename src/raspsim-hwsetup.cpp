@@ -43,12 +43,6 @@ Raspsim::Raspsim() {
   ctx.running = 1;
   ctx.commitarf[REG_ctx] = (Waddr)&ctx;
   ctx.commitarf[REG_fpstack] = (Waddr)&ctx.fpstack;
-
-  //
-  // Swap the FP control registers to the user process version, so FP uopimpls
-  // can use the real rounding control bits.
-  //
-  x86_set_mxcsr(ctx.mxcsr | MXCSR_EXCEPTION_DISABLE_MASK);
 }
 
 Raspsim::~Raspsim() {

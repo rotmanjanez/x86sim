@@ -501,7 +501,7 @@ bool ThreadContext::fetch() {
     }
 
     FetchBufferEntry& transop = *fetchq.alloc();
-    uopimpl_func_t synthop = null;
+    UopImpl synthop;
 
     assert(current_basic_block->synthops);
 

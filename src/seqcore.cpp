@@ -1149,7 +1149,7 @@ struct SequentialCore {
 
     while ((uopindex < bb->count) & (user_insns < insnlimit)) {
       TransOp uop;
-      uopimpl_func_t synthop = null;
+      UopImpl synthop;
 
       if unlikely (arf[REG_rip] == config.stop_at_rip) {
         return SEQEXEC_EARLY_EXIT;
@@ -1210,10 +1210,11 @@ struct SequentialCore {
       // Issue
       //
       IssueState state;
+      state.reg.rddata = 0;
+      state.reg.addr = 0;
       state.reg.rdflags = 0;
       ctx.exception = 0;
 
-      IssueInput input;
       W64 radata = arf[archreg_remap_table[uop.ra]];
       W64 rbdata = (uop.rb == REG_imm) ? uop.rbimm : arf[archreg_remap_table[uop.rb]];
       W64 rcdata = (uop.rc == REG_imm) ? uop.rcimm : arf[archreg_remap_table[uop.rc]];
@@ -1221,6 +1222,15 @@ struct SequentialCore {
       W16 raflags = arflags[archreg_remap_table[uop.ra]];
       W16 rbflags = arflags[archreg_remap_table[uop.rb]];
       W16 rcflags = arflags[archreg_remap_table[uop.rc]];
+
+      const UopInputs inputs{.ra = radata,
+                             .rb = rbdata,
+                             .rc = rcdata,
+                             .raflags = raflags,
+                             .rbflags = rbflags,
+                             .rcflags = rcflags,
+                             .riptaken = uop.riptaken,
+                             .ripseq = uop.ripseq};
 
       bool ld = isload(uop.opcode);
       bool st = isstore(uop.opcode);
@@ -1285,10 +1295,8 @@ struct SequentialCore {
           continue;
         }
       } else if unlikely (br) {
-        state.brreg.riptaken = uop.riptaken;
-        state.brreg.ripseq = uop.ripseq;
-        assert((void*)synthop);
-        synthop(state, radata, rbdata, rcdata, raflags, rbflags, rcflags);
+        assert(synthop);
+        state = issue_state_from(synthop(inputs));
 
         if unlikely (config.event_log_enabled) {
           SequentialCoreEvent* event = eventlog.add(EVENT_BRANCH, ctx.vcpuid, uop, rip, current_uop_in_macro_op,
@@ -1300,8 +1308,8 @@ struct SequentialCore {
             (uop.opcode == OP_jmp) ? (state.reg.rddata == bb->lasttarget) : (state.reg.rddata == uop.riptaken);
         bb->lasttarget = state.reg.rddata;
       } else {
-        assert((void*)synthop);
-        synthop(state, radata, rbdata, rcdata, raflags, rbflags, rcflags);
+        assert(synthop);
+        state = issue_state_from(synthop(inputs));
         if unlikely (state.reg.rdflags & FLAG_INV)
           ctx.exception = LO32(state.reg.rddata);
 

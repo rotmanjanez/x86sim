@@ -301,6 +301,8 @@ int ReorderBufferEntry::issue() {
   changestate(thread.rob_issued_list[cluster]);
 
   IssueState state;
+  state.reg.rddata = 0;
+  state.reg.addr = 0;
   state.reg.rdflags = 0;
 
   W64 radata = ra.data;
@@ -376,11 +378,15 @@ int ReorderBufferEntry::issue() {
     } else if unlikely (uop.opcode == OP_ld_pre) {
       issueprefetch(state, radata, rbdata, rcdata, uop.cachelevel);
     } else {
-      if unlikely (br) {
-        state.brreg.riptaken = uop.riptaken;
-        state.brreg.ripseq = uop.ripseq;
-      }
-      uop.synthop(state, radata, rbdata, rcdata, ra.flags, rb.flags, rc.flags);
+      assert(uop.synthop);
+      state = issue_state_from(uop.synthop({.ra = radata,
+                                            .rb = rbdata,
+                                            .rc = rcdata,
+                                            .raflags = ra.flags,
+                                            .rbflags = rb.flags,
+                                            .rcflags = rc.flags,
+                                            .riptaken = uop.riptaken,
+                                            .ripseq = uop.ripseq}));
     }
   }
 
