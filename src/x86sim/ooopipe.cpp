@@ -765,8 +765,7 @@ void ThreadContext::rename() {
     ReorderBufferEntry& rob = *ROB.alloc();
     PhysicalRegister* physreg = null;
 
-    LoadStoreQueueEntry* lsqp = (ld | st) ? LSQ.alloc() : null;
-    LoadStoreQueueEntry& lsq = *lsqp;
+    LoadStoreQueueEntry* lsq = (ld | st) ? LSQ.alloc() : null;
 
     rob.reset();
     rob.uop = transop;
@@ -774,14 +773,15 @@ void ThreadContext::rename() {
     rob.cycles_left = FRONTEND_STAGES;
     rob.lsq = null;
     if unlikely (ld | st) {
-      rob.lsq = &lsq;
-      lsq.rob = &rob;
-      lsq.store = st;
-      lsq.lfence = (transop.opcode == OP_mf) & ((transop.extshift & MF_TYPE_LFENCE) != 0);
-      lsq.sfence = (transop.opcode == OP_mf) & ((transop.extshift & MF_TYPE_SFENCE) != 0);
-      lsq.datavalid = 0;
-      lsq.addrvalid = 0;
-      lsq.invalid = 0;
+      assert(lsq);
+      rob.lsq = lsq;
+      lsq->rob = &rob;
+      lsq->store = st;
+      lsq->lfence = (transop.opcode == OP_mf) & ((transop.extshift & MF_TYPE_LFENCE) != 0);
+      lsq->sfence = (transop.opcode == OP_mf) & ((transop.extshift & MF_TYPE_SFENCE) != 0);
+      lsq->datavalid = 0;
+      lsq->addrvalid = 0;
+      lsq->invalid = 0;
       loads_in_flight += (st == 0);
       stores_in_flight += (st == 1);
     }
@@ -1054,9 +1054,10 @@ bool ReorderBufferEntry::find_sources() {
 
   foreach (operand, MAX_OPERANDS) {
     PhysicalRegister& source_physreg = *operands[operand];
-    ReorderBufferEntry& source_rob = *source_physreg.rob;
 
     if likely (source_physreg.state == PHYSREG_WAITING) {
+      assert(source_physreg.rob);
+      ReorderBufferEntry& source_rob = *source_physreg.rob;
       uopids[operand] = source_rob.get_tag();
       preready[operand] = 0;
       operands_still_needed++;
